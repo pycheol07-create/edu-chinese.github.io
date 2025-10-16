@@ -24,7 +24,7 @@ export default async function handler(request, response) {
         }],
       };
     } 
-    // 4. '음성 생성(tts)' 요청일 경우 Text-to-Speech 모델을 호출합니다. (이 부분이 중요!)
+    // 4. '음성 생성(tts)' 요청일 경우 Text-to-Speech 모델을 호출합니다.
     else if (action === 'tts') {
       apiUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
       apiRequestBody = {
@@ -32,12 +32,12 @@ export default async function handler(request, response) {
           text: text
         },
         voice: {
-          languageCode: 'cmn-CN', // 중국어 설정
+          languageCode: 'cmn-CN', // 중국어
           ssmlGender: 'NEUTRAL'
         },
         audioConfig: {
-          audioEncoding: 'LINEAR16', // WAV 형식 호환 인코딩
-          sampleRateHertz: 24000      // 샘플링 레이트
+          audioEncoding: 'LINEAR16',
+          sampleRateHertz: 24000
         }
       };
     } 
@@ -56,15 +56,30 @@ export default async function handler(request, response) {
     });
 
     if (!apiResponse.ok) {
-      // Google API에서 오류가 발생한 경우, 그 내용을 프런트엔드로 전달합니다.
       const errorData = await apiResponse.json();
       console.error('Google API Error:', errorData);
       throw new Error(`Google API 오류: ${errorData.error.message}`);
     }
 
     const data = await apiResponse.json();
+    
+    // Gemini API의 응답 형식과 TTS API의 응답 형식이 다르므로, TTS 응답을 프런트엔드가 기대하는 형식으로 맞춰줍니다.
+    if (action === 'tts') {
+        return response.status(200).json({
+            candidates: [{
+                content: {
+                    parts: [{
+                        inlineData: {
+                            mimeType: 'audio/wav; rate=24000',
+                            data: data.audioContent // TTS API는 'audioContent' 필드에 base64 데이터를 담아줍니다.
+                        }
+                    }]
+                }
+            }]
+        });
+    }
 
-    // 6. 성공적인 응답을 프런트엔드로 다시 보내줍니다.
+    // 6. 성공적인 응답(번역 결과)을 프런트엔드로 다시 보내줍니다.
     return response.status(200).json(data);
 
   } catch (error) {
