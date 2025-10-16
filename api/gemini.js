@@ -1,4 +1,5 @@
-// 파일 위치: /api/gemini.js
+// Vercel 서버에서 실행되는 코드입니다.
+// 이 파일은 절대 사용자에게 노출되지 않습니다.
 
 export default async function handler(request, response) {
   // 1. Vercel에 저장된 환경 변수에서 API 키를 안전하게 가져옵니다.
@@ -27,13 +28,17 @@ export default async function handler(request, response) {
     // 4. '음성 생성(tts)' 요청일 경우 Text-to-Speech 모델을 호출합니다.
     else if (action === 'tts') {
       apiUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
+      
+      // ✨ 이 부분이 빠져있던 TTS 요청 본문입니다. ✨
+      // 자연스러운 남성 WaveNet 목소리로 설정
       apiRequestBody = {
         input: {
           text: text
         },
         voice: {
-          languageCode: 'cmn-CN', // 중국어
-          ssmlGender: 'NEUTRAL'
+          languageCode: 'cmn-CN',
+          name: 'cmn-CN-Wavenet-B', // 자연스러운 남성 WaveNet 목소리
+          ssmlGender: 'MALE'       // 성별: 남성
         },
         audioConfig: {
           audioEncoding: 'LINEAR16',
@@ -56,6 +61,7 @@ export default async function handler(request, response) {
     });
 
     if (!apiResponse.ok) {
+      // Google API에서 오류가 발생한 경우, 그 내용을 프런트엔드로 전달합니다.
       const errorData = await apiResponse.json();
       console.error('Google API Error:', errorData);
       throw new Error(`Google API 오류: ${errorData.error.message}`);
@@ -63,7 +69,8 @@ export default async function handler(request, response) {
 
     const data = await apiResponse.json();
     
-    // Gemini API의 응답 형식과 TTS API의 응답 형식이 다르므로, TTS 응답을 프런트엔드가 기대하는 형식으로 맞춰줍니다.
+    // ✨ 이 부분이 빠져있던 TTS 응답 변환 로직입니다. ✨
+    // TTS API의 응답(data.audioContent)을 프런트엔드가 기대하는 형식으로 맞춰줍니다.
     if (action === 'tts') {
         return response.status(200).json({
             candidates: [{
