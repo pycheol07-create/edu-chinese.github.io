@@ -18,7 +18,8 @@ export default async function handler(request, response) {
 
     // 3. '번역' 요청일 경우 Gemini Pro 모델을 호출합니다.
     if (action === 'translate') {
-      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${apiKey}`;
+      // ★★★ 모델 이름을 최신 'gemini-pro'로 수정했습니다. ★★★
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
       apiRequestBody = {
         contents: [{
           parts: [{ text: `${systemPrompt}\n\n${text}` }]
@@ -29,8 +30,6 @@ export default async function handler(request, response) {
     else if (action === 'tts') {
       apiUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
       
-      // ✨ 이 부분이 빠져있던 TTS 요청 본문입니다. ✨
-      // 자연스러운 남성 WaveNet 목소리로 설정
       apiRequestBody = {
         input: {
           text: text
@@ -69,7 +68,6 @@ export default async function handler(request, response) {
 
     const data = await apiResponse.json();
     
-    // ✨ 이 부분이 빠져있던 TTS 응답 변환 로직입니다. ✨
     // TTS API의 응답(data.audioContent)을 프런트엔드가 기대하는 형식으로 맞춰줍니다.
     if (action === 'tts') {
         return response.status(200).json({
@@ -78,7 +76,7 @@ export default async function handler(request, response) {
                     parts: [{
                         inlineData: {
                             mimeType: 'audio/wav; rate=24000',
-                            data: data.audioContent // TTS API는 'audioContent' 필드에 base64 데이터를 담아줍니다.
+                            data: data.audioContent
                         }
                     }]
                 }
