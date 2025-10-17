@@ -18,8 +18,8 @@ export default async function handler(request, response) {
 
     // 3. '번역' 요청일 경우 Gemini Pro 모델을 호출합니다.
     if (action === 'translate') {
-      // ★★★ API 요청 구조와 모델 이름을 최종 수정했습니다. ★★★
-      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+      // ★★★ 모델 이름을 최신 'gemini-1.5-pro-latest'로 수정했습니다. ★★★
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
       apiRequestBody = {
         contents: [{
           parts: [{ text: text }] // 사용자의 번역 요청 텍스트
