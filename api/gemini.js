@@ -18,8 +18,8 @@ export default async function handler(request, response) {
 
     // 3. '번역' 요청일 경우 Gemini Pro 모델을 호출합니다.
     if (action === 'translate') {
-      // ★★★ 모델 이름을 최신 'gemini-pro'로 수정했습니다. ★★★
-      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+      // ★★★ 모델 이름을 최신 'gemini-1.5-flash-latest'로 수정했습니다. ★★★
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
       apiRequestBody = {
         contents: [{
           parts: [{ text: `${systemPrompt}\n\n${text}` }]
@@ -92,3 +92,4 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: error.message });
   }
 }
+
