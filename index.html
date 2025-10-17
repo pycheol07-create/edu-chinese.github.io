@@ -713,7 +713,7 @@
             }
 
             try {
-                const functionUrl = new URL('/.netlify/functions/gemini', window.location.origin).href;
+                const functionUrl = new URL('/api/gemini', window.location.origin).href;
                 const response = await fetch(functionUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -791,7 +791,7 @@
 [Provide a brief and clear explanation in Korean about why this expression is natural and used by native speakers.]`;
 
             try {
-                const functionUrl = new URL('/.netlify/functions/gemini', window.location.origin).href;
+                const functionUrl = new URL('/api/gemini', window.location.origin).href;
                 const response = await fetch(functionUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -830,6 +830,7 @@
     </script>
 </body>
 </html>
+
 
 
 
