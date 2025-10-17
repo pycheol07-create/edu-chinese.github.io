@@ -18,12 +18,15 @@ export default async function handler(request, response) {
 
     // 3. '번역' 요청일 경우 Gemini Pro 모델을 호출합니다.
     if (action === 'translate') {
-      // ★★★ 모델 이름을 최신 'gemini-1.5-flash-latest'로 수정했습니다. ★★★
-      apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+      // ★★★ API 요청 구조와 모델 이름을 최종 수정했습니다. ★★★
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
       apiRequestBody = {
         contents: [{
-          parts: [{ text: `${systemPrompt}\n\n${text}` }]
+          parts: [{ text: text }] // 사용자의 번역 요청 텍스트
         }],
+        systemInstruction: {
+          parts: [{ text: systemPrompt }] // AI의 역할을 정의하는 시스템 지시사항
+        }
       };
     } 
     // 4. '음성 생성(tts)' 요청일 경우 Text-to-Speech 모델을 호출합니다.
