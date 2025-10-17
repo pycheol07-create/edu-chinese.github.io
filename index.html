@@ -322,11 +322,7 @@
                 <div class="mt-6">
                     <h3 class="text-lg font-bold text-gray-700 border-b pb-1">✍️ 직접 말해보기</h3>
                     <div class="mt-3 bg-sky-50 p-4 rounded-lg relative">
-                                                <button id="show-hint-btn-${index}" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-4 right-4 bg-yellow-300 hover:bg-yellow-400 text-yellow-800 p-2 rounded-full transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 pointer-events-none">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.25 21.75l-.648-1.178a2.625 2.625 0 00-1.933-1.933L12.5 18l1.178-.648a2.625 2.625 0 001.933-1.933L16.25 14.25l.648 1.178a2.625 2.625 0 001.933 1.933L20 18l-1.178.648a2.625 2.625 0 00-1.933 1.933z" />
-                            </svg>
-                        </button>
+                                                <button id="show-hint-btn-${index}" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-4 right-4 bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold py-1 px-2 rounded-lg text-xs whitespace-nowrap">힌트 보기</button>
                                                 <p class="text-md text-gray-700 mb-2">다음 문장을 중국어로 입력해보세요:</p>
                         <p class="text-md font-semibold text-sky-800 mb-3">"${p.practice.korean}"</p>
                         <div class="flex items-center space-x-2">
@@ -373,6 +369,7 @@
             ${practiceHtml}
         `;
         patternContainer.appendChild(card);
+    });
 }
         
         function loadDailyPatterns() {
@@ -833,4 +830,5 @@
     </script>
 </body>
 </html>
+
 
