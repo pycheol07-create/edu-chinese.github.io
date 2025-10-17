@@ -750,7 +750,19 @@
                         if (currentPlayingButton === buttonEl) {
                             currentPlayingButton = null;
                         }
-                    };
+
+                    audioCache[text] = newAudio;
+                    playFromAudioObject(newAudio);
+
+                } else {
+                    throw new Error("API 응답에 오디오 데이터가 없습니다.");
+                }
+            } catch (error) {
+                console.error("TTS Error:", error);
+                showAlert(`음성 생성 중 오류가 발생했습니다: ${error.message}`);
+                buttonEl.classList.remove('is-playing');
+                currentPlayingButton = null;
+            }
 
                     audioCache[text] = newAudio;
                     playFromAudioObject(newAudio);
@@ -832,3 +844,4 @@
     </script>
 </body>
 </html>
+
