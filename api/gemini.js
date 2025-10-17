@@ -18,15 +18,17 @@ export default async function handler(request, response) {
 
     // 3. '번역' 요청일 경우 Gemini Pro 모델을 호출합니다.
     if (action === 'translate') {
-      // ★★★ 모델 이름을 최신 'gemini-1.5-pro-latest'로 수정했습니다. ★★★
-      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
+      // ✅ v1beta → v1 로 수정 (최신 모델은 v1 엔드포인트에서만 지원됨)
+      apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+      
       apiRequestBody = {
-        contents: [{
-          parts: [{ text: text }] // 사용자의 번역 요청 텍스트
-        }],
-        systemInstruction: {
-          parts: [{ text: systemPrompt }] // AI의 역할을 정의하는 시스템 지시사항
-        }
+        contents: [
+          {
+            parts: [
+              { text: `${systemPrompt}\n\n${text}` }
+            ]
+          }
+        ],
       };
     } 
     // 4. '음성 생성(tts)' 요청일 경우 Text-to-Speech 모델을 호출합니다.
@@ -40,7 +42,7 @@ export default async function handler(request, response) {
         voice: {
           languageCode: 'cmn-CN',
           name: 'cmn-CN-Wavenet-B', // 자연스러운 남성 WaveNet 목소리
-          ssmlGender: 'MALE'       // 성별: 남성
+          ssmlGender: 'MALE'        // 성별: 남성
         },
         audioConfig: {
           audioEncoding: 'LINEAR16',
@@ -63,7 +65,6 @@ export default async function handler(request, response) {
     });
 
     if (!apiResponse.ok) {
-      // Google API에서 오류가 발생한 경우, 그 내용을 프런트엔드로 전달합니다.
       const errorData = await apiResponse.json();
       console.error('Google API Error:', errorData);
       throw new Error(`Google API 오류: ${errorData.error.message}`);
@@ -71,7 +72,7 @@ export default async function handler(request, response) {
 
     const data = await apiResponse.json();
     
-    // TTS API의 응답(data.audioContent)을 프런트엔드가 기대하는 형식으로 맞춰줍니다.
+    // TTS API 응답 처리
     if (action === 'tts') {
         return response.status(200).json({
             candidates: [{
@@ -95,4 +96,3 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: error.message });
   }
 }
-
