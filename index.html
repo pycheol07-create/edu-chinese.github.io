@@ -61,6 +61,7 @@
                 </button>
             </div>
             <p class="text-xs text-gray-400 mt-4">매일 자정이 지나면 새로운 패턴이 자동으로 표시됩니다.</p>
+            <p class="text-xs text-gray-400 mt-1">v.2025.10.17-1</p>
         </footer>
     </div>
 
@@ -730,24 +731,25 @@
                 const audioData = audioContent?.inlineData?.data;
                 const mimeType = audioContent?.inlineData?.mimeType;
 
+                // --- 💡 여기가 수정된 부분입니다 💡 ---
                 if (audioData && mimeType) {
-                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
-                    const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 24000;
-                    
-                    const pcmData = base64ToArrayBuffer(audioData);
-                    const wavBlob = pcmToWav(new DataView(pcmData), sampleRate);
-                    const audioUrl = URL.createObjectURL(wavBlob);
+                    // 1. pcmToWav 변환 과정을 모두 삭제합니다.
+                    // 2. Base64 데이터를 디코딩하여 ArrayBuffer로 만듭니다.
+                    const audioDataBuffer = base64ToArrayBuffer(audioData);
+                    // 3. 서버가 알려준 mimeType을 그대로 사용하여 Blob을 생성합니다.
+                    //    (서버가 "audio/mpeg"를 주면 MP3 Blob이, "audio/wav"를 주면 WAV Blob이 됩니다)
+                    const audioBlob = new Blob([audioDataBuffer], { type: mimeType });
+                    const audioUrl = URL.createObjectURL(audioBlob);
                     const newAudio = new Audio(audioUrl);
-                    
-                    // ★★★ 핵심 수정 사항 (2) ★★★
-                    // 오디오 데이터 자체가 잘못되었을 경우 오류를 잡아냄
+                    // --- 💡 수정 끝 💡 ---
+
                     newAudio.onerror = function() {
-                        console.error("Audio format error.");
-                        showAlert("오디오 파일 형식 오류가 발생했습니다.");
-                        buttonEl.classList.remove('is-playing');
-                        if (currentPlayingButton === buttonEl) {
-                           currentPlayingButton = null;
-                        }
+                        console.error("Audio format error. MimeType:", mimeType);
+                        showAlert(`오디오 파일 형식 오류가 발생했습니다. (Type: ${mimeType})`);
+                        buttonEl.classList.remove('is-playing');
+                        if (currentPlayingButton === buttonEl) {
+                            currentPlayingButton = null;
+                        }
                     };
 
                     audioCache[text] = newAudio;
@@ -762,7 +764,6 @@
                 buttonEl.classList.remove('is-playing');
                 currentPlayingButton = null;
             }
-        }
 
         document.body.addEventListener('click', (e) => {
             const ttsButton = e.target.closest('.tts-btn');
@@ -822,6 +823,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // ver.2025.10.17-1
             displayDate();
             initializeCounts();
             loadDailyPatterns();
@@ -830,7 +832,3 @@
     </script>
 </body>
 </html>
-
-
-
-
