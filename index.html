@@ -59,6 +59,9 @@
                 <button id="all-patterns-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 shadow-lg text-lg">
                     전체 패턴 보기
                 </button>
+                <button id="chat-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 shadow-lg text-lg">
+                    대화하기
+                </button>
             </div>
             <p class="text-xs text-gray-400 mt-4">매일 자정이 지나면 새로운 패턴이 자동으로 표시됩니다.</p>
             <p class="text-xs text-gray-400 mt-1">v.2025.10.17-1</p>
@@ -122,6 +125,29 @@
         </div>
     </div>
 
+    <!-- AI와 대화하기 팝업 (모달) -->
+    <div id="chat-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 relative flex flex-col max-h-[90vh]">
+            <div class="flex-shrink-0 flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">AI와 대화하기 🇨🇳</h2>
+                <button id="close-chat-btn" class="p-1 rounded-full hover:bg-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="chat-history" class="flex-grow bg-gray-50 p-4 rounded-lg overflow-y-auto mb-4 space-y-4">
+                <!-- 채팅 메시지가 여기에 표시됩니다 -->
+            </div>
+            <div class="flex-shrink-0">
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="chat-input" class="w-full p-2 border border-gray-300 rounded-md chinese-text" placeholder="중국어로 메시지를 입력하세요...">
+                    <button id="send-chat-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">전송</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const patternContainer = document.getElementById('pattern-container');
         const currentDateEl = document.getElementById('current-date');
@@ -143,6 +169,15 @@
         const allPatternsModal = document.getElementById('all-patterns-modal');
         const closeAllPatternsBtn = document.getElementById('close-all-patterns-btn');
         const allPatternsList = document.getElementById('all-patterns-list');
+
+        // --- AI 채팅 모달 관련 요소 ---
+        const chatBtn = document.getElementById('chat-btn');
+        const chatModal = document.getElementById('chat-modal');
+        const closeChatBtn = document.getElementById('close-chat-btn');
+        const chatHistory = document.getElementById('chat-history');
+        const chatInput = document.getElementById('chat-input');
+        const sendChatBtn = document.getElementById('send-chat-btn');
+        let conversationHistory = [];
 
         const allPatterns = [
             {"pattern":"A是A, 但是B","pinyin":"A shì A, dànshì B","meaning":"A는 A지만, B하다","structure":"형용사/동사 + 是 + 형용사/동사, 但是 + 문장","examples":[{"chinese":"好看是好看, 但是太贵了。","pinyin":"hǎokàn shì hǎokàn, dànshì tài guì le.","korean":"예쁘긴 예쁜데, 너무 비싸요."},{"chinese":"方便是方便, 但是不安全。","pinyin":"fāngbiàn shì fāngbiàn, dànshì bù ānquán.","korean":"편리하긴 편리한데, 안전하지 않아요."}],"vocab":[{"word":"好看","pinyin":"hǎokàn","meaning":"예쁘다"},{"word":"但是","pinyin":"dànshì","meaning":"하지만"},{"word":"方便","pinyin":"fāngbiàn","meaning":"편리하다"},{"word":"安全","pinyin":"ānquán","meaning":"안전하다"}], "practice": {"korean": "이 옷, 싸기는 싼데 품질이 별로야.", "chinese": "这件衣服便宜是便宜, 但是质量不太好。", "pinyin": "zhè jiàn yīfu piányi shì piányi, dànshì zhìliàng bú tài hǎo."}, "practiceVocab": [{"word":"衣服","pinyin":"yīfu","meaning":"옷"},{"word":"便宜","pinyin":"piányi","meaning":"싸다"},{"word":"质量","pinyin":"zhìliàng","meaning":"품질"}]},
@@ -563,6 +598,103 @@
                     allPatternsModal.classList.add('hidden');
                     window.scrollTo(0, 0);
                 }
+            }
+        });
+
+        // --- AI 채팅 관련 함수 및 이벤트 리스너 ---
+        function addMessageToHistory(sender, messageData) {
+            const messageElement = document.createElement('div');
+            if (sender === 'user') {
+                messageElement.className = 'flex justify-end';
+                messageElement.innerHTML = `<div class="bg-purple-500 text-white p-3 rounded-lg max-w-xs">${messageData.text}</div>`;
+            } else { // AI
+                messageElement.className = 'flex justify-start';
+                messageElement.innerHTML = `
+                    <div class="bg-white p-3 rounded-lg max-w-xs border">
+                        <div class="flex items-center">
+                            <p class="text-lg chinese-text text-gray-800">${messageData.chinese}</p>
+                            <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-500">${messageData.pinyin}</p>
+                        <p class="text-sm text-gray-600 border-t mt-2 pt-2">${messageData.korean}</p>
+                    </div>
+                `;
+            }
+            chatHistory.appendChild(messageElement);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        async function handleSendMessage() {
+            const userInput = chatInput.value.trim();
+            if (!userInput) return;
+
+            addMessageToHistory('user', { text: userInput });
+            chatInput.value = '';
+            
+            const loadingElement = document.createElement('div');
+            loadingElement.className = 'flex justify-start';
+            loadingElement.id = 'chat-loading';
+            loadingElement.innerHTML = `<div class="bg-white p-3 rounded-lg border"><div class="loader"></div></div>`;
+            chatHistory.appendChild(loadingElement);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            try {
+                conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
+                
+                const response = await fetch('/api/gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'chat',
+                        text: userInput,
+                        history: conversationHistory
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API call failed: ${response.status} - ${errorText}`);
+                }
+
+                const result = await response.json();
+                const aiResponseText = result.candidates[0].content.parts[0].text;
+                const aiResponseData = JSON.parse(aiResponseText);
+                
+                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+
+                addMessageToHistory('ai', aiResponseData);
+
+            } catch (error) {
+                console.error('Chat error:', error);
+                showAlert(`대화 중 오류가 발생했습니다: ${error.message}`);
+            } finally {
+                const loader = document.getElementById('chat-loading');
+                if (loader) {
+                    loader.remove();
+                }
+            }
+        }
+
+        chatBtn.addEventListener('click', () => {
+            chatModal.classList.remove('hidden');
+            if (conversationHistory.length === 0) {
+                 addMessageToHistory('ai', {
+                    chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！',
+                    pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!',
+                    korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!'
+                });
+            }
+        });
+        closeChatBtn.addEventListener('click', () => chatModal.classList.add('hidden'));
+        sendChatBtn.addEventListener('click', handleSendMessage);
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSendMessage();
             }
         });
 
