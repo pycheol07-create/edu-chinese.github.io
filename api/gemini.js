@@ -59,7 +59,8 @@ export default async function handler(request, response) {
 - "pinyin": The pinyin for your Chinese response.
 - "korean": A natural Korean translation of your Chinese response.`;
 
-        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+        // --- 여기를 수정했습니다 ---
+        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
         
         // 이전 대화 기록을 함께 보내 AI가 맥락을 이해하도록 합니다.
         const contents = [
