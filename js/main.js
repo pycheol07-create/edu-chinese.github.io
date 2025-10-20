@@ -344,9 +344,22 @@ async function handleSendMessage() {
         
         // API 응답 구조가 gemini.js와 일치해야 함
         const aiResponseText = result.candidates[0].content.parts[0].text;
-        const aiResponseData = JSON.parse(aiResponseText);
         
-        // 대화 기록에 AI 응답 추가
+        // AI 응답이 유효한 JSON인지 확인
+        let aiResponseData;
+        try {
+            aiResponseData = JSON.parse(aiResponseText);
+        } catch (e) {
+            // JSON 파싱 실패 시, 텍스트 그대로를 보여주는 JSON 객체 생성
+            console.error("AI response is not valid JSON:", aiResponseText);
+            aiResponseData = {
+                chinese: aiResponseText,
+                pinyin: "(AI 응답 형식이 잘못되었습니다)",
+                korean: "(번역 오류)"
+            };
+        }
+        
+        // 대화 기록에 AI 응답 추가 (파싱된 텍스트 원본)
         conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
         
         addMessageToHistory('ai', aiResponseData);
@@ -391,7 +404,20 @@ Do not include markdown backticks.`;
         });
         
         const translationText = result.candidates[0].content.parts[0].text;
-        const translationData = JSON.parse(translationText);
+        
+        // AI 응답이 유효한 JSON인지 확인
+        let translationData;
+         try {
+            translationData = JSON.parse(translationText);
+        } catch (e) {
+            console.error("AI response is not valid JSON:", translationText);
+            // JSON 파싱 실패 시, 텍스트 그대로를 보여주는 JSON 객체 생성
+            translationData = {
+                chinese: translationText,
+                pinyin: "(AI 응답 형식이 잘못되었습니다)",
+                alternatives: []
+            };
+        }
         
         let alternativesHtml = '';
         if (translationData.alternatives && translationData.alternatives.length > 0) {
@@ -497,6 +523,8 @@ function setupEventListeners() {
             document.getElementById(`show-hint-btn-${index}`).style.display = 'none';
 
         } 
+        
+        // ------------------- [BUG FIX START] -------------------
         // 힌트 보기 버튼
         else if (target.classList.contains('show-hint-btn')) {
             const button = target;
@@ -506,9 +534,10 @@ function setupEventListeners() {
 
             const patternData = allPatterns.find(p => p.pattern === patternString);
 
-            // 'practice' 객체 안에 'practiceVocab'이 있는지 확인
-            if (patternData && patternData.practice && patternData.practice.practiceVocab && patternData.practice.practiceVocab.length > 0) {
-                const shuffledVocab = [...patternData.practice.practiceVocab].sort(() => 0.5 - Math.random());
+            // [수정] 'patternData.vocab' (패턴의 주요 단어)를 힌트로 사용합니다.
+            // (기존: patternData.practice.practiceVocab)
+            if (patternData && patternData.vocab && patternData.vocab.length > 0) {
+                const shuffledVocab = [...patternData.vocab].sort(() => 0.5 - Math.random()); // [수정]
                 
                 const hintsHtml = shuffledVocab.map(hint => `
                     <div class="flex items-baseline" style="line-height: 1.3;">
@@ -536,6 +565,8 @@ function setupEventListeners() {
             button.disabled = true;
             button.classList.add('opacity-50', 'cursor-not-allowed');
         } 
+        // ------------------- [BUG FIX END] -------------------
+        
         // 다시하기 버튼
         else if (target.classList.contains('retry-practice-btn')) {
             const index = target.dataset.practiceIndex;
@@ -688,3 +719,5 @@ export function initializeApp(patterns) {
 // DOMContentLoaded는 initializeApp 내에서 처리되므로,
 // patternsData를 즉시 전달하여 앱 초기화 로직을 설정합니다.
 initializeApp(patternsData);
+
+// v.2025.10.20_1008-2
