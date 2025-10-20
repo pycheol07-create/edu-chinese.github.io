@@ -68,19 +68,19 @@ export default async function handler(request, response) {
         ];
         apiRequestBody = { contents };
     }
-    // --- [FEATURE UPDATE START: Suggest Reply with Pinyin] ---
+    // --- [FEATURE UPDATE START: Suggest Reply with Pinyin & Korean] ---
     else if (action === 'suggest_reply') {
-        // [수정] 시스템 프롬프트: suggestions 배열 안에 chinese와 pinyin을 포함한 객체를 넣도록 요청
+        // [수정] 시스템 프롬프트: korean 필드 추가 요청
         const suggestSystemPrompt = `Based on the previous conversation history, suggest 1 or 2 simple and natural next replies in Chinese for the user who is learning Chinese. The user just received the last message from the AI model.
-- Provide only the suggested replies with their pinyin.
+- Provide only the suggested replies with their pinyin and Korean meaning.
 - Your entire response MUST be a single, valid JSON object containing a key "suggestions" which is an array of objects.
-- Each object in the "suggestions" array must have two keys: "chinese" (string) and "pinyin" (string).
-- Example: {"suggestions": [{"chinese": "你好!", "pinyin": "Nǐ hǎo!"}, {"chinese": "谢谢你。", "pinyin": "Xièxie nǐ."}]}
+- Each object in the "suggestions" array must have three keys: "chinese" (string), "pinyin" (string), and "korean" (string, the Korean meaning).
+- Example: {"suggestions": [{"chinese": "你好!", "pinyin": "Nǐ hǎo!", "korean": "안녕하세요!"}, {"chinese": "谢谢你。", "pinyin": "Xièxie nǐ.", "korean": "고마워요."}]}
 - Do not include any other text or markdown backticks.`;
 
          const contents = [
             { role: "user", parts: [{ text: suggestSystemPrompt }] },
-            { role: "model", parts: [{ text: "Okay, I will provide reply suggestions including pinyin in the specified JSON format." }] }, // AI의 이해 확인 응답 수정
+            { role: "model", parts: [{ text: "Okay, I will provide reply suggestions including pinyin and Korean meaning in the specified JSON format." }] }, // AI 응답 수정
             ...history
         ];
         apiRequestBody = { contents };
@@ -120,7 +120,8 @@ export default async function handler(request, response) {
     // 번역, 채팅, 답변 추천 응답 처리 (v1 응답 구조 확인)
     if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
         console.error("Invalid response structure from Google API:", data);
-        if (data.promptFeedback && data.promptFeedback.blockReason) {
+        // ... (이전 오류 처리 로직 동일) ...
+         if (data.promptFeedback && data.promptFeedback.blockReason) {
              throw new Error(`AI 응답 생성 실패 (안전 필터): ${data.promptFeedback.blockReason}`);
         } else if (data.candidates && data.candidates.length > 0 && data.candidates[0].finishReason && data.candidates[0].finishReason !== 'STOP') {
              throw new Error(`AI 응답 생성 중단됨: ${data.candidates[0].finishReason}`);
@@ -130,27 +131,34 @@ export default async function handler(request, response) {
         throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다. (candidates 확인 실패)");
     }
 
-    // --- [FEATURE UPDATE START: Suggest Reply with Pinyin Parsing] ---
+    // --- [BUG FIX & FEATURE UPDATE START: Suggest Reply Parsing] ---
      if (action === 'suggest_reply') {
         let suggestionData = null;
         let foundSuggestions = false;
-        // 여러 'parts' 중에서 'suggestions' 키를 포함하는 JSON 문자열 찾기
+        // 여러 'parts' 중에서 'suggestions' 키를 포함하는 유효한 JSON 문자열 찾기
         for (const part of data.candidates[0].content.parts) {
             try {
-                const parsedPart = JSON.parse(part.text);
-                // suggestions 키가 있고, 배열이며, 배열의 첫 요소가 chinese와 pinyin을 포함하는 객체인지 확인
+                // 앞뒤 공백 및 줄바꿈 제거 후 파싱 시도
+                const cleanedText = part.text.trim();
+                // 가끔 마크다운 ```json ... ``` 이 포함될 수 있으므로 제거
+                const jsonText = cleanedText.replace(/^```json\s*|\s*```$/g, '');
+                const parsedPart = JSON.parse(jsonText);
+
+                // suggestions 키가 있고, 배열이며, 비어있지 않고, 모든 요소가 필요한 키를 포함하는지 확인
                 if (parsedPart.suggestions && Array.isArray(parsedPart.suggestions) &&
-                    parsedPart.suggestions.length > 0 && // 배열이 비어있지 않고
-                    typeof parsedPart.suggestions[0] === 'object' && // 첫 요소가 객체이며
-                    parsedPart.suggestions[0].hasOwnProperty('chinese') && // 'chinese' 키가 있고
-                    parsedPart.suggestions[0].hasOwnProperty('pinyin')      // 'pinyin' 키가 있는지
-                   )
+                    parsedPart.suggestions.length > 0 &&
+                    parsedPart.suggestions.every(item => // [수정] every()로 모든 요소 검사
+                        typeof item === 'object' &&
+                        item.hasOwnProperty('chinese') &&
+                        item.hasOwnProperty('pinyin') &&
+                        item.hasOwnProperty('korean') // [추가] korean 키 확인
+                    ))
                 {
                     suggestionData = parsedPart;
                     foundSuggestions = true;
-                    break; // 찾았으면 반복 중단
+                    break; // 유효한 데이터 찾으면 반복 중단
                 } else if (parsedPart.suggestions && Array.isArray(parsedPart.suggestions) && parsedPart.suggestions.length === 0) {
-                    // suggestions 배열은 있지만 비어있는 경우도 정상 처리
+                    // 빈 배열도 정상으로 간주
                     suggestionData = parsedPart;
                     foundSuggestions = true;
                     break;
@@ -160,15 +168,14 @@ export default async function handler(request, response) {
             }
         }
 
-        if (foundSuggestions) {
-            // 빈 배열일 수도 있으므로 suggestions 키 존재 여부만 확인 후 반환
+        if (foundSuggestions && suggestionData) {
             return response.status(200).json(suggestionData);
         } else {
-            console.error("Could not find valid 'suggestions' JSON object array in any response parts:", JSON.stringify(data.candidates[0].content.parts, null, 2));
-            throw new Error("AI로부터 유효한 답변 추천(병음 포함) JSON 형식을 찾지 못했습니다.");
+            console.error("Could not find valid 'suggestions' JSON object array with required keys (chinese, pinyin, korean) in any response parts:", JSON.stringify(data.candidates[0].content.parts, null, 2));
+            throw new Error("AI로부터 유효한 답변 추천(병음, 뜻 포함) JSON 형식을 찾지 못했습니다."); // 오류 메시지 수정
         }
     }
-    // --- [FEATURE UPDATE END] ---
+    // --- [BUG FIX & FEATURE UPDATE END] ---
 
     // 번역 및 채팅은 data 전체를 반환 (프론트엔드에서 파싱)
     return response.status(200).json(data);
@@ -179,4 +186,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1056-9
+// v.2025.10.20_1101-10
