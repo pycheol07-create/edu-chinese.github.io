@@ -19,7 +19,7 @@ function initializeDOM() {
     patternContainer = document.getElementById('pattern-container');
     currentDateEl = document.getElementById('current-date');
     newPatternBtn = document.getElementById('new-pattern-btn');
-    
+
     // 번역기 모달
     openTranslatorBtn = document.getElementById('open-translator-btn');
     translatorModal = document.getElementById('translator-modal');
@@ -27,18 +27,18 @@ function initializeDOM() {
     translateBtn = document.getElementById('translate-btn');
     koreanInput = document.getElementById('korean-input');
     translationResult = document.getElementById('translation-result');
-    
+
     // 커스텀 알림
     customAlertModal = document.getElementById('custom-alert-modal');
     customAlertMessage = document.getElementById('custom-alert-message');
     customAlertCloseBtn = document.getElementById('custom-alert-close-btn');
-    
+
     // 전체 패턴 모달
     allPatternsBtn = document.getElementById('all-patterns-btn');
     allPatternsModal = document.getElementById('all-patterns-modal');
     closeAllPatternsBtn = document.getElementById('close-all-patterns-btn');
     allPatternsList = document.getElementById('all-patterns-list');
-    
+
     // 채팅 모달
     chatBtn = document.getElementById('chat-btn');
     chatModal = document.getElementById('chat-modal');
@@ -66,7 +66,7 @@ async function callGeminiAPI(action, body) {
         const errorData = await response.json();
         throw new Error(errorData.error || `API ${action} failed`);
     }
-    
+
     return response.json();
 }
 
@@ -87,7 +87,7 @@ async function playTTS(text, buttonElement) {
     // 새 버튼 활성화
     currentPlayingButton = buttonElement;
     buttonElement.classList.add('is-playing');
-    
+
     try {
         let audioData;
         if (audioCache[text]) {
@@ -95,21 +95,21 @@ async function playTTS(text, buttonElement) {
         } else {
             const result = await callGeminiAPI('tts', { text });
             // API 응답 구조에 맞게 수정 (api/gemini.js의 응답 형식 기준)
-            audioData = result.audioContent; 
+            audioData = result.audioContent;
             audioCache[text] = audioData;
         }
 
         const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
         currentAudio = audio;
-        
+
         audio.play();
-        
+
         audio.onended = () => {
             buttonElement.classList.remove('is-playing');
             currentAudio = null;
             currentPlayingButton = null;
         };
-        
+
         audio.onerror = (e) => {
             console.error('Audio playback error:', e);
             showAlert('오디오 재생 중 오류가 발생했습니다.');
@@ -158,7 +158,7 @@ function renderPatterns(patterns, showIndex = false) {
         const count = learningCounts[p.pattern] || 0;
         const card = document.createElement('div');
         card.className = 'bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300';
-        
+
         const examplesHtml = p.examples.map(ex => `
             <div class="mt-3">
                 <div class="flex items-center">
@@ -183,16 +183,16 @@ function renderPatterns(patterns, showIndex = false) {
         `).join('');
 
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
-        
+
+        // ------------------- [ICON UPDATE START] -------------------
         const practiceHtml = p.practice ? `
             <div class="mt-6">
                 <h3 class="text-lg font-bold text-gray-700 border-b pb-1">✍️ 직접 말해보기</h3>
                 <div class="mt-3 bg-sky-50 p-4 rounded-lg relative">
-                    <button id="show-hint-btn-${index}" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-3 right-3 bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold py-1 px-2 rounded-lg text-xs whitespace-nowrap flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.25 21.75l-.648-1.178a2.625 2.625 0 00-1.933-1.933L12.5 18l1.178-.648a2.625 2.625 0 001.933-1.933L16.25 14.25l.648 1.178a2.625 2.625 0 001.933 1.933L20 18l-1.178.648a2.625 2.625 0 00-1.933 1.933z" />
+                    <button id="show-hint-btn-${index}" title="힌트 보기" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-3 right-3 bg-gray-300 hover:bg-gray-400 text-gray-700 p-1.5 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" />
                         </svg>
-                        힌트
                     </button>
                     <p class="text-md text-gray-700 mb-2">다음 문장을 중국어로 입력해보세요:</p>
                     <p class="text-md font-semibold text-sky-800 mb-3">"${p.practice.korean}"</p>
@@ -205,6 +205,7 @@ function renderPatterns(patterns, showIndex = false) {
                 </div>
             </div>
         ` : '';
+        // ------------------- [ICON UPDATE END] -------------------
 
         card.innerHTML = `
             <div class="flex items-center justify-between mb-3">
@@ -224,7 +225,7 @@ function renderPatterns(patterns, showIndex = false) {
                 <p class="text-lg text-blue-700 font-semibold mb-2">${p.meaning}</p>
                 <p class="text-sm text-gray-500 bg-gray-100 p-2 rounded-md"><b>🤔 어떻게 사용할까요?</b> ${p.structure || '구조 정보 없음'}</p>
             </div>
-            
+
             <div class="mt-4">
                 <h3 class="text-lg font-bold text-gray-700 border-b pb-1">💡 예문 살펴보기</h3>
                 ${examplesHtml}
@@ -324,7 +325,7 @@ async function handleSendMessage() {
 
     addMessageToHistory('user', { text: userInput });
     chatInput.value = '';
-    
+
     // 로딩 인디케이터 추가
     const loadingElement = document.createElement('div');
     loadingElement.className = 'flex justify-start';
@@ -336,15 +337,15 @@ async function handleSendMessage() {
     try {
         // 대화 기록에 사용자 메시지 추가
         conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
-        
+
         const result = await callGeminiAPI('chat', {
             text: userInput,
             history: conversationHistory
         });
-        
+
         // API 응답 구조가 gemini.js와 일치해야 함
         const aiResponseText = result.candidates[0].content.parts[0].text;
-        
+
         // AI 응답이 유효한 JSON인지 확인
         let aiResponseData;
         try {
@@ -358,10 +359,10 @@ async function handleSendMessage() {
                 korean: "(번역 오류)"
             };
         }
-        
+
         // 대화 기록에 AI 응답 추가 (파싱된 텍스트 원본)
         conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
-        
+
         addMessageToHistory('ai', aiResponseData);
 
     } catch (error) {
@@ -376,7 +377,6 @@ async function handleSendMessage() {
     }
 }
 
-// ------------------- [FEATURE UPDATE START] -------------------
 // --- 번역기 함수 ---
 async function handleTranslation() {
     const text = koreanInput.value.trim();
@@ -405,9 +405,9 @@ Do not include markdown backticks.`;
             text,
             systemPrompt
         });
-        
+
         const translationText = result.candidates[0].content.parts[0].text;
-        
+
         // AI 응답이 유효한 JSON인지 확인
         let translationData;
          try {
@@ -422,7 +422,7 @@ Do not include markdown backticks.`;
                 explanation: "(AI 응답 형식이 잘못되어 설명을 가져올 수 없습니다.)" // [추가]
             };
         }
-        
+
         // [수정] 'alternatives' 렌더링 로직
         let alternativesHtml = '';
         if (translationData.alternatives && translationData.alternatives.length > 0) {
@@ -467,12 +467,11 @@ Do not include markdown backticks.`;
         translateBtn.disabled = false;
     }
 }
-// ------------------- [FEATURE UPDATE END] -------------------
 
 
 // --- 메인 이벤트 리스너 설정 ---
 function setupEventListeners() {
-    
+
     // 새로운 패턴 보기
     newPatternBtn.addEventListener('click', () => {
          const newPatterns = getRandomPatterns();
@@ -484,29 +483,29 @@ function setupEventListeners() {
     // 패턴 카드 내부 이벤트 (이벤트 위임)
     patternContainer.addEventListener('click', (e) => {
         const target = e.target;
-        
+
         // 학습 완료 버튼
         if (target.classList.contains('learn-btn')) {
             const pattern = target.dataset.pattern;
             learningCounts[pattern] = (learningCounts[pattern] || 0) + 1;
             saveCounts();
             target.nextElementSibling.querySelector('.count-display').textContent = learningCounts[pattern];
-        } 
+        }
         // 정답 확인 버튼
         else if (target.classList.contains('check-practice-btn')) {
             const button = target;
             const inputId = button.dataset.inputId;
             const index = inputId.split('-').pop();
-            
+
             const correctAnswer = button.dataset.answer;
             const correctPinyin = button.dataset.pinyin;
             const userInput = document.getElementById(inputId).value.trim();
             const resultDiv = document.getElementById(`practice-result-${index}`);
-            
+
             const normalize = (str) => str.replace(/[.,。，？！？!]/g, '').replace(/\s+/g, '');
 
             let resultMessageHtml = '';
-            
+
             const answerHtml = `
                 <div class="mt-2 p-2 bg-gray-100 rounded text-left">
                     <p class="text-sm">정답:</p>
@@ -537,15 +536,15 @@ function setupEventListeners() {
                     다시하기
                 </button>
             `;
-            
+
             button.style.display = 'none';
             document.getElementById(`show-hint-btn-${index}`).style.display = 'none';
 
-        } 
-        
+        }
+
         // 힌트 보기 버튼
-        else if (target.classList.contains('show-hint-btn')) {
-            const button = target;
+        else if (target.closest('.show-hint-btn')) { // 아이콘 클릭 시에도 동작하도록 closest 사용
+            const button = target.closest('.show-hint-btn');
             const patternString = button.dataset.patternString;
             const hintTargetId = button.dataset.hintTarget;
             const hintDiv = document.getElementById(hintTargetId);
@@ -555,7 +554,7 @@ function setupEventListeners() {
             // [수정] 'patternData.vocab' (패턴의 주요 단어)를 힌트로 사용합니다.
             if (patternData && patternData.vocab && patternData.vocab.length > 0) {
                 const shuffledVocab = [...patternData.vocab].sort(() => 0.5 - Math.random()); // [수정]
-                
+
                 const hintsHtml = shuffledVocab.map(hint => `
                     <div class="flex items-baseline" style="line-height: 1.3;">
                         <span class="inline-block w-[40%] font-medium chinese-text pr-2">${hint.word}</span>
@@ -568,21 +567,21 @@ function setupEventListeners() {
                 <div class="bg-white/50 rounded-md p-2 text-left">
                     <div class="flex items-center mb-1">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-0.5 text-yellow-500">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.572L16.25 21.75l-.648-1.178a2.625 2.625 0 00-1.933-1.933L12.5 18l1.178-.648a2.625 2.625 0 001.933-1.933L16.25 14.25l.648 1.178a2.625 2.625 0 001.933 1.933L20 18l-1.178.648a2.625 2.625 0 00-1.933 1.933z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" />
                         </svg>
                         <span class="font-semibold text-sm text-gray-700">힌트</span>
                     </div>
                     <div class="border-t border-gray-300/50 pt-1">${hintsHtml}</div>
                 </div>`;
-                
+
             } else {
                 hintDiv.innerHTML = `<p class="text-sm text-gray-500">이 문장에 대한 핵심 단어 정보가 없습니다.</p>`;
             }
-            
+
             button.disabled = true;
             button.classList.add('opacity-50', 'cursor-not-allowed');
-        } 
-        
+        }
+
         // 다시하기 버튼
         else if (target.classList.contains('retry-practice-btn')) {
             const index = target.dataset.practiceIndex;
@@ -606,21 +605,21 @@ function setupEventListeners() {
             }
         }
     });
-    
+
     // '직접 말해보기' Enter 키 이벤트
     patternContainer.addEventListener('keydown', (e) => {
         if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') {
-            e.preventDefault(); 
+            e.preventDefault();
             const checkButton = e.target.nextElementSibling;
             if (checkButton && checkButton.classList.contains('check-practice-btn')) {
                 checkButton.click();
             }
         }
     });
-    
+
     // --- 번역기 모달 이벤트 ---
     openTranslatorBtn.addEventListener('click', () => translatorModal.classList.remove('hidden'));
-    
+
     closeTranslatorBtn.addEventListener('click', () => {
         translatorModal.classList.add('hidden');
         if (currentAudio) {
@@ -635,7 +634,7 @@ function setupEventListeners() {
             handleTranslation();
         }
     });
-    
+
     // 번역 결과 영역의 TTS 버튼 (이벤트 위임)
     translationResult.addEventListener('click', (e) => {
         const ttsButton = e.target.closest('.tts-btn');
@@ -682,21 +681,21 @@ function setupEventListeners() {
                 korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!'
             });
              // AI 첫 메시지 대화 기록에 추가
-             conversationHistory.push({ 
-                 role: 'model', 
+             conversationHistory.push({
+                 role: 'model',
                  parts: [{ text: JSON.stringify({
                     chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！',
                     pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!',
                     korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!'
-                }) }] 
+                }) }]
             });
         }
     });
 
     closeChatBtn.addEventListener('click', () => chatModal.classList.add('hidden'));
-    
+
     sendChatBtn.addEventListener('click', handleSendMessage);
-    
+
     chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -736,4 +735,4 @@ export function initializeApp(patterns) {
 // patternsData를 즉시 전달하여 앱 초기화 로직을 설정합니다.
 initializeApp(patternsData);
 
-// v.2025.10.20_1015-3
+// v.2025.10.20_1022-4
