@@ -37,6 +37,11 @@
             color: #3b82f6; /* Tailwind blue-500 */
             animation: pulse 1.5s ease-in-out infinite;
         }
+        /* 마이크 녹음 중 애니메이션 */
+        .mic-btn.is-recording svg {
+            color: #ef4444; /* Tailwind red-500 */
+            animation: pulse 1.2s ease-in-out infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -48,8 +53,7 @@
         </header>
 
         <main id="pattern-container" class="space-y-6">
-            <!-- 중국어 패턴 카드가 여기에 동적으로 추가됩니다. -->
-        </main>
+            </main>
 
         <footer class="text-center mt-8">
             <div class="flex justify-center items-center space-x-4">
@@ -64,18 +68,15 @@
                 </button>
             </div>
             <p class="text-xs text-gray-400 mt-4">매일 자정이 지나면 새로운 패턴이 자동으로 표시됩니다.</p>
-            <!-- v.2025.10.17-final -->
-        </footer>
+            </footer>
     </div>
 
-    <!-- "이렇게 말하고 싶어요!" 플로팅 버튼 -->
     <button id="open-translator-btn" class="fixed bottom-6 right-6 bg-green-500 hover:bg-green-600 text-white font-bold rounded-full w-16 h-16 flex items-center justify-center shadow-xl transition-transform transform hover:scale-110">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
         </svg>
     </button>
-    
-    <!-- 번역기 팝업 (모달) -->
+
     <div id="translator-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 relative flex flex-col max-h-[90vh]">
             <div class="flex-shrink-0">
@@ -97,7 +98,6 @@
         </div>
     </div>
 
-    <!-- Custom Alert Modal -->
     <div id="custom-alert-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 text-center">
             <p id="custom-alert-message" class="text-gray-700 mb-4"></p>
@@ -105,7 +105,6 @@
         </div>
     </div>
 
-    <!-- 전체 패턴 목록 팝업 (모달) -->
     <div id="all-patterns-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6 relative flex flex-col max-h-[90vh]">
             <div class="flex-shrink-0">
@@ -120,12 +119,10 @@
                 <p class="text-gray-600 mb-4">학습하고 싶은 패턴을 선택하세요.</p>
             </div>
             <div id="all-patterns-list" class="mt-2 overflow-y-auto divide-y">
-                <!-- 전체 패턴 목록이 여기에 동적으로 추가됩니다. -->
-            </div>
+                </div>
         </div>
     </div>
-    
-    <!-- AI와 대화하기 팝업 (모달) -->
+
     <div id="chat-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 relative flex flex-col max-h-[90vh]">
             <div class="flex-shrink-0 flex justify-between items-center mb-4">
@@ -137,13 +134,22 @@
                 </button>
             </div>
             <div id="chat-history" class="flex-grow bg-gray-50 p-4 rounded-lg overflow-y-auto mb-4 space-y-4">
-                <!-- 채팅 메시지가 여기에 표시됩니다 -->
-            </div>
+                </div>
             <div class="flex-shrink-0">
                 <div class="flex items-center space-x-2">
+                    <button id="mic-btn" title="음성 입력" class="mic-btn p-2 rounded-full text-gray-500 hover:bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6V7.5a6 6 0 0 0-12 0v5.25a6 6 0 0 0 6 6Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5v2.25a7.5 7.5 0 0 1-15 0v-2.25" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 18.75a8.25 8.25 0 0 0 10.5 0" />
+                        </svg>
+                    </button>
                     <input type="text" id="chat-input" class="w-full p-2 border border-gray-300 rounded-md chinese-text" placeholder="중국어로 메시지를 입력하세요...">
                     <button id="send-chat-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">전송</button>
                 </div>
+                 <div class="mt-2 text-right">
+                    <button id="suggest-reply-btn" class="text-sm text-blue-600 hover:text-blue-800">💡 답변 추천받기</button>
+                 </div>
             </div>
         </div>
     </div>
@@ -151,4 +157,3 @@
     <script type="module" src="./js/main.js"></script>
 </body>
 </html>
-
