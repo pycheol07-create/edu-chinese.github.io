@@ -48,7 +48,6 @@ export default async function handler(request, response) {
         const prompt = systemPrompt || `Translate this Korean text to Chinese: ${text}`;
         apiRequestBody = {
             contents: [{ parts: [{ text: `${prompt}\n\nKorean: "${text}"` }] }]
-            // v1은 JSON 응답 스키마 강제 불가, 프롬프트로 유도
         };
     } else if (action === 'chat') {
         const chatSystemPrompt = `You are a friendly and encouraging native Chinese speaker named "Ling" (灵). Your goal is to have a natural, casual conversation with a user who is learning Chinese.
@@ -113,18 +112,28 @@ export default async function handler(request, response) {
         return response.status(200).json(data);
     }
 
-    // --- [BUG FIX START] ---
+    // --- [DEBUGGING START] ---
     // 번역, 채팅, 답변 추천 응답 처리 (v1 응답 구조 확인)
+
+    // 답변 추천 액션일 경우, 응답 데이터 구조 확인을 위한 로그 추가
+    if (action === 'suggest_reply') {
+        console.log("Raw Suggest Reply API Response:", JSON.stringify(data, null, 2));
+    }
+    // --- [DEBUGGING END] ---
+
+
     if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
-        // AI가 응답을 생성하지 못했거나 (예: 안전 필터링), 예상치 못한 구조일 경우
         console.error("Invalid response structure from Google API:", data);
-         // safetyRatings가 있는지 확인하여 구체적인 오류 메시지 제공
         if (data.promptFeedback && data.promptFeedback.blockReason) {
-             throw new Error(`AI 응답 생성 실패: ${data.promptFeedback.blockReason}`);
-        } else if (data.candidates && data.candidates[0].finishReason && data.candidates[0].finishReason !== 'STOP') {
+             throw new Error(`AI 응답 생성 실패 (안전 필터): ${data.promptFeedback.blockReason}`);
+        } else if (data.candidates && data.candidates.length > 0 && data.candidates[0].finishReason && data.candidates[0].finishReason !== 'STOP') {
+             // candidates 배열은 있지만 finishReason이 STOP이 아닌 경우
              throw new Error(`AI 응답 생성 중단됨: ${data.candidates[0].finishReason}`);
+        } else if (data.candidates && data.candidates.length === 0) {
+             // candidates 배열 자체가 비어있는 경우 (finishReason 확인 불가)
+             throw new Error(`AI 응답 생성 실패: Candidates 배열이 비어있습니다.`);
         }
-        throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다.");
+        throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다. (candidates 확인 실패)");
     }
 
     const responseText = data.candidates[0].content.parts[0].text;
@@ -132,16 +141,20 @@ export default async function handler(request, response) {
      if (action === 'suggest_reply') {
          try {
             const suggestionData = JSON.parse(responseText);
+             // suggestions 필드가 배열인지 추가 확인
+            if (!suggestionData.suggestions || !Array.isArray(suggestionData.suggestions)) {
+                 console.error("Parsed suggestion data does not contain a valid 'suggestions' array:", suggestionData);
+                 throw new Error("AI 응답에 'suggestions' 배열이 없습니다.");
+            }
             return response.status(200).json(suggestionData); // { suggestions: [...] } 객체 반환
          } catch (e) {
-             console.error("Failed to parse suggestion response:", responseText);
-             throw new Error("AI로부터 유효한 답변 추천 형식을 받지 못했습니다.");
+             console.error("Failed to parse suggestion response or invalid format:", responseText, e);
+             throw new Error("AI로부터 유효한 답변 추천 JSON 형식을 받지 못했습니다.");
          }
     }
 
     // 번역 및 채팅은 data 전체를 반환 (프론트엔드에서 파싱)
     return response.status(200).json(data);
-    // --- [BUG FIX END] ---
 
   } catch (error) {
     console.error('서버 함수 오류:', error);
@@ -149,4 +162,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1041-6
+// v.2025.10.20_1046-7
