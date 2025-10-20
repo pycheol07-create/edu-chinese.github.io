@@ -112,48 +112,50 @@ export default async function handler(request, response) {
         return response.status(200).json(data);
     }
 
-    // --- [DEBUGGING START] ---
     // 번역, 채팅, 답변 추천 응답 처리 (v1 응답 구조 확인)
-
-    // 답변 추천 액션일 경우, 응답 데이터 구조 확인을 위한 로그 추가
-    if (action === 'suggest_reply') {
-        console.log("Raw Suggest Reply API Response:", JSON.stringify(data, null, 2));
-    }
-    // --- [DEBUGGING END] ---
-
-
     if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
         console.error("Invalid response structure from Google API:", data);
         if (data.promptFeedback && data.promptFeedback.blockReason) {
              throw new Error(`AI 응답 생성 실패 (안전 필터): ${data.promptFeedback.blockReason}`);
         } else if (data.candidates && data.candidates.length > 0 && data.candidates[0].finishReason && data.candidates[0].finishReason !== 'STOP') {
-             // candidates 배열은 있지만 finishReason이 STOP이 아닌 경우
              throw new Error(`AI 응답 생성 중단됨: ${data.candidates[0].finishReason}`);
         } else if (data.candidates && data.candidates.length === 0) {
-             // candidates 배열 자체가 비어있는 경우 (finishReason 확인 불가)
              throw new Error(`AI 응답 생성 실패: Candidates 배열이 비어있습니다.`);
         }
         throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다. (candidates 확인 실패)");
     }
 
-    const responseText = data.candidates[0].content.parts[0].text;
-
+    // --- [BUG FIX START for suggest_reply with multiple parts] ---
      if (action === 'suggest_reply') {
-         try {
-            const suggestionData = JSON.parse(responseText);
-             // suggestions 필드가 배열인지 추가 확인
-            if (!suggestionData.suggestions || !Array.isArray(suggestionData.suggestions)) {
-                 console.error("Parsed suggestion data does not contain a valid 'suggestions' array:", suggestionData);
-                 throw new Error("AI 응답에 'suggestions' 배열이 없습니다.");
+        let suggestionData = null;
+        // 여러 'parts' 중에서 'suggestions' 키를 포함하는 JSON 문자열 찾기
+        for (const part of data.candidates[0].content.parts) {
+            try {
+                const parsedPart = JSON.parse(part.text);
+                // suggestions 키가 있고, 그 값이 배열인지 확인
+                if (parsedPart.suggestions && Array.isArray(parsedPart.suggestions)) {
+                    suggestionData = parsedPart;
+                    break; // 찾았으면 반복 중단
+                }
+            } catch (e) {
+                // 이 부분은 JSON이 아니거나 형식이 잘못된 것이므로 무시
+                console.warn("Ignoring non-JSON or invalid JSON part in suggest_reply:", part.text);
             }
+        }
+
+        if (suggestionData) {
             return response.status(200).json(suggestionData); // { suggestions: [...] } 객체 반환
-         } catch (e) {
-             console.error("Failed to parse suggestion response or invalid format:", responseText, e);
-             throw new Error("AI로부터 유효한 답변 추천 JSON 형식을 받지 못했습니다.");
-         }
+        } else {
+            // 모든 part를 확인했는데도 못 찾은 경우
+            console.error("Could not find valid 'suggestions' JSON in any response parts:", JSON.stringify(data.candidates[0].content.parts, null, 2));
+            throw new Error("AI로부터 유효한 답변 추천 JSON 형식을 찾지 못했습니다.");
+        }
     }
+    // --- [BUG FIX END] ---
 
     // 번역 및 채팅은 data 전체를 반환 (프론트엔드에서 파싱)
+    // 주의: 프론트엔드도 여러 parts가 올 수 있음을 인지하고 처리해야 할 수 있음
+    //      (하지만 현재 chat, translate 프롬프트는 단일 JSON 응답을 강하게 요구하므로 괜찮을 가능성 높음)
     return response.status(200).json(data);
 
   } catch (error) {
@@ -162,4 +164,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1046-7
+// v.2025.10.20_1054-8
