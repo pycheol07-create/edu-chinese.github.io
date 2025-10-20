@@ -69,7 +69,6 @@ export default async function handler(request, response) {
         ];
         apiRequestBody = { contents };
     }
-    // --- [NEW] 답변 추천 액션 추가 ---
     else if (action === 'suggest_reply') {
         const suggestSystemPrompt = `Based on the previous conversation history, suggest 1 or 2 simple and natural next replies in Chinese for the user who is learning Chinese. The user just received the last message from the AI model.
 - Provide only the suggested replies.
@@ -77,15 +76,12 @@ export default async function handler(request, response) {
 - Do not include any other text or markdown backticks.`;
 
          const contents = [
-            // 시스템 프롬프트 주입 (역할 설명)
             { role: "user", parts: [{ text: suggestSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I will provide reply suggestions in the specified JSON format." }] },
-            // 실제 대화 기록 전달
             ...history
         ];
         apiRequestBody = { contents };
     }
-    // --- 답변 추천 액션 끝 ---
     else if (action === 'tts') {
         apiUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
         apiRequestBody = {
@@ -117,22 +113,35 @@ export default async function handler(request, response) {
         return response.status(200).json(data);
     }
 
-    // 번역, 채팅, 답변 추천 응답 처리
-    // v1 응답은 candidates[0].content.parts[0].text 에 결과가 있음
-    // 답변 추천의 경우, 응답 자체가 { suggestions: [...] } 형태의 JSON 문자열일 것으로 예상
+    // --- [BUG FIX START] ---
+    // 번역, 채팅, 답변 추천 응답 처리 (v1 응답 구조 확인)
+    if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
+        // AI가 응답을 생성하지 못했거나 (예: 안전 필터링), 예상치 못한 구조일 경우
+        console.error("Invalid response structure from Google API:", data);
+         // safetyRatings가 있는지 확인하여 구체적인 오류 메시지 제공
+        if (data.promptFeedback && data.promptFeedback.blockReason) {
+             throw new Error(`AI 응답 생성 실패: ${data.promptFeedback.blockReason}`);
+        } else if (data.candidates && data.candidates[0].finishReason && data.candidates[0].finishReason !== 'STOP') {
+             throw new Error(`AI 응답 생성 중단됨: ${data.candidates[0].finishReason}`);
+        }
+        throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다.");
+    }
+
+    const responseText = data.candidates[0].content.parts[0].text;
+
      if (action === 'suggest_reply') {
          try {
-            // AI가 JSON 형식의 문자열을 반환했다고 가정
-            const suggestionData = JSON.parse(data.candidates[0].content.parts[0].text);
+            const suggestionData = JSON.parse(responseText);
             return response.status(200).json(suggestionData); // { suggestions: [...] } 객체 반환
          } catch (e) {
-             console.error("Failed to parse suggestion response:", data.candidates[0].content.parts[0].text);
+             console.error("Failed to parse suggestion response:", responseText);
              throw new Error("AI로부터 유효한 답변 추천 형식을 받지 못했습니다.");
          }
     }
 
-    // 번역 및 채팅은 기존 로직 유지 (data 자체를 반환)
+    // 번역 및 채팅은 data 전체를 반환 (프론트엔드에서 파싱)
     return response.status(200).json(data);
+    // --- [BUG FIX END] ---
 
   } catch (error) {
     console.error('서버 함수 오류:', error);
@@ -140,4 +149,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1032-5
+// v.2025.10.20_1041-6
