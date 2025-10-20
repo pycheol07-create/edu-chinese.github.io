@@ -18,7 +18,8 @@ export default async function handler(request, response) {
 
     // 3. '번역' 요청일 경우 Gemini Pro 모델을 호출합니다.
     if (action === 'translate') {
-      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+      // --- 여기를 수정했습니다 ---
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${apiKey}`;
       
       const prompt = systemPrompt || `Translate this Korean text to Chinese: ${text}`;
       
@@ -60,7 +61,7 @@ export default async function handler(request, response) {
 - "korean": A natural Korean translation of your Chinese response.`;
 
         // --- 여기를 수정했습니다 ---
-        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${apiKey}`;
         
         // 이전 대화 기록을 함께 보내 AI가 맥락을 이해하도록 합니다.
         const contents = [
