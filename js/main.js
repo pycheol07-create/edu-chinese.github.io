@@ -376,6 +376,7 @@ async function handleSendMessage() {
     }
 }
 
+// ------------------- [FEATURE UPDATE START] -------------------
 // --- 번역기 함수 ---
 async function handleTranslation() {
     const text = koreanInput.value.trim();
@@ -388,14 +389,16 @@ async function handleTranslation() {
     translationResult.innerHTML = '<div class="loader mx-auto"></div>';
 
     try {
-        const systemPrompt = `You are a professional Korean-to-Chinese translator.
+        // [수정] AI의 역할을 '언어 교사'로 변경하고 'explanation' 필드를 (한국어로) 요청
+        const systemPrompt = `You are a professional Korean-to-Chinese translator and language teacher.
 Translate the following Korean sentence into natural, native-sounding Chinese.
 Provide:
 1.  The main Chinese translation.
-2.  (Optional) 1-2 alternative natural expressions if applicable.
-3.  The pinyin for the main translation.
+2.  The pinyin for the main translation.
+3.  (Optional) 1-2 alternative natural expressions if applicable.
+4.  A concise explanation (in Korean) of why this expression is natural, what the key vocabulary or grammar point is.
 
-Format your response as a single, valid JSON object with keys "chinese", "pinyin", and "alternatives" (string array).
+Format your response as a single, valid JSON object with keys "chinese", "pinyin", "alternatives" (string array), and "explanation" (string, in Korean).
 Do not include markdown backticks.`;
 
         const result = await callGeminiAPI('translate', {
@@ -415,10 +418,12 @@ Do not include markdown backticks.`;
             translationData = {
                 chinese: translationText,
                 pinyin: "(AI 응답 형식이 잘못되었습니다)",
-                alternatives: []
+                alternatives: [],
+                explanation: "(AI 응답 형식이 잘못되어 설명을 가져올 수 없습니다.)" // [추가]
             };
         }
         
+        // [수정] 'alternatives' 렌더링 로직
         let alternativesHtml = '';
         if (translationData.alternatives && translationData.alternatives.length > 0) {
             alternativesHtml = `
@@ -429,6 +434,18 @@ Do not include markdown backticks.`;
             `;
         }
 
+        // [추가] 'explanation' 렌더링 로직
+        let explanationHtml = '';
+        if (translationData.explanation) {
+            explanationHtml = `
+                <div class="mt-4 pt-3 border-t">
+                    <h4 class="text-sm font-semibold text-gray-700">💡 표현 꿀팁:</h4>
+                    <p class="text-sm text-gray-600 mt-1">${translationData.explanation.replace(/\n/g, '<br>')}</p>
+                </div>
+            `;
+        }
+
+        // [수정] 'explanationHtml'을 포함하도록 innerHTML 업데이트
         translationResult.innerHTML = `
             <div class="flex items-center">
                 <p class="text-xl chinese-text font-bold text-gray-800">${translationData.chinese}</p>
@@ -440,6 +457,7 @@ Do not include markdown backticks.`;
             </div>
             <p class="text-md text-gray-500">${translationData.pinyin}</p>
             ${alternativesHtml}
+            ${explanationHtml}
         `;
 
     } catch (error) {
@@ -449,6 +467,7 @@ Do not include markdown backticks.`;
         translateBtn.disabled = false;
     }
 }
+// ------------------- [FEATURE UPDATE END] -------------------
 
 
 // --- 메인 이벤트 리스너 설정 ---
@@ -524,7 +543,6 @@ function setupEventListeners() {
 
         } 
         
-        // ------------------- [BUG FIX START] -------------------
         // 힌트 보기 버튼
         else if (target.classList.contains('show-hint-btn')) {
             const button = target;
@@ -535,7 +553,6 @@ function setupEventListeners() {
             const patternData = allPatterns.find(p => p.pattern === patternString);
 
             // [수정] 'patternData.vocab' (패턴의 주요 단어)를 힌트로 사용합니다.
-            // (기존: patternData.practice.practiceVocab)
             if (patternData && patternData.vocab && patternData.vocab.length > 0) {
                 const shuffledVocab = [...patternData.vocab].sort(() => 0.5 - Math.random()); // [수정]
                 
@@ -565,7 +582,6 @@ function setupEventListeners() {
             button.disabled = true;
             button.classList.add('opacity-50', 'cursor-not-allowed');
         } 
-        // ------------------- [BUG FIX END] -------------------
         
         // 다시하기 버튼
         else if (target.classList.contains('retry-practice-btn')) {
@@ -720,4 +736,4 @@ export function initializeApp(patterns) {
 // patternsData를 즉시 전달하여 앱 초기화 로직을 설정합니다.
 initializeApp(patternsData);
 
-// v.2025.10.20_1008-2
+// v.2025.10.20_1015-3
