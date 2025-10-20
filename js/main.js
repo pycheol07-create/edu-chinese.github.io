@@ -13,7 +13,7 @@ let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translato
     closeTranslatorBtn, translateBtn, koreanInput, translationResult, customAlertModal,
     customAlertMessage, customAlertCloseBtn, allPatternsBtn, allPatternsModal,
     closeAllPatternsBtn, allPatternsList, chatBtn, chatModal, closeChatBtn,
-    chatHistory, chatInput, sendChatBtn, micBtn, suggestReplyBtn; // <-- micBtn, suggestReplyBtn 추가
+    chatHistory, chatInput, sendChatBtn, micBtn, suggestReplyBtn;
 
 // 음성 인식 관련
 let recognition = null;
@@ -50,8 +50,8 @@ function initializeDOM() {
     chatHistory = document.getElementById('chat-history');
     chatInput = document.getElementById('chat-input');
     sendChatBtn = document.getElementById('send-chat-btn');
-    micBtn = document.getElementById('mic-btn'); // <-- 마이크 버튼 추가
-    suggestReplyBtn = document.getElementById('suggest-reply-btn'); // <-- 답변 추천 버튼 추가
+    micBtn = document.getElementById('mic-btn');
+    suggestReplyBtn = document.getElementById('suggest-reply-btn');
 }
 
 // --- 커스텀 알림 함수 ---
@@ -86,11 +86,10 @@ async function playTTS(text, buttonElement) {
         }
         if (currentPlayingButton === buttonElement) {
             currentPlayingButton = null;
-            return; // 같은 버튼을 다시 누르면 재생 중지
+            return;
         }
     }
 
-    // 새 버튼 활성화
     currentPlayingButton = buttonElement;
     buttonElement.classList.add('is-playing');
 
@@ -322,26 +321,29 @@ function addMessageToHistory(sender, messageData) {
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
-// --- [NEW] 답변 추천 UI 추가 함수 ---
-function addSuggestionToHistory(suggestions) {
+// --- [FEATURE UPDATE START: Suggest Reply with Pinyin Display] ---
+// 답변 추천 UI 추가 함수
+function addSuggestionToHistory(suggestions) { // suggestions는 [{chinese: "...", pinyin: "..."}, ...] 형태의 배열
     const suggestionElement = document.createElement('div');
     suggestionElement.className = 'flex justify-center my-2'; // 가운데 정렬
 
+    // [수정] 버튼 내부에 chinese와 pinyin을 함께 표시
     const buttonsHtml = suggestions.map(suggestion =>
-        `<button class="suggestion-chip bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm chinese-text hover:bg-blue-200 mx-1" data-text="${suggestion}">
-            ${suggestion}
+        `<button class="suggestion-chip bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-sm hover:bg-blue-200 mx-1 flex flex-col items-center" data-text="${suggestion.chinese}">
+            <span class="chinese-text">${suggestion.chinese}</span>
+            <span class="text-xs text-gray-500 mt-0.5">${suggestion.pinyin}</span>
          </button>`
     ).join('');
 
     suggestionElement.innerHTML = `
         <div class="bg-gray-100 p-2 rounded-lg text-center">
             <p class="text-xs text-gray-600 mb-1">이렇게 답해보세요:</p>
-            <div>${buttonsHtml}</div>
+            <div class="flex flex-wrap justify-center">${buttonsHtml}</div>
         </div>`;
 
     chatHistory.appendChild(suggestionElement);
 
-    // 추천 답변 클릭 시 입력창에 채우기
+    // 추천 답변 클릭 시 입력창에 채우기 (data-text의 chinese만 사용)
     suggestionElement.querySelectorAll('.suggestion-chip').forEach(chip => {
         chip.addEventListener('click', () => {
             chatInput.value = chip.dataset.text;
@@ -352,6 +354,7 @@ function addSuggestionToHistory(suggestions) {
 
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
+// --- [FEATURE UPDATE END] ---
 
 
 async function handleSendMessage() {
@@ -364,7 +367,6 @@ async function handleSendMessage() {
     addMessageToHistory('user', { text: userInput });
     chatInput.value = '';
 
-    // 로딩 인디케이터 추가
     const loadingElement = document.createElement('div');
     loadingElement.className = 'flex justify-start';
     loadingElement.id = 'chat-loading';
@@ -373,7 +375,6 @@ async function handleSendMessage() {
     chatHistory.scrollTop = chatHistory.scrollHeight;
 
     try {
-        // 대화 기록에 사용자 메시지 추가
         conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
 
         const result = await callGeminiAPI('chat', {
@@ -381,24 +382,23 @@ async function handleSendMessage() {
             history: conversationHistory
         });
 
-        // API 응답 구조가 gemini.js와 일치해야 함
-        const aiResponseText = result.candidates[0].content.parts[0].text;
-
-        // AI 응답이 유효한 JSON인지 확인
+        // 응답 구조 확인 및 처리 강화
         let aiResponseData;
-        try {
-            aiResponseData = JSON.parse(aiResponseText);
-        } catch (e) {
-            console.error("AI response is not valid JSON:", aiResponseText);
-            aiResponseData = {
-                chinese: aiResponseText,
-                pinyin: "(AI 응답 형식이 잘못되었습니다)",
-                korean: "(번역 오류)"
-            };
+        if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+            const aiResponseText = result.candidates[0].content.parts[0].text;
+            try {
+                aiResponseData = JSON.parse(aiResponseText);
+                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+            } catch (e) {
+                console.error("AI response is not valid JSON:", aiResponseText);
+                aiResponseData = { chinese: aiResponseText, pinyin: "(JSON 파싱 오류)", korean: "(번역 오류)" };
+                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] }); // 원본 텍스트 저장
+            }
+        } else {
+             console.error("Invalid response structure from chat API:", result);
+             aiResponseData = { chinese: "(유효하지 않은 응답)", pinyin: "", korean: "" };
+             // 실패한 응답도 기록에 남길지 결정 (일단 남기지 않음)
         }
-
-        // 대화 기록에 AI 응답 추가 (파싱된 텍스트 원본)
-        conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
 
         addMessageToHistory('ai', aiResponseData);
 
@@ -406,7 +406,6 @@ async function handleSendMessage() {
         console.error('Chat error:', error);
         showAlert(`대화 중 오류가 발생했습니다: ${error.message}`);
     } finally {
-        // 로딩 인디케이터 제거
         const loader = document.getElementById('chat-loading');
         if (loader) {
             loader.remove();
@@ -414,9 +413,7 @@ async function handleSendMessage() {
     }
 }
 
-// --- [NEW] 답변 추천 요청 함수 ---
 async function handleSuggestReply() {
-    // 기존 추천 답변 UI 제거
     chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
 
     if (conversationHistory.length === 0) {
@@ -432,8 +429,7 @@ async function handleSuggestReply() {
             history: conversationHistory
         });
 
-        // API 응답에서 추천 목록 가져오기 (api/gemini.js 구조에 따라 다름)
-        // 예시: { suggestions: ["你好!", "你叫什么名字？"] }
+        // result.suggestions는 [{chinese: ..., pinyin: ...}, ...] 형태일 것으로 기대
         const suggestions = result.suggestions || [];
 
         if (suggestions.length > 0) {
@@ -480,21 +476,21 @@ Do not include markdown backticks.`;
             systemPrompt
         });
 
-        const translationText = result.candidates[0].content.parts[0].text;
-
-        // AI 응답이 유효한 JSON인지 확인
+        // 응답 구조 확인 및 처리 강화
         let translationData;
-         try {
-            translationData = JSON.parse(translationText);
-        } catch (e) {
-            console.error("AI response is not valid JSON:", translationText);
-            translationData = {
-                chinese: translationText,
-                pinyin: "(AI 응답 형식이 잘못되었습니다)",
-                alternatives: [],
-                explanation: "(AI 응답 형식이 잘못되어 설명을 가져올 수 없습니다.)"
-            };
+        if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+            const translationText = result.candidates[0].content.parts[0].text;
+            try {
+                translationData = JSON.parse(translationText);
+            } catch (e) {
+                console.error("AI translation response is not valid JSON:", translationText);
+                translationData = { chinese: translationText, pinyin: "(JSON 파싱 오류)", alternatives: [], explanation: "(설명 파싱 오류)" };
+            }
+        } else {
+             console.error("Invalid response structure from translate API:", result);
+             translationData = { chinese: "(유효하지 않은 응답)", pinyin: "", alternatives: [], explanation: "" };
         }
+
 
         let alternativesHtml = '';
         if (translationData.alternatives && translationData.alternatives.length > 0) {
@@ -525,7 +521,7 @@ Do not include markdown backticks.`;
                     </svg>
                 </button>
             </div>
-            <p class="text-md text-gray-500">${translationData.pinyin}</p>
+            <p class="text-md text-gray-500">${translationData.pinyin || '(병음 정보 없음)'}</p>
             ${alternativesHtml}
             ${explanationHtml}
         `;
@@ -538,23 +534,21 @@ Do not include markdown backticks.`;
     }
 }
 
-// --- [NEW] 음성 인식 초기화 ---
 function initializeSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
-        recognition.lang = 'zh-CN'; // 중국어 설정
-        recognition.interimResults = false; // 최종 결과만 받음
+        recognition.lang = 'zh-CN';
+        recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
         recognition.onresult = (event) => {
             const speechResult = event.results[0][0].transcript;
             chatInput.value = speechResult;
-            // 필요하다면 여기서 바로 전송: handleSendMessage();
         };
 
         recognition.onspeechend = () => {
-            recognition.stop();
+            if(isRecognizing) recognition.stop(); // isRecognizing 플래그 확인 추가
         };
 
         recognition.onnomatch = () => {
@@ -562,10 +556,14 @@ function initializeSpeechRecognition() {
         };
 
         recognition.onerror = (event) => {
-            if (event.error !== 'no-speech' && event.error !== 'aborted') {
-                showAlert(`음성 인식 오류: ${event.error}`);
+            console.error("Speech recognition error:", event.error);
+            // 'no-speech'나 'aborted'는 사용자가 취소한 경우일 수 있으므로 무시
+            if (event.error !== 'no-speech' && event.error !== 'aborted' && event.error !== 'not-allowed') {
+                 showAlert(`음성 인식 오류: ${event.error}. 마이크 권한을 확인하세요.`);
+            } else if (event.error === 'not-allowed') {
+                 showAlert('마이크 사용 권한이 거부되었습니다. 브라우저 설정을 확인해주세요.');
             }
-             micBtn.classList.remove('is-recording'); // 오류 시 녹음 중 상태 해제
+             micBtn.classList.remove('is-recording');
              isRecognizing = false;
         };
          recognition.onend = () => {
@@ -574,8 +572,9 @@ function initializeSpeechRecognition() {
         };
 
     } else {
-        showAlert('お使いのブラウザは音声認識をサポートしていません。');
-        micBtn.disabled = true; // 지원 안 하면 버튼 비활성화
+        console.warn('Web Speech API is not supported in this browser.');
+        showAlert('현재 브라우저에서는 음성 인식을 지원하지 않습니다.');
+        if(micBtn) micBtn.disabled = true;
     }
 }
 
@@ -583,7 +582,6 @@ function initializeSpeechRecognition() {
 // --- 메인 이벤트 리스너 설정 ---
 function setupEventListeners() {
 
-    // 새로운 패턴 보기
     newPatternBtn.addEventListener('click', () => {
          const newPatterns = getRandomPatterns();
          localStorage.setItem('dailyChinesePatterns', JSON.stringify({ date: getTodayString(), patterns: newPatterns }));
@@ -591,32 +589,25 @@ function setupEventListeners() {
          window.scrollTo(0, 0);
     });
 
-    // 패턴 카드 내부 이벤트 (이벤트 위임)
     patternContainer.addEventListener('click', (e) => {
         const target = e.target;
 
-        // 학습 완료 버튼
         if (target.classList.contains('learn-btn')) {
             const pattern = target.dataset.pattern;
             learningCounts[pattern] = (learningCounts[pattern] || 0) + 1;
             saveCounts();
             target.nextElementSibling.querySelector('.count-display').textContent = learningCounts[pattern];
         }
-        // 정답 확인 버튼
         else if (target.classList.contains('check-practice-btn')) {
             const button = target;
             const inputId = button.dataset.inputId;
             const index = inputId.split('-').pop();
-
             const correctAnswer = button.dataset.answer;
             const correctPinyin = button.dataset.pinyin;
             const userInput = document.getElementById(inputId).value.trim();
             const resultDiv = document.getElementById(`practice-result-${index}`);
-
             const normalize = (str) => str.replace(/[.,。，？！？!]/g, '').replace(/\s+/g, '');
-
             let resultMessageHtml = '';
-
             const answerHtml = `
                 <div class="mt-2 p-2 bg-gray-100 rounded text-left">
                     <p class="text-sm">정답:</p>
@@ -647,27 +638,19 @@ function setupEventListeners() {
                     다시하기
                 </button>
             `;
-
             button.style.display = 'none';
-             // 아이콘으로 변경했으므로, 감추기 대신 비활성화/스타일 변경 등을 고려할 수 있음
              const hintButton = document.getElementById(`show-hint-btn-${index}`);
-             if(hintButton) hintButton.style.display = 'none'; // 일단 간단히 감춤
-
+             if(hintButton) hintButton.style.display = 'none';
         }
-
-        // 힌트 보기 버튼
-        else if (target.closest('.show-hint-btn')) { // 아이콘 클릭 시에도 동작하도록 closest 사용
+        else if (target.closest('.show-hint-btn')) {
             const button = target.closest('.show-hint-btn');
             const patternString = button.dataset.patternString;
             const hintTargetId = button.dataset.hintTarget;
             const hintDiv = document.getElementById(hintTargetId);
-
             const patternData = allPatterns.find(p => p.pattern === patternString);
 
-            // [수정] 'patternData.vocab' (패턴의 주요 단어)를 힌트로 사용합니다.
             if (patternData && patternData.vocab && patternData.vocab.length > 0) {
-                const shuffledVocab = [...patternData.vocab].sort(() => 0.5 - Math.random()); // [수정]
-
+                const shuffledVocab = [...patternData.vocab].sort(() => 0.5 - Math.random());
                 const hintsHtml = shuffledVocab.map(hint => `
                     <div class="flex items-baseline" style="line-height: 1.3;">
                         <span class="inline-block w-[40%] font-medium chinese-text pr-2">${hint.word}</span>
@@ -675,7 +658,6 @@ function setupEventListeners() {
                         <span class="inline-block w-[20%] text-sm text-gray-600">${hint.meaning}</span>
                     </div>
                 `).join('');
-
                 hintDiv.innerHTML = `
                 <div class="bg-white/50 rounded-md p-2 text-left">
                     <div class="flex items-center mb-1">
@@ -686,30 +668,23 @@ function setupEventListeners() {
                     </div>
                     <div class="border-t border-gray-300/50 pt-1">${hintsHtml}</div>
                 </div>`;
-
             } else {
                 hintDiv.innerHTML = `<p class="text-sm text-gray-500">이 문장에 대한 핵심 단어 정보가 없습니다.</p>`;
             }
-
             button.disabled = true;
             button.classList.add('opacity-50', 'cursor-not-allowed');
         }
-
-        // 다시하기 버튼
         else if (target.classList.contains('retry-practice-btn')) {
             const index = target.dataset.practiceIndex;
-
             document.getElementById(`practice-input-${index}`).value = '';
             document.getElementById(`practice-result-${index}`).innerHTML = '';
             document.getElementById(`practice-hint-${index}`).innerHTML = '';
-
             document.getElementById(`check-practice-btn-${index}`).style.display = '';
             const hintBtn = document.getElementById(`show-hint-btn-${index}`);
-            hintBtn.style.display = ''; // 다시 보이게
+            hintBtn.style.display = '';
             hintBtn.disabled = false;
             hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
-        // TTS 버튼 (이벤트 위임으로 변경)
         else if (target.closest('.tts-btn')) {
             const ttsButton = target.closest('.tts-btn');
             const textToSpeak = ttsButton.dataset.text;
@@ -719,7 +694,6 @@ function setupEventListeners() {
         }
     });
 
-    // '직접 말해보기' Enter 키 이벤트
     patternContainer.addEventListener('keydown', (e) => {
         if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') {
             e.preventDefault();
@@ -730,16 +704,11 @@ function setupEventListeners() {
         }
     });
 
-    // --- 번역기 모달 이벤트 ---
     openTranslatorBtn.addEventListener('click', () => translatorModal.classList.remove('hidden'));
-
     closeTranslatorBtn.addEventListener('click', () => {
         translatorModal.classList.add('hidden');
-        if (currentAudio) {
-            currentAudio.pause(); // 모달 닫을 때 오디오 중지
-        }
+        if (currentAudio) currentAudio.pause();
     });
-
     translateBtn.addEventListener('click', handleTranslation);
     koreanInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -747,30 +716,18 @@ function setupEventListeners() {
             handleTranslation();
         }
     });
-
-    // 번역 결과 영역의 TTS 버튼 (이벤트 위임)
     translationResult.addEventListener('click', (e) => {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) {
-                playTTS(textToSpeak, ttsButton);
-            }
+            if (textToSpeak) playTTS(textToSpeak, ttsButton);
         }
     });
 
-    // --- 커스텀 알림 닫기 ---
     customAlertCloseBtn.addEventListener('click', () => customAlertModal.classList.add('hidden'));
 
-    // --- 전체 패턴 보기 모달 이벤트 ---
-    allPatternsBtn.addEventListener('click', () => {
-        allPatternsModal.classList.remove('hidden');
-    });
-
-    closeAllPatternsBtn.addEventListener('click', () => {
-        allPatternsModal.classList.add('hidden');
-    });
-
+    allPatternsBtn.addEventListener('click', () => allPatternsModal.classList.remove('hidden'));
+    closeAllPatternsBtn.addEventListener('click', () => allPatternsModal.classList.add('hidden'));
     allPatternsList.addEventListener('click', (e) => {
         const selectedPatternDiv = e.target.closest('[data-pattern-index]');
         if (selectedPatternDiv) {
@@ -784,7 +741,6 @@ function setupEventListeners() {
         }
     });
 
-    // --- AI 채팅 모달 이벤트 ---
     chatBtn.addEventListener('click', () => {
         chatModal.classList.remove('hidden');
         if (conversationHistory.length === 0) {
@@ -793,7 +749,6 @@ function setupEventListeners() {
                 pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!',
                 korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!'
             });
-             // AI 첫 메시지 대화 기록에 추가
              conversationHistory.push({
                  role: 'model',
                  parts: [{ text: JSON.stringify({
@@ -804,61 +759,52 @@ function setupEventListeners() {
             });
         }
     });
-
     closeChatBtn.addEventListener('click', () => {
         chatModal.classList.add('hidden');
-         // 음성 인식 중지 (모달 닫을 때)
-        if (recognition && isRecognizing) {
-            recognition.stop();
-        }
+        if (recognition && isRecognizing) recognition.stop();
     });
-
     sendChatBtn.addEventListener('click', handleSendMessage);
-
     chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSendMessage();
         }
     });
-
-    // 채팅창 TTS 버튼 (이벤트 위임)
     chatHistory.addEventListener('click', (e) => {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) {
-                playTTS(textToSpeak, ttsButton);
-            }
+            if (textToSpeak) playTTS(textToSpeak, ttsButton);
         }
     });
 
-    // --- [NEW] 마이크 버튼 이벤트 ---
     micBtn.addEventListener('click', () => {
         if (!recognition) {
-             showAlert('음성 인식이 지원되지 않는 브라우저입니다.');
+             showAlert('음성 인식이 지원되지 않거나 초기화되지 않았습니다.');
             return;
         }
         if (isRecognizing) {
             recognition.stop();
-            micBtn.classList.remove('is-recording');
-            isRecognizing = false;
+            // onend 이벤트 핸들러가 isRecognizing = false 처리
         } else {
              try {
                 recognition.start();
                 micBtn.classList.add('is-recording');
                 isRecognizing = true;
             } catch(e) {
-                 // 사용자가 권한 거부 후 다시 눌렀을 때 등 에러 처리
                  console.error("Speech recognition start error:", e);
-                 showAlert("음성 인식을 시작할 수 없습니다. 마이크 권한을 확인해주세요.");
+                 // iOS 등 일부 환경에서는 첫 사용자 인터랙션 후 시작해야 할 수 있음
+                 if (e.name === 'NotAllowedError' || e.name === 'SecurityError') {
+                      showAlert("마이크 권한이 필요합니다. 브라우저 설정에서 허용해주세요.");
+                 } else {
+                      showAlert("음성 인식을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.");
+                 }
                  micBtn.classList.remove('is-recording');
                  isRecognizing = false;
             }
         }
     });
 
-     // --- [NEW] 답변 추천 버튼 이벤트 ---
     suggestReplyBtn.addEventListener('click', handleSuggestReply);
 }
 
@@ -873,7 +819,7 @@ export function initializeApp(patterns) {
         loadDailyPatterns();
         renderAllPatternsList();
         setupScreenWakeLock();
-        initializeSpeechRecognition(); // <-- 음성 인식 초기화 추가
+        initializeSpeechRecognition();
         setupEventListeners();
     });
 }
@@ -881,4 +827,4 @@ export function initializeApp(patterns) {
 // --- 앱 실행 ---
 initializeApp(patternsData);
 
-// v.2025.10.20_1032-5
+// v.2025.10.20_1056-9

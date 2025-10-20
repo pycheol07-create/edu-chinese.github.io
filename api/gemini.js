@@ -68,19 +68,24 @@ export default async function handler(request, response) {
         ];
         apiRequestBody = { contents };
     }
+    // --- [FEATURE UPDATE START: Suggest Reply with Pinyin] ---
     else if (action === 'suggest_reply') {
+        // [수정] 시스템 프롬프트: suggestions 배열 안에 chinese와 pinyin을 포함한 객체를 넣도록 요청
         const suggestSystemPrompt = `Based on the previous conversation history, suggest 1 or 2 simple and natural next replies in Chinese for the user who is learning Chinese. The user just received the last message from the AI model.
-- Provide only the suggested replies.
-- Your entire response MUST be a single, valid JSON object containing a key "suggestions" which is an array of strings (the suggested Chinese replies). Example: {"suggestions": ["你好!", "谢谢你。"]}
+- Provide only the suggested replies with their pinyin.
+- Your entire response MUST be a single, valid JSON object containing a key "suggestions" which is an array of objects.
+- Each object in the "suggestions" array must have two keys: "chinese" (string) and "pinyin" (string).
+- Example: {"suggestions": [{"chinese": "你好!", "pinyin": "Nǐ hǎo!"}, {"chinese": "谢谢你。", "pinyin": "Xièxie nǐ."}]}
 - Do not include any other text or markdown backticks.`;
 
          const contents = [
             { role: "user", parts: [{ text: suggestSystemPrompt }] },
-            { role: "model", parts: [{ text: "Okay, I will provide reply suggestions in the specified JSON format." }] },
+            { role: "model", parts: [{ text: "Okay, I will provide reply suggestions including pinyin in the specified JSON format." }] }, // AI의 이해 확인 응답 수정
             ...history
         ];
         apiRequestBody = { contents };
     }
+    // --- [FEATURE UPDATE END] ---
     else if (action === 'tts') {
         apiUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
         apiRequestBody = {
@@ -125,37 +130,47 @@ export default async function handler(request, response) {
         throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다. (candidates 확인 실패)");
     }
 
-    // --- [BUG FIX START for suggest_reply with multiple parts] ---
+    // --- [FEATURE UPDATE START: Suggest Reply with Pinyin Parsing] ---
      if (action === 'suggest_reply') {
         let suggestionData = null;
+        let foundSuggestions = false;
         // 여러 'parts' 중에서 'suggestions' 키를 포함하는 JSON 문자열 찾기
         for (const part of data.candidates[0].content.parts) {
             try {
                 const parsedPart = JSON.parse(part.text);
-                // suggestions 키가 있고, 그 값이 배열인지 확인
-                if (parsedPart.suggestions && Array.isArray(parsedPart.suggestions)) {
+                // suggestions 키가 있고, 배열이며, 배열의 첫 요소가 chinese와 pinyin을 포함하는 객체인지 확인
+                if (parsedPart.suggestions && Array.isArray(parsedPart.suggestions) &&
+                    parsedPart.suggestions.length > 0 && // 배열이 비어있지 않고
+                    typeof parsedPart.suggestions[0] === 'object' && // 첫 요소가 객체이며
+                    parsedPart.suggestions[0].hasOwnProperty('chinese') && // 'chinese' 키가 있고
+                    parsedPart.suggestions[0].hasOwnProperty('pinyin')      // 'pinyin' 키가 있는지
+                   )
+                {
                     suggestionData = parsedPart;
+                    foundSuggestions = true;
                     break; // 찾았으면 반복 중단
+                } else if (parsedPart.suggestions && Array.isArray(parsedPart.suggestions) && parsedPart.suggestions.length === 0) {
+                    // suggestions 배열은 있지만 비어있는 경우도 정상 처리
+                    suggestionData = parsedPart;
+                    foundSuggestions = true;
+                    break;
                 }
             } catch (e) {
-                // 이 부분은 JSON이 아니거나 형식이 잘못된 것이므로 무시
                 console.warn("Ignoring non-JSON or invalid JSON part in suggest_reply:", part.text);
             }
         }
 
-        if (suggestionData) {
-            return response.status(200).json(suggestionData); // { suggestions: [...] } 객체 반환
+        if (foundSuggestions) {
+            // 빈 배열일 수도 있으므로 suggestions 키 존재 여부만 확인 후 반환
+            return response.status(200).json(suggestionData);
         } else {
-            // 모든 part를 확인했는데도 못 찾은 경우
-            console.error("Could not find valid 'suggestions' JSON in any response parts:", JSON.stringify(data.candidates[0].content.parts, null, 2));
-            throw new Error("AI로부터 유효한 답변 추천 JSON 형식을 찾지 못했습니다.");
+            console.error("Could not find valid 'suggestions' JSON object array in any response parts:", JSON.stringify(data.candidates[0].content.parts, null, 2));
+            throw new Error("AI로부터 유효한 답변 추천(병음 포함) JSON 형식을 찾지 못했습니다.");
         }
     }
-    // --- [BUG FIX END] ---
+    // --- [FEATURE UPDATE END] ---
 
     // 번역 및 채팅은 data 전체를 반환 (프론트엔드에서 파싱)
-    // 주의: 프론트엔드도 여러 parts가 올 수 있음을 인지하고 처리해야 할 수 있음
-    //      (하지만 현재 chat, translate 프롬프트는 단일 JSON 응답을 강하게 요구하므로 괜찮을 가능성 높음)
     return response.status(200).json(data);
 
   } catch (error) {
@@ -164,4 +179,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1054-8
+// v.2025.10.20_1056-9
