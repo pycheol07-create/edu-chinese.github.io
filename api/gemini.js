@@ -16,26 +16,22 @@ export default async function handler(request, response) {
     let apiUrl;
     let apiRequestBody;
 
-    // 3. '번역' 요청 (v1 엔드포인트로 수정)
+    // 3. '번역' 요청 (v1 엔드포인트)
     if (action === 'translate') {
-      // API 주소를 'v1'과 안정적인 'gemini-1.0-pro'로 변경
       apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent?key=${apiKey}`;
       
       const prompt = systemPrompt || `Translate this Korean text to Chinese: ${text}`;
       
-      // 'v1' 방식은 systemInstruction을 지원하지 않으므로, contents에 직접 결합합니다.
+      // v1 방식은 systemInstruction을 지원하지 않으므로, contents에 직접 결합합니다.
+      // 'generationConfig' 블록을 완전히 제거했습니다.
       apiRequestBody = {
         contents: [{
             parts: [{ text: `${prompt}\n\nKorean: "${text}"` }]
-        }],
-        generationConfig: {
-            // v1은 responseSchema를 지원하지 않지만, JSON을 반환하라는 프롬프트 명령은 따릅니다.
-            responseMimeType: "application/json",
-        }
+        }]
       };
     } 
     
-    // 4. '대화하기' (v1 엔드포인트로 수정)
+    // 4. '대화하기' (v1 엔드포인트)
     else if (action === 'chat') {
         const chatSystemPrompt = `You are a friendly and encouraging native Chinese speaker named "Ling" (灵). Your goal is to have a natural, casual conversation with a user who is learning Chinese.
 - Keep your responses concise (1-2 short sentences).
@@ -47,12 +43,9 @@ export default async function handler(request, response) {
 - "pinyin": The pinyin for your Chinese response.
 - "korean": A natural Korean translation of your Chinese response.`;
 
-        // API 주소를 'v1'과 안정적인 'gemini-1.0-pro'로 변경
         apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent?key=${apiKey}`;
         
-        // 'v1' 방식에 맞게 'systemInstruction'을 'contents'의 첫 부분에 추가합니다.
         const contents = [
-            // 시스템 프롬프트를 'user'와 'model' 역할로 나누어 주입
             {
                 "role": "user",
                 "parts": [{ "text": "Please follow these instructions for all future responses: " + chatSystemPrompt }]
@@ -61,20 +54,16 @@ export default async function handler(request, response) {
                 "role": "model",
                 "parts": [{ "text": "Okay, I understand. I will act as Ling and respond in the required JSON format." }]
             },
-            // 기존 대화 기록 추가
             ...history, 
-            // 현재 사용자 입력 추가
             {
                 "role": "user",
                 "parts": [{ "text": text }]
             }
         ];
 
+        // 'generationConfig' 블록을 완전히 제거했습니다.
         apiRequestBody = {
-          contents, // 'systemInstruction' 대신 'contents'에 모두 포함
-          generationConfig: {
-            responseMimeType: "application/json",
-          }
+          contents
         };
     }
 
