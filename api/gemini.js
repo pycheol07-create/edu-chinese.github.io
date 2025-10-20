@@ -10,7 +10,7 @@ export default async function handler(request, response) {
   }
 
   // 2. 프런트엔드에서 보낸 요청 데이터를 받습니다.
-  const { action, text, systemPrompt } = request.body;
+  const { action, text, systemPrompt, history } = request.body;
 
   try {
     let apiUrl;
@@ -18,17 +18,38 @@ export default async function handler(request, response) {
 
     // 3. '번역' 요청일 경우 Gemini Pro 모델을 호출합니다.
     if (action === 'translate') {
-      // ★★★ 모델 이름을 'gemini-pro'로 수정했습니다. ★★★
       apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+      
+      const prompt = systemPrompt || `Translate this Korean text to Chinese: ${text}`;
+      
       apiRequestBody = {
-        // ... existing TTS request body
+        contents: [{
+            parts: [{ text: prompt }]
+        }],
+        systemInstruction: {
+            parts: [{ text: systemPrompt }]
+        },
+        generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: "OBJECT",
+                properties: {
+                    "chinese": { "type": "STRING" },
+                    "pinyin": { "type": "STRING" },
+                    "alternatives": { 
+                        "type": "ARRAY",
+                        "items": { "type": "STRING" }
+                    }
+                },
+                required: ["chinese", "pinyin"]
+            }
+        }
       };
     } 
-    // ✨ AI와 대화하는 'chat' 액션이 새로 추가되었습니다. ✨
+    
+    // ✨ AI와 대화하는 'chat' 액션 ✨
     else if (action === 'chat') {
-        const { history } = request.body; // 프런트에서 보낸 대화 기록을 받습니다.
-
-        const systemPrompt = `You are a friendly and encouraging native Chinese speaker named "Ling" (灵). Your goal is to have a natural, casual conversation with a user who is learning Chinese.
+        const chatSystemPrompt = `You are a friendly and encouraging native Chinese speaker named "Ling" (灵). Your goal is to have a natural, casual conversation with a user who is learning Chinese.
 - Keep your responses concise (1-2 short sentences).
 - Ask questions to keep the conversation going.
 - If the user makes a small grammar mistake, gently correct it by using the correct form in your response. For example, if they say "我昨天去公园了玩", you can respond with "哦，你昨天去公园玩了啊！公园里人多吗？" without explicitly pointing out the mistake.
@@ -52,7 +73,7 @@ export default async function handler(request, response) {
         apiRequestBody = {
           contents,
           systemInstruction: {
-            parts: [{ text: systemPrompt }]
+            parts: [{ text: chatSystemPrompt }]
           },
           generationConfig: {
             responseMimeType: "application/json",
@@ -68,6 +89,25 @@ export default async function handler(request, response) {
           }
         };
     }
+
+    // 🎧 'TTS' 액션 추가 🎧
+    else if (action === 'tts') {
+        apiUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
+        
+        apiRequestBody = {
+            input: {
+                text: text
+            },
+            voice: {
+                languageCode: 'cmn-CN', // 표준 중국어
+                name: 'cmn-CN-Wavenet-B' // 여성 목소리 예시 (A=남성, B=여성)
+            },
+            audioConfig: {
+                audioEncoding: 'MP3' // MP3 포맷으로 요청
+            }
+        };
+    }
+    
     // 그 외의 요청은 오류 처리
     else {
       return response.status(400).json({ error: '잘못된 요청(action)입니다.' });
@@ -81,33 +121,22 @@ export default async function handler(request, response) {
       },
       body: JSON.stringify(apiRequestBody),
     });
+    
+    const data = await apiResponse.json();
 
     if (!apiResponse.ok) {
       // Google API에서 오류가 발생한 경우, 그 내용을 프런트엔드로 전달합니다.
-      const errorData = await apiResponse.json();
-      console.error('Google API Error:', errorData);
-      throw new Error(`Google API 오류: ${errorData.error.message}`);
+      console.error('Google API Error:', data);
+      const errorDetails = data.error ? data.error.message : JSON.stringify(data);
+      throw new Error(`Google API 오류: ${errorDetails}`);
     }
-
-    const data = await apiResponse.json();
     
-    // TTS API의 응답(data.audioContent)을 프런트엔드가 기대하는 형식으로 맞춰줍니다.
+    // TTS API의 응답(data.audioContent)을 프런트엔드로 바로 전달합니다.
     if (action === 'tts') {
-        return response.status(200).json({
-            candidates: [{
-                content: {
-                    parts: [{
-                        inlineData: {
-                            mimeType: 'audio/wav; rate=24000',
-                            data: data.audioContent
-                        }
-                    }]
-                }
-            }]
-        });
+        return response.status(200).json(data); // data는 { audioContent: "..." } 형태
     }
 
-    // 6. 성공적인 응답(번역 결과)을 프런트엔드로 다시 보내줍니다.
+    // 6. 성공적인 응답(번역 또는 채팅 결과)을 프런트엔드로 다시 보내줍니다.
     return response.status(200).json(data);
 
   } catch (error) {
@@ -115,5 +144,3 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: error.message });
   }
 }
-
-

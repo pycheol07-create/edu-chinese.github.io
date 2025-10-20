@@ -6,7 +6,7 @@ const audioCache = {};
 let currentAudio = null;
 let currentPlayingButton = null;
 let wakeLock = null;
-let conversationHistory = [];
+let conversationHistory = []; // AI 채팅 기록
 
 // DOM Elements
 let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translatorModal,
@@ -19,19 +19,27 @@ function initializeDOM() {
     patternContainer = document.getElementById('pattern-container');
     currentDateEl = document.getElementById('current-date');
     newPatternBtn = document.getElementById('new-pattern-btn');
+    
+    // 번역기 모달
     openTranslatorBtn = document.getElementById('open-translator-btn');
     translatorModal = document.getElementById('translator-modal');
     closeTranslatorBtn = document.getElementById('close-translator-btn');
     translateBtn = document.getElementById('translate-btn');
     koreanInput = document.getElementById('korean-input');
     translationResult = document.getElementById('translation-result');
+    
+    // 커스텀 알림
     customAlertModal = document.getElementById('custom-alert-modal');
     customAlertMessage = document.getElementById('custom-alert-message');
     customAlertCloseBtn = document.getElementById('custom-alert-close-btn');
+    
+    // 전체 패턴 모달
     allPatternsBtn = document.getElementById('all-patterns-btn');
     allPatternsModal = document.getElementById('all-patterns-modal');
     closeAllPatternsBtn = document.getElementById('close-all-patterns-btn');
     allPatternsList = document.getElementById('all-patterns-list');
+    
+    // 채팅 모달
     chatBtn = document.getElementById('chat-btn');
     chatModal = document.getElementById('chat-modal');
     closeChatBtn = document.getElementById('close-chat-btn');
@@ -40,6 +48,86 @@ function initializeDOM() {
     sendChatBtn = document.getElementById('send-chat-btn');
 }
 
+// --- 커스텀 알림 함수 ---
+function showAlert(message) {
+    customAlertMessage.textContent = message;
+    customAlertModal.classList.remove('hidden');
+}
+
+// --- API 호출 공통 함수 ---
+async function callGeminiAPI(action, body) {
+    const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...body })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API ${action} failed`);
+    }
+    
+    return response.json();
+}
+
+// --- TTS (Text-to-Speech) 함수 ---
+async function playTTS(text, buttonElement) {
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+        if (currentPlayingButton) {
+            currentPlayingButton.classList.remove('is-playing');
+        }
+        if (currentPlayingButton === buttonElement) {
+            currentPlayingButton = null;
+            return; // 같은 버튼을 다시 누르면 재생 중지
+        }
+    }
+
+    // 새 버튼 활성화
+    currentPlayingButton = buttonElement;
+    buttonElement.classList.add('is-playing');
+    
+    try {
+        let audioData;
+        if (audioCache[text]) {
+            audioData = audioCache[text];
+        } else {
+            const result = await callGeminiAPI('tts', { text });
+            // API 응답 구조에 맞게 수정 (api/gemini.js의 응답 형식 기준)
+            audioData = result.audioContent; 
+            audioCache[text] = audioData;
+        }
+
+        const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
+        currentAudio = audio;
+        
+        audio.play();
+        
+        audio.onended = () => {
+            buttonElement.classList.remove('is-playing');
+            currentAudio = null;
+            currentPlayingButton = null;
+        };
+        
+        audio.onerror = (e) => {
+            console.error('Audio playback error:', e);
+            showAlert('오디오 재생 중 오류가 발생했습니다.');
+            buttonElement.classList.remove('is-playing');
+            currentAudio = null;
+            currentPlayingButton = null;
+        };
+
+    } catch (error) {
+        console.error('TTS error:', error);
+        showAlert(`음성(TTS)을 불러오는 데 실패했습니다: ${error.message}`);
+        buttonElement.classList.remove('is-playing');
+        currentPlayingButton = null;
+    }
+}
+
+
+// --- 학습 카운트 관련 함수 ---
 function initializeCounts() {
     const storedCounts = localStorage.getItem('chineseLearningCounts');
     learningCounts = storedCounts ? JSON.parse(storedCounts) : {};
@@ -49,6 +137,7 @@ function saveCounts() {
     localStorage.setItem('chineseLearningCounts', JSON.stringify(learningCounts));
 }
 
+// --- 날짜 및 패턴 렌더링 함수 ---
 function getTodayString() {
     return new Date().toISOString().split('T')[0];
 }
@@ -74,7 +163,7 @@ function renderPatterns(patterns, showIndex = false) {
             <div class="mt-3">
                 <div class="flex items-center">
                     <p class="text-lg chinese-text text-gray-800">${ex.chinese}</p>
-                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors">
+                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${ex.chinese}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                         </svg>
@@ -152,7 +241,7 @@ function renderPatterns(patterns, showIndex = false) {
         patternContainer.appendChild(card);
     });
 }
-// ... (rest of the file is the same, no need to repeat)
+
 function loadDailyPatterns() {
     const todayStr = getTodayString();
     const storedData = JSON.parse(localStorage.getItem('dailyChinesePatterns'));
@@ -185,6 +274,7 @@ function renderAllPatternsList() {
     });
 }
 
+// --- 화면 꺼짐 방지 ---
 async function setupScreenWakeLock() {
     if ('wakeLock' in navigator) {
         try {
@@ -194,18 +284,151 @@ async function setupScreenWakeLock() {
             });
             console.log('Screen Wake Lock is active');
         } catch (err) {
-            if (err.name === 'NotAllowedError') {
-                console.log('Screen Wake Lock request failed because access is disallowed by permissions policy.');
-            } else {
-                console.error(`${err.name}, ${err.message}`);
-            }
+            console.error(`${err.name}, ${err.message}`);
         }
     } else {
         console.log('Screen Wake Lock API not supported.');
     }
 }
 
+// --- AI 채팅 관련 함수 ---
+function addMessageToHistory(sender, messageData) {
+    const messageElement = document.createElement('div');
+    if (sender === 'user') {
+        messageElement.className = 'flex justify-end';
+        messageElement.innerHTML = `<div class="bg-purple-500 text-white p-3 rounded-lg max-w-xs">${messageData.text}</div>`;
+    } else { // AI
+        messageElement.className = 'flex justify-start';
+        messageElement.innerHTML = `
+            <div class="bg-white p-3 rounded-lg max-w-xs border">
+                <div class="flex items-center">
+                    <p class="text-lg chinese-text text-gray-800">${messageData.chinese}</p>
+                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${messageData.chinese}">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500">${messageData.pinyin}</p>
+                <p class="text-sm text-gray-600 border-t mt-2 pt-2">${messageData.korean}</p>
+            </div>
+        `;
+    }
+    chatHistory.appendChild(messageElement);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+async function handleSendMessage() {
+    const userInput = chatInput.value.trim();
+    if (!userInput) return;
+
+    addMessageToHistory('user', { text: userInput });
+    chatInput.value = '';
+    
+    // 로딩 인디케이터 추가
+    const loadingElement = document.createElement('div');
+    loadingElement.className = 'flex justify-start';
+    loadingElement.id = 'chat-loading';
+    loadingElement.innerHTML = `<div class="bg-white p-3 rounded-lg border"><div class="loader"></div></div>`;
+    chatHistory.appendChild(loadingElement);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+
+    try {
+        // 대화 기록에 사용자 메시지 추가
+        conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
+        
+        const result = await callGeminiAPI('chat', {
+            text: userInput,
+            history: conversationHistory
+        });
+        
+        // API 응답 구조가 gemini.js와 일치해야 함
+        const aiResponseText = result.candidates[0].content.parts[0].text;
+        const aiResponseData = JSON.parse(aiResponseText);
+        
+        // 대화 기록에 AI 응답 추가
+        conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+        
+        addMessageToHistory('ai', aiResponseData);
+
+    } catch (error) {
+        console.error('Chat error:', error);
+        showAlert(`대화 중 오류가 발생했습니다: ${error.message}`);
+    } finally {
+        // 로딩 인디케이터 제거
+        const loader = document.getElementById('chat-loading');
+        if (loader) {
+            loader.remove();
+        }
+    }
+}
+
+// --- 번역기 함수 ---
+async function handleTranslation() {
+    const text = koreanInput.value.trim();
+    if (!text) {
+        showAlert('번역할 한국어 문장을 입력하세요.');
+        return;
+    }
+
+    translateBtn.disabled = true;
+    translationResult.innerHTML = '<div class="loader mx-auto"></div>';
+
+    try {
+        const systemPrompt = `You are a professional Korean-to-Chinese translator.
+Translate the following Korean sentence into natural, native-sounding Chinese.
+Provide:
+1.  The main Chinese translation.
+2.  (Optional) 1-2 alternative natural expressions if applicable.
+3.  The pinyin for the main translation.
+
+Format your response as a single, valid JSON object with keys "chinese", "pinyin", and "alternatives" (string array).
+Do not include markdown backticks.`;
+
+        const result = await callGeminiAPI('translate', {
+            text,
+            systemPrompt
+        });
+        
+        const translationText = result.candidates[0].content.parts[0].text;
+        const translationData = JSON.parse(translationText);
+        
+        let alternativesHtml = '';
+        if (translationData.alternatives && translationData.alternatives.length > 0) {
+            alternativesHtml = `
+                <p class="text-sm text-gray-500 mt-3">다른 표현:</p>
+                <ul class="list-disc list-inside text-sm text-gray-600 chinese-text">
+                    ${translationData.alternatives.map(alt => `<li>${alt}</li>`).join('')}
+                </ul>
+            `;
+        }
+
+        translationResult.innerHTML = `
+            <div class="flex items-center">
+                <p class="text-xl chinese-text font-bold text-gray-800">${translationData.chinese}</p>
+                <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${translationData.chinese}">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                    </svg>
+                </button>
+            </div>
+            <p class="text-md text-gray-500">${translationData.pinyin}</p>
+            ${alternativesHtml}
+        `;
+
+    } catch (error) {
+        console.error('Translation error:', error);
+        translationResult.innerHTML = `<p class="text-red-500 text-center">번역 중 오류가 발생했습니다: ${error.message}</p>`;
+    } finally {
+        translateBtn.disabled = false;
+    }
+}
+
+
+// --- 메인 이벤트 리스너 설정 ---
 function setupEventListeners() {
+    
+    // 새로운 패턴 보기
     newPatternBtn.addEventListener('click', () => {
          const newPatterns = getRandomPatterns();
          localStorage.setItem('dailyChinesePatterns', JSON.stringify({ date: getTodayString(), patterns: newPatterns }));
@@ -213,14 +436,20 @@ function setupEventListeners() {
          window.scrollTo(0, 0);
     });
 
+    // 패턴 카드 내부 이벤트 (이벤트 위임)
     patternContainer.addEventListener('click', (e) => {
-        if (e.target.classList.contains('learn-btn')) {
-            const pattern = e.target.dataset.pattern;
+        const target = e.target;
+        
+        // 학습 완료 버튼
+        if (target.classList.contains('learn-btn')) {
+            const pattern = target.dataset.pattern;
             learningCounts[pattern] = (learningCounts[pattern] || 0) + 1;
             saveCounts();
-            e.target.nextElementSibling.querySelector('.count-display').textContent = learningCounts[pattern];
-        } else if (e.target.classList.contains('check-practice-btn')) {
-            const button = e.target;
+            target.nextElementSibling.querySelector('.count-display').textContent = learningCounts[pattern];
+        } 
+        // 정답 확인 버튼
+        else if (target.classList.contains('check-practice-btn')) {
+            const button = target;
             const inputId = button.dataset.inputId;
             const index = inputId.split('-').pop();
             
@@ -238,7 +467,7 @@ function setupEventListeners() {
                     <p class="text-sm">정답:</p>
                     <div class="flex items-center">
                         <p class="text-md chinese-text font-semibold text-gray-800">${correctAnswer}</p>
-                        <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors">
+                        <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${correctAnswer}">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                             </svg>
@@ -267,16 +496,19 @@ function setupEventListeners() {
             button.style.display = 'none';
             document.getElementById(`show-hint-btn-${index}`).style.display = 'none';
 
-        } else if (e.target.classList.contains('show-hint-btn')) {
-            const button = e.target;
+        } 
+        // 힌트 보기 버튼
+        else if (target.classList.contains('show-hint-btn')) {
+            const button = target;
             const patternString = button.dataset.patternString;
             const hintTargetId = button.dataset.hintTarget;
             const hintDiv = document.getElementById(hintTargetId);
 
             const patternData = allPatterns.find(p => p.pattern === patternString);
 
-            if (patternData && patternData.practiceVocab && patternData.practiceVocab.length > 0) {
-                const shuffledVocab = [...patternData.practiceVocab].sort(() => 0.5 - Math.random());
+            // 'practice' 객체 안에 'practiceVocab'이 있는지 확인
+            if (patternData && patternData.practice && patternData.practice.practiceVocab && patternData.practice.practiceVocab.length > 0) {
+                const shuffledVocab = [...patternData.practice.practiceVocab].sort(() => 0.5 - Math.random());
                 
                 const hintsHtml = shuffledVocab.map(hint => `
                     <div class="flex items-baseline" style="line-height: 1.3;">
@@ -303,8 +535,10 @@ function setupEventListeners() {
             
             button.disabled = true;
             button.classList.add('opacity-50', 'cursor-not-allowed');
-        } else if (e.target.classList.contains('retry-practice-btn')) {
-            const index = e.target.dataset.practiceIndex;
+        } 
+        // 다시하기 버튼
+        else if (target.classList.contains('retry-practice-btn')) {
+            const index = target.dataset.practiceIndex;
 
             document.getElementById(`practice-input-${index}`).value = '';
             document.getElementById(`practice-result-${index}`).innerHTML = '';
@@ -316,14 +550,127 @@ function setupEventListeners() {
             hintBtn.disabled = false;
             hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
+        // TTS 버튼 (이벤트 위임으로 변경)
+        else if (target.closest('.tts-btn')) {
+            const ttsButton = target.closest('.tts-btn');
+            const textToSpeak = ttsButton.dataset.text;
+            if (textToSpeak) {
+                playTTS(textToSpeak, ttsButton);
+            }
+        }
     });
     
-    // ... (other event listeners) ...
+    // '직접 말해보기' Enter 키 이벤트
+    patternContainer.addEventListener('keydown', (e) => {
+        if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') {
+            e.preventDefault(); 
+            const checkButton = e.target.nextElementSibling;
+            if (checkButton && checkButton.classList.contains('check-practice-btn')) {
+                checkButton.click();
+            }
+        }
+    });
+    
+    // --- 번역기 모달 이벤트 ---
+    openTranslatorBtn.addEventListener('click', () => translatorModal.classList.remove('hidden'));
+    
+    closeTranslatorBtn.addEventListener('click', () => {
+        translatorModal.classList.add('hidden');
+        if (currentAudio) {
+            currentAudio.pause(); // 모달 닫을 때 오디오 중지
+        }
+    });
+
+    translateBtn.addEventListener('click', handleTranslation);
+    koreanInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleTranslation();
+        }
+    });
+    
+    // 번역 결과 영역의 TTS 버튼 (이벤트 위임)
+    translationResult.addEventListener('click', (e) => {
+        const ttsButton = e.target.closest('.tts-btn');
+        if (ttsButton) {
+            const textToSpeak = ttsButton.dataset.text;
+            if (textToSpeak) {
+                playTTS(textToSpeak, ttsButton);
+            }
+        }
+    });
+
+    // --- 커스텀 알림 닫기 ---
+    customAlertCloseBtn.addEventListener('click', () => customAlertModal.classList.add('hidden'));
+
+    // --- 전체 패턴 보기 모달 이벤트 ---
+    allPatternsBtn.addEventListener('click', () => {
+        allPatternsModal.classList.remove('hidden');
+    });
+
+    closeAllPatternsBtn.addEventListener('click', () => {
+        allPatternsModal.classList.add('hidden');
+    });
+
+    allPatternsList.addEventListener('click', (e) => {
+        const selectedPatternDiv = e.target.closest('[data-pattern-index]');
+        if (selectedPatternDiv) {
+            const patternIndex = parseInt(selectedPatternDiv.dataset.patternIndex, 10);
+            const selectedPattern = allPatterns[patternIndex];
+            if (selectedPattern) {
+                renderPatterns([selectedPattern]);
+                allPatternsModal.classList.add('hidden');
+                window.scrollTo(0, 0);
+            }
+        }
+    });
+
+    // --- AI 채팅 모달 이벤트 ---
+    chatBtn.addEventListener('click', () => {
+        chatModal.classList.remove('hidden');
+        if (conversationHistory.length === 0) {
+             addMessageToHistory('ai', {
+                chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！',
+                pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!',
+                korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!'
+            });
+             // AI 첫 메시지 대화 기록에 추가
+             conversationHistory.push({ 
+                 role: 'model', 
+                 parts: [{ text: JSON.stringify({
+                    chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！',
+                    pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!',
+                    korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!'
+                }) }] 
+            });
+        }
+    });
+
+    closeChatBtn.addEventListener('click', () => chatModal.classList.add('hidden'));
+    
+    sendChatBtn.addEventListener('click', handleSendMessage);
+    
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    });
+
+    // 채팅창 TTS 버튼 (이벤트 위임)
+    chatHistory.addEventListener('click', (e) => {
+        const ttsButton = e.target.closest('.tts-btn');
+        if (ttsButton) {
+            const textToSpeak = ttsButton.dataset.text;
+            if (textToSpeak) {
+                playTTS(textToSpeak, ttsButton);
+            }
+        }
+    });
 }
 
 
-// ... (TTS, Translation, and other helper functions) ...
-
+// --- 앱 초기화 함수 ---
 export function initializeApp(patterns) {
     allPatterns = patterns;
     document.addEventListener('DOMContentLoaded', () => {
@@ -337,3 +684,7 @@ export function initializeApp(patterns) {
     });
 }
 
+// --- 앱 실행 ---
+// DOMContentLoaded는 initializeApp 내에서 처리되므로,
+// patternsData를 즉시 전달하여 앱 초기화 로직을 설정합니다.
+initializeApp(patternsData);
