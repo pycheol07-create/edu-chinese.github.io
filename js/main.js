@@ -134,12 +134,14 @@ function getRandomPatterns() {
     const shuffled = [...allPatterns].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, 2);
 }
+
 function renderPatterns(patterns, showIndex = false) {
     patternContainer.innerHTML = '';
     patterns.forEach((p, index) => {
         const count = learningCounts[p.pattern] || 0;
         const card = document.createElement('div');
         card.className = 'bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300';
+
         const examplesHtml = p.examples.map(ex => `
             <div class="mt-3">
                 <div class="flex items-center">
@@ -151,13 +153,16 @@ function renderPatterns(patterns, showIndex = false) {
                 <p class="text-sm text-gray-500">${ex.pinyin}</p>
                 <p class="text-md text-gray-600">${ex.korean}</p>
             </div>`).join('');
+
         const vocabHtml = p.vocab.map(v => `
             <div class="flex items-baseline">
                 <p class="w-1/3 text-md chinese-text text-gray-700 font-medium">${v.word}</p>
                 <p class="w-1/3 text-sm text-gray-500">${v.pinyin}</p>
                 <p class="w-1/3 text-sm text-gray-600">${v.meaning}</p>
             </div>`).join('');
+
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
+
         const practiceHtml = p.practice ? `
             <div class="mt-6">
                 <h3 class="text-lg font-bold text-gray-700 border-b pb-1">✍️ 직접 말해보기</h3>
@@ -175,6 +180,7 @@ function renderPatterns(patterns, showIndex = false) {
                     <div id="practice-result-${index}" class="mt-3 text-center"></div>
                 </div>
             </div>` : '';
+
         card.innerHTML = `
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center">${indexHtml}<div><h2 class="text-2xl font-bold text-gray-800 chinese-text">${p.pattern}</h2><p class="text-md text-gray-500">${p.pinyin}</p></div></div>
@@ -187,6 +193,7 @@ function renderPatterns(patterns, showIndex = false) {
         patternContainer.appendChild(card);
     });
 }
+
 function loadDailyPatterns() {
     const todayStr = getTodayString();
     const storedData = JSON.parse(localStorage.getItem('dailyChinesePatterns'));
@@ -395,17 +402,29 @@ function initializeSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
-        recognition.lang = 'zh-CN';
+        recognition.lang = 'zh-CN'; // 중국어 설정
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
+
         recognition.onresult = (event) => {
+            console.log("Speech Recognition Result:", event.results); // 결과 로그
             const speechResult = event.results[0][0].transcript;
+            console.log("Recognized Text:", speechResult); // 인식된 텍스트 로그
             chatInput.value = speechResult;
         };
-        recognition.onspeechend = () => { if(isRecognizing) recognition.stop(); };
-        recognition.onnomatch = () => showAlert('음성을 인식하지 못했습니다. 다시 시도해주세요.');
+
+        recognition.onspeechend = () => {
+            console.log("Speech Recognition: Speech has stopped being detected."); // 음성 종료 로그
+            if(isRecognizing) recognition.stop();
+        };
+
+        recognition.onnomatch = () => {
+            console.log("Speech Recognition: No match found."); // 불일치 로그
+            showAlert('음성을 인식하지 못했습니다. 다시 시도해주세요.');
+        };
+
         recognition.onerror = (event) => {
-            console.error("Speech recognition error:", event.error);
+            console.error("Speech Recognition Error:", event.error, event.message); // 오류 상세 로그
             if (event.error !== 'no-speech' && event.error !== 'aborted' && event.error !== 'not-allowed') {
                  showAlert(`음성 인식 오류: ${event.error}. 마이크 권한을 확인하세요.`);
             } else if (event.error === 'not-allowed') {
@@ -414,10 +433,15 @@ function initializeSpeechRecognition() {
              micBtn.classList.remove('is-recording');
              isRecognizing = false;
         };
+
          recognition.onend = () => {
+            console.log("Speech Recognition: Service ended."); // 서비스 종료 로그
             micBtn.classList.remove('is-recording');
             isRecognizing = false;
         };
+
+        console.log("Speech Recognition initialized for zh-CN."); // 초기화 로그
+
     } else {
         console.warn('Web Speech API is not supported in this browser.');
         showAlert('현재 브라우저에서는 음성 인식을 지원하지 않습니다.');
@@ -433,14 +457,15 @@ function setupEventListeners() {
          renderPatterns(newPatterns);
          window.scrollTo(0, 0);
     });
+
     patternContainer.addEventListener('click', (e) => {
         const target = e.target;
-        if (target.classList.contains('learn-btn')) { /* 학습 완료 로직 */
+        if (target.classList.contains('learn-btn')) { // 학습 완료
             const pattern = target.dataset.pattern;
             learningCounts[pattern] = (learningCounts[pattern] || 0) + 1;
             saveCounts();
             target.nextElementSibling.querySelector('.count-display').textContent = learningCounts[pattern];
-        } else if (target.classList.contains('check-practice-btn')) { /* 정답 확인 로직 */
+        } else if (target.classList.contains('check-practice-btn')) { // 정답 확인
             const button = target;
             const inputId = button.dataset.inputId;
             const index = inputId.split('-').pop();
@@ -456,7 +481,7 @@ function setupEventListeners() {
             resultDiv.innerHTML = `${resultMessageHtml}<button class="retry-practice-btn mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">다시하기</button>`;
             button.style.display = 'none';
             const hintButton = document.getElementById(`show-hint-btn-${index}`); if(hintButton) hintButton.style.display = 'none';
-        } else if (target.closest('.show-hint-btn')) { /* 힌트 보기 로직 (이전 데이터 구조 기준) */
+        } else if (target.closest('.show-hint-btn')) { // 힌트 보기 (이전 데이터 구조 기준)
             const button = target.closest('.show-hint-btn');
             const patternString = button.dataset.patternString;
             const hintTargetId = button.dataset.hintTarget;
@@ -473,34 +498,110 @@ function setupEventListeners() {
                 hintDiv.innerHTML = `<p class="text-sm text-gray-500">이 문장에 대한 핵심 단어 정보가 없습니다.</p>`;
             }
             button.disabled = true; button.classList.add('opacity-50', 'cursor-not-allowed');
-        } else if (target.classList.contains('retry-practice-btn')) { /* 다시하기 로직 */
+        } else if (target.classList.contains('retry-practice-btn')) { // 다시하기
             const index = target.dataset.practiceIndex;
             document.getElementById(`practice-input-${index}`).value = '';
             document.getElementById(`practice-result-${index}`).innerHTML = '';
             document.getElementById(`practice-hint-${index}`).innerHTML = '';
             document.getElementById(`check-practice-btn-${index}`).style.display = '';
             const hintBtn = document.getElementById(`show-hint-btn-${index}`); hintBtn.style.display = ''; hintBtn.disabled = false; hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        } else if (target.closest('.tts-btn')) { /* TTS 로직 */
+        } else if (target.closest('.tts-btn')) { // TTS
             const ttsButton = target.closest('.tts-btn');
             const textToSpeak = ttsButton.dataset.text; if (textToSpeak) playTTS(textToSpeak, ttsButton);
         }
     });
-    patternContainer.addEventListener('keydown', (e) => { if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') { e.preventDefault(); const checkButton = e.target.nextElementSibling; if (checkButton?.classList.contains('check-practice-btn')) checkButton.click(); } });
+
+    patternContainer.addEventListener('keydown', (e) => { // Enter 키
+        if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') {
+            e.preventDefault();
+            const checkButton = e.target.nextElementSibling;
+            if (checkButton?.classList.contains('check-practice-btn')) checkButton.click();
+        }
+    });
+
+    // 번역기 모달 이벤트
     openTranslatorBtn.addEventListener('click', () => translatorModal.classList.remove('hidden'));
     closeTranslatorBtn.addEventListener('click', () => { translatorModal.classList.add('hidden'); if (currentAudio) currentAudio.pause(); });
     translateBtn.addEventListener('click', handleTranslation);
     koreanInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTranslation(); } });
     translationResult.addEventListener('click', (e) => { const ttsButton = e.target.closest('.tts-btn'); if (ttsButton) { const textToSpeak = ttsButton.dataset.text; if (textToSpeak) playTTS(textToSpeak, ttsButton); } });
+
+    // 커스텀 알림
     customAlertCloseBtn.addEventListener('click', () => customAlertModal.classList.add('hidden'));
+
+    // 전체 패턴 모달 이벤트
     allPatternsBtn.addEventListener('click', () => allPatternsModal.classList.remove('hidden'));
     closeAllPatternsBtn.addEventListener('click', () => allPatternsModal.classList.add('hidden'));
-    allPatternsList.addEventListener('click', (e) => { const selectedPatternDiv = e.target.closest('[data-pattern-index]'); if (selectedPatternDiv) { const patternIndex = parseInt(selectedPatternDiv.dataset.patternIndex, 10); const selectedPattern = allPatterns[patternIndex]; if (selectedPattern) { renderPatterns([selectedPattern]); allPatternsModal.classList.add('hidden'); window.scrollTo(0, 0); } } });
-    chatBtn.addEventListener('click', () => { chatModal.classList.remove('hidden'); if (conversationHistory.length === 0) { const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' }; addMessageToHistory('ai', firstMsg); conversationHistory.push({ role: 'model', parts: [{ text: JSON.stringify(firstMsg) }] }); } });
-    closeChatBtn.addEventListener('click', () => { chatModal.classList.add('hidden'); if (recognition && isRecognizing) recognition.stop(); });
+    allPatternsList.addEventListener('click', (e) => {
+        const selectedPatternDiv = e.target.closest('[data-pattern-index]');
+        if (selectedPatternDiv) {
+            const patternIndex = parseInt(selectedPatternDiv.dataset.patternIndex, 10);
+            const selectedPattern = allPatterns[patternIndex];
+            if (selectedPattern) {
+                renderPatterns([selectedPattern]);
+                allPatternsModal.classList.add('hidden');
+                window.scrollTo(0, 0);
+            }
+        }
+    });
+
+    // AI 채팅 모달 이벤트
+    chatBtn.addEventListener('click', () => {
+        chatModal.classList.remove('hidden');
+        if (conversationHistory.length === 0) {
+            const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };
+            addMessageToHistory('ai', firstMsg);
+            conversationHistory.push({ role: 'model', parts: [{ text: JSON.stringify(firstMsg) }] });
+        }
+    });
+    closeChatBtn.addEventListener('click', () => {
+        chatModal.classList.add('hidden');
+        if (recognition && isRecognizing) recognition.stop(); // 모달 닫을 때 인식 중지
+    });
     sendChatBtn.addEventListener('click', handleSendMessage);
-    chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
-    chatHistory.addEventListener('click', (e) => { const ttsButton = e.target.closest('.tts-btn'); if (ttsButton) { const textToSpeak = ttsButton.dataset.text; if (textToSpeak) playTTS(textToSpeak, ttsButton); } });
-    micBtn.addEventListener('click', () => { if (!recognition) { showAlert('음성 인식이 지원되지 않거나 초기화되지 않았습니다.'); return; } if (isRecognizing) { recognition.stop(); } else { try { recognition.start(); micBtn.classList.add('is-recording'); isRecognizing = true; } catch(e) { console.error("Speech recognition start error:", e); if (e.name === 'NotAllowedError' || e.name === 'SecurityError') { showAlert("마이크 권한이 필요합니다. 브라우저 설정에서 허용해주세요."); } else { showAlert("음성 인식을 시작할 수 없습니다. 잠시 후 다시 시도해주세요."); } micBtn.classList.remove('is-recording'); isRecognizing = false; } } });
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    });
+    chatHistory.addEventListener('click', (e) => { // 채팅창 내 TTS
+        const ttsButton = e.target.closest('.tts-btn');
+        if (ttsButton) {
+            const textToSpeak = ttsButton.dataset.text;
+            if (textToSpeak) playTTS(textToSpeak, ttsButton);
+        }
+    });
+
+    // 마이크 버튼 이벤트
+    micBtn.addEventListener('click', () => {
+        if (!recognition) {
+             showAlert('음성 인식이 지원되지 않거나 초기화되지 않았습니다.');
+             console.log("Recognition not available or not initialized.");
+            return;
+        }
+        if (isRecognizing) {
+            console.log("Stopping recognition...");
+            recognition.stop();
+            // onend 핸들러가 isRecognizing = false 및 아이콘 상태 변경 처리
+        } else {
+             try {
+                console.log("Starting recognition...");
+                recognition.start();
+                micBtn.classList.add('is-recording'); // 녹음 중 스타일 적용
+                isRecognizing = true;
+            } catch(e) {
+                 console.error("Speech recognition start error:", e);
+                 if (e.name === 'NotAllowedError' || e.name === 'SecurityError') { showAlert("마이크 권한이 필요합니다. 브라우저 설정에서 허용해주세요."); }
+                 else if (e.name === 'InvalidStateError') { showAlert("음성 인식이 이미 진행 중일 수 있습니다."); }
+                 else { showAlert("음성 인식을 시작할 수 없습니다. 잠시 후 다시 시도해주세요."); }
+                 micBtn.classList.remove('is-recording'); // 에러 시 스타일 제거
+                 isRecognizing = false;
+            }
+        }
+    });
+
+    // 답변 추천 버튼 이벤트
     suggestReplyBtn.addEventListener('click', handleSuggestReply);
 }
 
@@ -514,8 +615,8 @@ export function initializeApp(patterns) {
         loadDailyPatterns();
         renderAllPatternsList();
         setupScreenWakeLock();
-        initializeSpeechRecognition();
-        setupEventListeners(); // 모든 이벤트 리스너 설정 복원
+        initializeSpeechRecognition(); // 음성 인식 초기화
+        setupEventListeners(); // 모든 이벤트 리스너 설정
     });
 }
 
