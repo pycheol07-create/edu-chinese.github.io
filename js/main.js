@@ -36,7 +36,7 @@ function initializeDOM() {
     allPatternsModal = document.getElementById('all-patterns-modal');
     closeAllPatternsBtn = document.getElementById('close-all-patterns-btn');
     allPatternsList = document.getElementById('all-patterns-list');
-    chatBtn = document.getElementById('chat-btn');
+    chatBtn = document.getElementById('open-chat-btn'); // <-- ID 변경 적용
     chatModal = document.getElementById('chat-modal');
     closeChatBtn = document.getElementById('close-chat-btn');
     chatHistory = document.getElementById('chat-history');
@@ -487,13 +487,13 @@ function setupEventListeners() {
             const hintTargetId = button.dataset.hintTarget;
             const hintDiv = document.getElementById(hintTargetId);
             const patternData = allPatterns.find(p => p.pattern === patternString);
-            if (patternData && patternData.practiceVocab && patternData.practiceVocab.length > 0) {
+            if (patternData && patternData.practiceVocab && patternData.practiceVocab.length > 0) { // practiceVocab 우선 확인
                 const vocabSource = patternData.practiceVocab;
                 console.log("Using practiceVocab for hint.");
                 const shuffledVocab = [...vocabSource].sort(() => 0.5 - Math.random());
                 const hintsHtml = shuffledVocab.map(hint => `<div class="flex items-baseline" style="line-height: 1.3;"><span class="inline-block w-[40%] font-medium chinese-text pr-2">${hint.word}</span><span class="inline-block w-[40%] text-sm text-gray-500 pr-2">${hint.pinyin}</span><span class="inline-block w-[20%] text-sm text-gray-600">${hint.meaning}</span></div>`).join('');
                 hintDiv.innerHTML = `<div class="bg-white/50 rounded-md p-2 text-left"><div class="flex items-center mb-1"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-0.5 text-yellow-500"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg><span class="font-semibold text-sm text-gray-700">힌트</span></div><div class="border-t border-gray-300/50 pt-1">${hintsHtml}</div></div>`;
-            } else {
+            } else { // practiceVocab 없으면 정보 없음
                 console.log("No practiceVocab found for hint.");
                 hintDiv.innerHTML = `<p class="text-sm text-gray-500">이 문장에 대한 핵심 단어 정보가 없습니다.</p>`;
             }
@@ -545,7 +545,7 @@ function setupEventListeners() {
         }
     });
 
-    // AI 채팅 모달 이벤트
+    // AI 채팅 모달 이벤트 (chatBtn은 이제 플로팅 버튼 ID 참조)
     chatBtn.addEventListener('click', () => {
         chatModal.classList.remove('hidden');
         if (conversationHistory.length === 0) {
@@ -583,7 +583,6 @@ function setupEventListeners() {
         if (isRecognizing) {
             console.log("Stopping recognition...");
             recognition.stop();
-            // onend 핸들러가 isRecognizing = false 및 아이콘 상태 변경 처리
         } else {
              try {
                 console.log("Starting recognition...");
