@@ -114,6 +114,17 @@ function initializeCounts() {
     const storedCounts = localStorage.getItem('chineseLearningCounts');
     learningCounts = storedCounts ? JSON.parse(storedCounts) : {};
 }
+
+function cleanupOldStorage() {
+    const now = Date.now();
+    const lastClean = localStorage.getItem('storageCleanTime');
+    if (!lastClean || now - lastClean > 1000 * 60 * 60 * 24 * 30) { // 30일
+        console.log("Cleaning up old localStorage data...");
+        localStorage.removeItem('dailyChinesePatterns');
+        localStorage.setItem('storageCleanTime', now);
+    }
+}
+
 function saveCounts() {
     localStorage.setItem('chineseLearningCounts', JSON.stringify(learningCounts));
 }
@@ -362,11 +373,16 @@ async function handleTranslation() {
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const translationText = result.candidates[0].content.parts[0].text;
             try {
-                translationData = JSON.parse(translationText);
-            } catch (e) {
-                console.error("AI translation response is not valid JSON:", translationText);
-                translationData = { chinese: translationText, pinyin: "(JSON 파싱 오류)", alternatives: [], explanation: "(설명 파싱 오류)" };
-            }
+    translationData = JSON.parse(translationText);
+    } catch (e) {
+        console.error("AI translation response is not valid JSON:", translationText);
+        translationData = {
+            chinese: translationText.split("\n")[0] || "(응답 없음)",
+            pinyin: "(AI 응답 형식 오류)",
+            alternatives: [],
+            explanation: "AI 응답 형식이 잘못되어 일부 정보가 누락되었습니다. 다시 시도해주세요."
+        };
+    }
         } else {
              console.error("Invalid response structure from translate API:", result);
              translationData = { chinese: "(유효하지 않은 응답)", pinyin: "", alternatives: [], explanation: "" };
@@ -575,30 +591,29 @@ function setupEventListeners() {
 
     // 마이크 버튼 이벤트
     micBtn.addEventListener('click', () => {
-        if (!recognition) {
-             showAlert('음성 인식이 지원되지 않거나 초기화되지 않았습니다.');
-             console.log("Recognition not available or not initialized.");
-            return;
+    if (!recognition) {
+        showAlert('음성 인식이 지원되지 않거나 초기화되지 않았습니다.');
+        console.log("Recognition not available or not initialized.");
+        return;
+    }
+
+    if (isRecognizing) {
+        console.log("Stopping recognition...");
+        recognition.stop();
+    } else {
+        try {
+            console.log("Starting recognition...");
+            recognition.start();
+            micBtn.classList.add('is-recording');
+            isRecognizing = true;
+        } catch (e) {
+            console.error("Speech recognition start error:", e);
+            micBtn.classList.remove('is-recording');
+            isRecognizing = false;
+            showAlert(`음성 인식 시작 오류: ${e.message || e.name}`);
         }
-        if (isRecognizing) {
-            console.log("Stopping recognition...");
-            recognition.stop();
-        } else {
-             try {
-                console.log("Starting recognition...");
-                recognition.start();
-                micBtn.classList.add('is-recording'); // 녹음 중 스타일 적용
-                isRecognizing = true;
-            } catch(e) {
-                 console.error("Speech recognition start error:", e);
-                 if (e.name === 'NotAllowedError' || e.name === 'SecurityError') { showAlert("마이크 권한이 필요합니다. 브라우저 설정에서 허용해주세요."); }
-                 else if (e.name === 'InvalidStateError') { showAlert("음성 인식이 이미 진행 중일 수 있습니다."); }
-                 else { showAlert("음성 인식을 시작할 수 없습니다. 잠시 후 다시 시도해주세요."); }
-                 micBtn.classList.remove('is-recording'); // 에러 시 스타일 제거
-                 isRecognizing = false;
-            }
-        }
-    });
+    }
+});
 
     // 답변 추천 버튼 이벤트
     suggestReplyBtn.addEventListener('click', handleSuggestReply);
@@ -609,6 +624,7 @@ export function initializeApp(patterns) {
     allPatterns = patterns; // 복원된 데이터 사용
     document.addEventListener('DOMContentLoaded', () => {
         initializeDOM();
+        cleanupOldStorage();
         displayDate();
         initializeCounts();
         loadDailyPatterns();

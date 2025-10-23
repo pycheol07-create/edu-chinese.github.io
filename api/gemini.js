@@ -2,6 +2,12 @@
 // 이 파일은 절대 사용자에게 노출되지 않습니다.
 
 export default async function handler(request, response) {
+
+// 🔹 모델 캐싱을 위한 전역 변수 (API 호출 성능 개선)
+  // 한 번 모델을 가져오면 이후 요청에서는 재사용합니다.
+  // (함수 실행 중 유지되며, Vercel 함수 재시작 시 초기화됩니다.)
+  let cachedModel = null;
+
   // 1. Vercel에 저장된 환경 변수에서 API 키를 안전하게 가져옵니다.
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -18,6 +24,7 @@ export default async function handler(request, response) {
 
     // TTS가 아닌 경우 (번역, 채팅, 답변 추천) 모델 동적 선택 필요
     if (action !== 'tts') {
+    if (!cachedModel) {
         const listModelsRes = await fetch(
             `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`
         );
@@ -27,21 +34,17 @@ export default async function handler(request, response) {
         }
         const modelData = await listModelsRes.json();
         const availableModels = modelData.models || [];
-
-        const chosenModel =
+        cachedModel =
             availableModels.find(m => m.name.includes('flash') && m.supportedGenerationMethods.includes('generateContent')) ||
             availableModels.find(m => m.name.includes('gemini-1.0-pro') && m.supportedGenerationMethods.includes('generateContent')) ||
-            availableModels.find(m => m.name.includes('gemini-pro') && m.supportedGenerationMethods.includes('generateContent'));
-
-        if (!chosenModel) {
-            console.warn('API 키로 접근 가능한 (flash 또는 pro) 모델을 찾지 못해 기본 모델(gemini-1.0-pro)을 사용합니다.');
-        } else {
-             modelShortName = chosenModel.name.split('/').pop();
-             console.log("Using model:", modelShortName); // 어떤 모델 쓰는지 로그 출력
-        }
-
-        apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelShortName}:generateContent?key=${apiKey}`;
+            availableModels.find(m => m.name.includes('gemini-pro') && m.supportedGenerationMethods.includes('generateContent')) ||
+            { name: 'models/gemini-1.0-pro' };
     }
+
+    modelShortName = cachedModel.name.split('/').pop();
+    apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelShortName}:generateContent?key=${apiKey}`;
+}
+
 
     // 3. 액션별 요청 본문 설정
     if (action === 'translate') {
@@ -59,6 +62,15 @@ export default async function handler(request, response) {
 - "chinese": Your response in simplified Chinese characters.
 - "pinyin": The pinyin for your Chinese response.
 - "korean": A natural Korean translation of your Chinese response.`;
+
+    else if (action === 'correction') {
+        const prompt = `Please correct the following Chinese sentence and explain why it is incorrect. 
+    Respond ONLY in JSON with keys: "corrected", "pinyin", "explanation" (Korean).
+    Example: {"corrected":"我昨天去了公园玩。","pinyin":"Wǒ zuótiān qùle gōngyuán wán.","explanation":"‘了’의 위치가 잘못되었음"}`;
+        apiRequestBody = {
+            contents: [{ parts: [{ text: `${prompt}\n\nSentence: "${text}"` }] }]
+        };
+    }
 
         const contents = [
             { role: "user", parts: [{ text: "Please follow these instructions for all future responses: " + chatSystemPrompt }] },
@@ -185,5 +197,6 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: error.message });
   }
 }
+
 
 // v.2025.10.20_1101-10
