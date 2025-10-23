@@ -9,17 +9,17 @@ export default async function handler(request, response) {
   }
 
   // 2. 프런트엔드에서 보낸 요청 데이터를 받습니다.
-  const { action, text, systemPrompt, history, pattern } = request.body;
+  const { action, text, systemPrompt, history, pattern } = request.body; // 'text' will be used for writing correction
 
   try {
     let apiUrl;
     let apiRequestBody;
     let modelShortName = 'gemini-1.0-pro'; // 기본 모델 설정
 
-    // TTS가 아닌 경우 (번역, 채팅, 답변 추천, 패턴 채팅 시작, 문제 생성) 모델 동적 선택 필요
+    // TTS가 아닌 경우 (번역, 채팅, 답변 추천, 패턴 채팅 시작, 문제 생성, 작문 교정) 모델 동적 선택 필요
     if (action !== 'tts') {
         const listModelsRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}` // 오타 수정: language
+            `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`
         );
         if (!listModelsRes.ok) {
             const errData = await listModelsRes.json();
@@ -56,20 +56,10 @@ export default async function handler(request, response) {
 - **VERY IMPORTANT:** Analyze the user's *last* message for grammatical errors or unnatural expressions.
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
-
-- "chinese": Your *new* conversational response in simplified Chinese (e.g., "你今天过得怎么样？").
+- "chinese": Your *new* conversational response in simplified Chinese.
 - "pinyin": The pinyin for your "chinese" response.
 - "korean": A natural Korean translation of your "chinese" response.
-- "correction": An object containing feedback on the *user's previous message*, OR \`null\`.
-    - If the user's message was grammatically correct and natural, set "correction" to: \`null\`.
-    - If the user's message had an error:
-        - Set "correction" to an object with keys: "original" (the user's text), "corrected" (the corrected Chinese text), and "explanation" (a simple explanation *in Korean* of what was wrong and why).
-
-- Example if user said "我昨天去公园了玩":
-  {"chinese": "哦，你昨天去公园玩了啊！公园里人多吗？", "pinyin": "Ò, nǐ zuótiān qù gōngyuán wán le a! Gōngyuán lǐ rén duō ma?", "korean": "오, 어제 공원에 놀러 갔군요! 공원에 사람 많았어요?", "correction": {"original": "我昨天去公园了玩", "corrected": "我昨天去公园玩了", "explanation": "'了'는 동사 '玩' 뒤에 와야 해요. '...了玩'은 올바르지 않아요."}}
-- Example if user said "你好":
-  {"chinese": "你好！你吃饭了吗？", "pinyin": "Nǐ hǎo! Nǐ chīfàn le ma?", "korean": "안녕하세요! 밥 먹었어요?", "correction": null}
-`;
+- "correction": An object containing feedback on the *user's previous message*, OR \`null\`. If correct, set to \`null\`. If error, include "original", "corrected", and "explanation" (in Korean).`;
         const contents = [
             { role: "user", parts: [{ text: "Please follow these instructions for all future responses: " + chatSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I understand. I will act as Ling and respond in the required JSON format, including grammar corrections." }] },
@@ -77,59 +67,61 @@ export default async function handler(request, response) {
             { role: "user", parts: [{ text: text }] }
         ];
         apiRequestBody = { contents };
-    
-    } else if (action === 'start_chat_with_pattern') {
-        const startChatSystemPrompt = `You are "Ling" (灵), a friendly native Chinese speaker and language tutor. Your goal is to help a user learning Chinese.
-- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
-- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
-- Set "correction" to \`null\` for this first message.
-- Your *very first message* must be a natural, conversational question that cleverly uses or relates to the Chinese pattern: "${pattern}".
-- Ask a question to encourage the user to reply, perhaps using the same pattern.
-- Example for pattern "A是A, 但是B": {"chinese": "今天天气好是好, 但是有点儿热。你觉得呢？", "pinyin": "Jīntiān tiānqì hǎo shì hǎo, dànshì yǒudiǎnr rè. Nǐ juéde ne?", "korean": "오늘 날씨가 좋긴 좋은데, 조금 덥네요. 당신은 어때요?", "correction": null}`;
 
+    } else if (action === 'start_chat_with_pattern') {
+        const startChatSystemPrompt = `You are "Ling" (灵), a friendly native Chinese speaker and language tutor.
+- Your entire response MUST be a single, valid JSON object (no markdown) with keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\`.
+- Your *first message* must be a natural, conversational question using or relating to the pattern: "${pattern}". Encourage the user to reply.`;
         const contents = [
             { role: "user", parts: [{ text: startChatSystemPrompt }] },
             { role: "model", parts: [{ text: `Okay, I understand. I will act as Ling and respond in the required JSON format.` }] },
             { role: "user", parts: [{ text: `Great. Now, please start the conversation by asking me a question using the pattern "${pattern}".` }] }
         ];
         apiRequestBody = { contents };
-    
-    // --- [확인 및 수정]: `generate_practice` 액션 ---
-    } else if (action === 'generate_practice') {
-        const practiceSystemPrompt = `You are a Chinese language teacher. Your task is to generate one new, simple practice problem for the given Chinese pattern.
-- The problem must be different from the examples provided in the pattern data.
-- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
-- The JSON object must have these exact keys: "korean" (string), "chinese" (string), "pinyin" (string), and "practiceVocab" (array).
-- "korean": A simple Korean sentence for the user to translate.
-- "chinese": The correct Chinese translation (the answer).
-- "pinyin": The pinyin for the Chinese answer.
-- "practiceVocab": An array of 2-3 key vocabulary objects used in the "chinese" answer. Each object must have keys: "word", "pinyin", "meaning".
 
-- Pattern to use: "${pattern}"
-- Example Response (for pattern "越来越..."):
-  {"korean": "그는 점점 더 잘생겨져.", "chinese": "他越来越帅了。", "pinyin": "tā yuèláiyuè shuài le.", "practiceVocab": [{"word": "越来越", "pinyin": "yuèláiyuè", "meaning": "점점 더"}, {"word": "帅", "pinyin": "shuài", "meaning": "잘생기다"}]}`;
-        
-        // [수정 확인] contents 배열 마지막이 'user' 역할로 끝나야 함
+    } else if (action === 'generate_practice') {
+        const practiceSystemPrompt = `You are a Chinese language teacher. Generate one new, simple practice problem for the pattern: "${pattern}".
+- Must be different from typical examples.
+- Response MUST be a single valid JSON object (no markdown) with keys: "korean" (string), "chinese" (string), "pinyin" (string), and "practiceVocab" (array of {word, pinyin, meaning} for 2-3 key words).`;
         const contents = [
             { role: "user", parts: [{ text: practiceSystemPrompt }] },
-            { role: "model", parts: [{ text: `Okay, I understand. I will generate a new practice problem for the pattern "${pattern}" in the specified JSON format, including "practiceVocab".` }] },
-            // 마지막 메시지가 AI에게 생성을 '명령'하는 user 역할이어야 합니다.
-            { role: "user", parts: [{ text: `Great. Now, please generate the practice problem for the pattern "${pattern}".` }] } // 이 부분이 이전 코드에서 정확했는지 다시 확인 (이번 코드는 확실히 맞습니다)
+            { role: "model", parts: [{ text: `Okay, I will generate a new practice problem for the pattern "${pattern}" in the specified JSON format, including "practiceVocab".` }] },
+            { role: "user", parts: [{ text: `Great. Now, please generate the practice problem for the pattern "${pattern}".` }] }
         ];
         apiRequestBody = { contents };
-    // --- [수정 완료] ---
-        
-    } else if (action === 'suggest_reply') {
-        const suggestSystemPrompt = `Based on the previous conversation history, suggest 1 or 2 simple and natural next replies in Chinese for the user who is learning Chinese. The user just received the last message from the AI model.
-- Provide only the suggested replies with their pinyin and Korean meaning.
-- Your entire response MUST be a single, valid JSON object containing a key "suggestions" which is an array of objects.
-- Each object in the "suggestions" array must have three keys: "chinese" (string), "pinyin" (string), "korean" (string, the Korean meaning).
-- Example: {"suggestions": [{"chinese": "你好!", "pinyin": "Nǐ hǎo!", "korean": "안녕하세요!"}, {"chinese": "谢谢你。", "pinyin": "Xièxie nǐ.", "korean": "고마워요."}]}
-- Do not include any other text or markdown backticks.`;
 
+    // --- [FEATURE 1 START: 'correct_writing' 액션 추가] ---
+    } else if (action === 'correct_writing') {
+        const writingSystemPrompt = `You are a Chinese language teacher evaluating a student's writing.
+- Analyze the provided Chinese sentence ("${text}") for grammatical errors, unnatural phrasing, or typos.
+- If the sentence is perfect and natural, congratulate the student.
+- If there are errors, provide the corrected sentence and a simple explanation of the mistakes *in Korean*.
+- Your entire response MUST be a single, valid JSON object (no markdown) with keys: "corrected_sentence" (string) and "explanation" (string, in Korean).
+- If the original sentence was perfect, "corrected_sentence" should be the original sentence, and the explanation should praise the student.
+
+Example (Error):
+User input: "我昨天去公园了玩"
+Response: {"corrected_sentence": "我昨天去公园玩了。", "explanation": "'了'는 보통 동사 뒤에 와서 동작의 완료를 나타내요. '去公园玩(공원에 가서 놀다)' 뒤에 '了'를 붙이는 것이 자연스러워요."}
+
+Example (Correct):
+User input: "我的爱好是看电影。"
+Response: {"corrected_sentence": "我的爱好是看电影。", "explanation": "훌륭해요! 문법적으로 완벽하고 아주 자연스러운 문장입니다. 👍"}
+`;
+        const contents = [
+             // No need for a model 'okay' response here, just the instruction.
+            { role: "user", parts: [{ text: writingSystemPrompt }] }
+            // The model will generate the correction based on the prompt implicitly containing the user's text.
+        ];
+        apiRequestBody = { contents };
+    // --- [FEATURE 1 END] ---
+
+    } else if (action === 'suggest_reply') {
+        const suggestSystemPrompt = `Based on the previous conversation history, suggest 1-2 simple, natural Chinese replies for the user (a learner).
+- Response MUST be a single valid JSON object (no markdown) with a key "suggestions" (array of {chinese, pinyin, korean}).`;
          const contents = [
             { role: "user", parts: [{ text: suggestSystemPrompt }] },
-            { role: "model", parts: [{ text: "Okay, I will provide reply suggestions including pinyin and Korean meaning in the specified JSON format." }] }, 
+            { role: "model", parts: [{ text: "Okay, I will provide reply suggestions including pinyin and Korean meaning in the specified JSON format." }] },
             ...history
         ];
         apiRequestBody = { contents };
@@ -165,7 +157,7 @@ export default async function handler(request, response) {
         return response.status(200).json(data);
     }
 
-    // 번역, 채팅, 답변 추천, 패턴 채팅 시작, 문제 생성 응답 처리 (v1 응답 구조 확인)
+    // 번역, 채팅, 추천, 패턴 시작, 문제 생성, 작문 교정 응답 처리
     if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
         console.error("Invalid response structure from Google API:", data);
          if (data.promptFeedback && data.promptFeedback.blockReason) {
@@ -179,6 +171,7 @@ export default async function handler(request, response) {
     }
 
      if (action === 'suggest_reply') {
+        // ... (suggest_reply 파싱 로직 - 변경 없음) ...
         let suggestionData = null;
         let foundSuggestions = false;
         for (const part of data.candidates[0].content.parts) {
@@ -188,18 +181,17 @@ export default async function handler(request, response) {
                 const parsedPart = JSON.parse(jsonText);
 
                 if (parsedPart.suggestions && Array.isArray(parsedPart.suggestions) &&
-                    parsedPart.suggestions.length > 0 &&
-                    parsedPart.suggestions.every(item => 
+                    // Allow empty suggestions array
+                    (parsedPart.suggestions.length === 0 ||
+                     (parsedPart.suggestions.length > 0 &&
+                      parsedPart.suggestions.every(item =>
                         typeof item === 'object' &&
                         item.hasOwnProperty('chinese') &&
                         item.hasOwnProperty('pinyin') &&
-                        item.hasOwnProperty('korean') 
-                    ))
+                        item.hasOwnProperty('korean')
+                    )))
+                )
                 {
-                    suggestionData = parsedPart;
-                    foundSuggestions = true;
-                    break; 
-                } else if (parsedPart.suggestions && Array.isArray(parsedPart.suggestions) && parsedPart.suggestions.length === 0) {
                     suggestionData = parsedPart;
                     foundSuggestions = true;
                     break;
@@ -208,16 +200,15 @@ export default async function handler(request, response) {
                 console.warn("Ignoring non-JSON or invalid JSON part in suggest_reply:", part.text);
             }
         }
-
         if (foundSuggestions && suggestionData) {
             return response.status(200).json(suggestionData);
         } else {
             console.error("Could not find valid 'suggestions' JSON object array with required keys (chinese, pinyin, korean) in any response parts:", JSON.stringify(data.candidates[0].content.parts, null, 2));
-            throw new Error("AI로부터 유효한 답변 추천(병음, 뜻 포함) JSON 형식을 찾지 못했습니다."); 
+            throw new Error("AI로부터 유효한 답변 추천(병음, 뜻 포함) JSON 형식을 찾지 못했습니다.");
         }
     }
 
-    // 번역, 채팅, 패턴 채팅 시작, 문제 생성은 data 전체를 반환 (프론트엔드에서 파싱)
+    // 번역, 채팅, 패턴 시작, 문제 생성, 작문 교정은 data 전체를 반환 (프론트엔드에서 파싱)
     return response.status(200).json(data);
 
   } catch (error) {
@@ -226,4 +217,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1101-10
+// v.2025.10.23_1500
