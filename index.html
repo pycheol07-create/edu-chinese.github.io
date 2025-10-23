@@ -50,10 +50,35 @@
             color: #ef4444; /* Tailwind red-500 */
             animation: pulse 1.2s ease-in-out infinite;
         }
-        /* [추가] 플로팅 버튼 위치용 */
-        .bottom-42 {
-            bottom: 10.5rem; /* 168px */
+        
+        /* [수정] FAB (플로팅 버튼) 관련 스타일 */
+        .fab-sub-button {
+            opacity: 0;
+            transform: translateY(1rem) scale(0.9);
+            pointer-events: none;
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
         }
+        
+        /* FAB가 열렸을 때 (is-open) 서브 버튼 스타일 */
+        #fab-container.is-open .fab-sub-button {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        /* FAB가 열렸을 때 서브 버튼별 애니메이션 지연 (아래서부터 순서대로) */
+        #fab-container.is-open #open-translator-btn { transition-delay: 0.0s; }
+        #fab-container.is-open #open-correction-btn { transition-delay: 0.1s; }
+        #fab-container.is-open #open-chat-btn { transition-delay: 0.2s; }
+
+        /* FAB가 열렸을 때 메인 버튼 아이콘 회전 */
+        #fab-main-btn svg {
+            transition: transform 0.3s ease-in-out;
+        }
+        #fab-container.is-open #fab-main-btn svg {
+            transform: rotate(45deg);
+        }
+        /* [FAB 수정 완료] */
     </style>
 </head>
 <body class="bg-gray-100">
@@ -78,28 +103,41 @@
                 <button id="daily-quiz-btn" class="w-full md:w-auto bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 shadow-lg text-lg">
                     오늘의 퀴즈 📝
                 </button>
-                </div>
+            </div>
             <p class="text-xs text-gray-400 mt-4">매일 자정이 지나면 새로운 패턴이 자동으로 표시됩니다.</p>
             </footer>
     </div>
 
-    <button id="open-correction-btn" title="AI 자유 작문 교정" class="fixed bottom-42 right-6 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-full w-16 h-16 flex items-center justify-center shadow-xl transition-transform transform hover:scale-110">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-        </svg>
-    </button>
-    <button id="open-chat-btn" title="AI와 대화하기" class="fixed bottom-24 right-6 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-full w-16 h-16 flex items-center justify-center shadow-xl transition-transform transform hover:scale-110">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-3.04 8.3-7.146 9.574a18.79 18.79 0 0 1-8.708 0C3.04 20.3 0 16.556 0 12c0-4.556 3.04-8.3 7.146-9.574a18.79 18.79 0 0 1 8.708 0C17.96 3.7 21 7.444 21 12Z" />
-        </svg>
-    </button>
+    <div id="fab-container" class="fixed bottom-6 right-6 flex flex-col items-center z-30">
+        
+        <div id="fab-menu" class="flex flex-col-reverse items-center space-y-3 space-y-reverse mb-3">
+            
+            <button id="open-chat-btn" title="AI와 대화하기" class="fab-sub-button bg-purple-600 hover:bg-purple-700 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-3.04 8.3-7.146 9.574a18.79 18.79 0 0 1-8.708 0C3.04 20.3 0 16.556 0 12c0-4.556 3.04-8.3 7.146-9.574a18.79 18.79 0 0 1 8.708 0C17.96 3.7 21 7.444 21 12Z" />
+                </svg>
+            </button>
 
-    <button id="open-translator-btn" title="번역하기" class="fixed bottom-6 right-6 bg-green-500 hover:bg-green-600 text-white font-bold rounded-full w-16 h-16 flex items-center justify-center shadow-xl transition-transform transform hover:scale-110">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-        </svg>
-    </button>
+            <button id="open-correction-btn" title="AI 자유 작문 교정" class="fab-sub-button bg-orange-500 hover:bg-orange-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                </svg>
+            </button>
 
+            <button id="open-translator-btn" title="번역하기" class="fab-sub-button bg-green-500 hover:bg-green-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                </svg>
+            </button>
+
+        </div>
+
+        <button id="fab-main-btn" title="메뉴 열기" class="bg-blue-600 hover:bg-blue-700 text-white w-16 h-16 rounded-full shadow-xl flex items-center justify-center transition-transform duration-300 transform hover:scale-110 z-10">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-8 h-8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+        </button>
+    </div>
     <div id="translator-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 relative flex flex-col max-h-[90vh]">
             <div class="flex-shrink-0">
@@ -133,15 +171,48 @@
                     </button>
                 </div>
                 <p class="text-gray-600 mb-4">연습하고 싶은 중국어 문장을 자유롭게 작성해보세요. AI가 문법과 어색한 표현을 교정해 드립니다.</p>
+                
+                <div id="topic-suggestion-container" class="mb-4 p-3 bg-gray-50 rounded-lg text-center">
+                    <p id="writing-topic-display" class="text-gray-700 italic">"주제 추천받기" 버튼을 눌러보세요!</p>
+                    <button id="get-topic-btn" class="mt-2 text-sm text-blue-600 hover:text-blue-800">💡 오늘의 작문 주제 추천받기</button>
+                </div>
+
                 <textarea id="correction-input" class="w-full p-2 border border-gray-300 rounded-md h-32 chinese-text" placeholder="예) 我昨天去公园了玩。"></textarea>
-                <button id="correct-writing-btn" class="w-full mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg">교정받기</button>
-            </div>
+                <div class="flex items-center space-x-2 mt-4">
+                    <button id="correct-writing-btn" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg">교정받기</button>
+                    <button id="open-correction-history-btn" title="내 교정 노트 보기" class="flex-shrink-0 p-2 bg-gray-200 hover:bg-gray-300 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-700">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+                        </svg>
+                    </button>
+                </div>
+                </div>
             <div id="correction-result" class="mt-4 p-4 bg-gray-50 rounded-md min-h-[100px] overflow-y-auto">
                  <p class="text-gray-400 text-center">결과가 여기에 표시됩니다.</p>
             </div>
         </div>
     </div>
 
+    <div id="correction-history-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+       <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6 relative flex flex-col max-h-[90vh]">
+            <div class="flex-shrink-0">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">내 교정 노트 📖</h2>
+                    <button id="close-correction-history-btn" class="p-1 rounded-full hover:bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-gray-600 mb-4">지금까지 교정받은 내역입니다. 클릭하면 TTS로 들을 수 있습니다.</p>
+            </div>
+            <div id="correction-history-list" class="mt-2 overflow-y-auto divide-y flex-grow">
+                </div>
+            <button id="clear-correction-history-btn" class="mt-4 w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
+                모든 기록 삭제하기
+            </button>
+        </div>
+    </div>
     <div id="custom-alert-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 text-center">
             <p id="custom-alert-message" class="text-gray-700 mb-4"></p>
