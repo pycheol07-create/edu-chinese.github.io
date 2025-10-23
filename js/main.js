@@ -402,18 +402,43 @@ async function handleStartChatWithPattern(patternString) {
         let aiResponseData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const aiResponseText = result.candidates[0].content.parts[0].text;
-            try {
-                aiResponseData = JSON.parse(aiResponseText);
-                // 이 첫 번째 메시지를 대화 기록에 추가
-                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
-            } catch (e) {
-                console.error("AI response is not valid JSON:", aiResponseText);
-                aiResponseData = { chinese: aiResponseText, pinyin: "(JSON 파싱 오류)", korean: "(번역 오류)" };
-                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+
+            // --- [FIX 3 START: JSON 파싱 안정성 강화 (패턴 시작용)] ---
+            // 1. 응답이 비어있거나 JSON 형태({)가 아닌지 먼저 확인
+            if (!aiResponseText || !aiResponseText.trim().startsWith('{')) {
+                console.error("AI response is not valid JSON (or is empty) in start_chat_with_pattern:", aiResponseText);
+                // 2. 사용자에게 친절한 오류 메시지 표시
+                aiResponseData = { 
+                    chinese: "哎呀，我好像走神了...", 
+                    pinyin: "Āiyā, wǒ hǎoxiàng zǒushén le...", 
+                    korean: "어머, 제가 잠시 딴생각을 했나 봐요. '패턴으로 대화' 버튼을 다시 한 번 눌러주시겠어요?" 
+                };
+                // (이 오류 응답은 대화 기록에 저장하지 않음)
+            } else {
+                // 3. 유효한 JSON 형태일 때만 파싱 시도
+                try {
+                    aiResponseData = JSON.parse(aiResponseText);
+                    // 성공한 경우에만 대화 기록에 저장
+                    conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+                } catch (e) {
+                    console.error("AI response looked like JSON but failed to parse in start_chat_with_pattern:", aiResponseText, e);
+                    aiResponseData = { 
+                        chinese: "糟糕... (zāogāo)", 
+                        pinyin: "", 
+                        korean: "이런... 응답 형식을 처리하는 데 실패했어요. 다시 시도해주세요."
+                    };
+                    conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+                }
             }
+            // --- [FIX 3 END] ---
+
         } else {
              console.error("Invalid response structure from start_chat_with_pattern API:", result);
-             aiResponseData = { chinese: "(유효하지 않은 응답)", pinyin: "", korean: "" };
+             aiResponseData = { 
+                chinese: "(응답 없음)", 
+                pinyin: "", 
+                korean: "AI로부터 유효한 응답을 받지 못했습니다."
+             };
         }
         // 첫 번째 AI 메시지 표시
         addMessageToHistory('ai', aiResponseData);
