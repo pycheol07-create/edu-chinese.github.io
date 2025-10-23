@@ -62,21 +62,21 @@ export default async function handler(request, response) {
 - "chinese": Your *new* conversational response in simplified Chinese (e.g., "你今天过得怎么样？").
 - "pinyin": The pinyin for your "chinese" response.
 - "korean": A natural Korean translation of your "chinese" response.
-- "correction": An object containing feedback on the *user's previous message*, OR `null`.
-    - If the user's message was grammatically correct and natural, set "correction" to: `null`.
+- "correction": An object containing feedback on the *user's previous message*, OR \`null\`.
+    - If the user's message was grammatically correct and natural, set "correction" to: \`null\`.
     - If the user's message had an error:
         - Set "correction" to an object with keys: "original" (the user's text), "corrected" (the corrected Chinese text), and "explanation" (a simple explanation *in Korean* of what was wrong and why).
-    
+
 - Example if user said "我昨天去公园了玩":
-  `{"chinese": "哦，你昨天去公园玩了啊！公园里人多吗？", "pinyin": "Ò, nǐ zuótiān qù gōngyuán wán le a! Gōngyuán lǐ rén duō ma?", "korean": "오, 어제 공원에 놀러 갔군요! 공원에 사람 많았어요?", "correction": {"original": "我昨天去公园了玩", "corrected": "我昨天去公园玩了", "explanation": "'了'는 동사 '玩' 뒤에 와야 해요. '...了玩'은 올바르지 않아요."}}`
+  {"chinese": "哦，你昨天去公园玩了啊！公园里人多吗？", "pinyin": "Ò, nǐ zuótiān qù gōngyuán wán le a! Gōngyuán lǐ rén duō ma?", "korean": "오, 어제 공원에 놀러 갔군요! 공원에 사람 많았어요?", "correction": {"original": "我昨天去公园了玩", "corrected": "我昨天去公园玩了", "explanation": "'了'는 동사 '玩' 뒤에 와야 해요. '...了玩'은 올바르지 않아요."}}
 - Example if user said "你好":
-  `{"chinese": "你好！你吃饭了吗？", "pinyin": "Nǐ hǎo! Nǐ chīfàn le ma?", "korean": "안녕하세요! 밥 먹었어요?", "correction": null}`
+  {"chinese": "你好！你吃饭了吗？", "pinyin": "Nǐ hǎo! Nǐ chīfàn le ma?", "korean": "안녕하세요! 밥 먹었어요?", "correction": null}
 `;
-        // --- [FEATURE UPDATE END] ---
+        // --- [FEATURE UPDATE END & BUG FIX] ---
 
         const contents = [
             { role: "user", parts: [{ text: "Please follow these instructions for all future responses: " + chatSystemPrompt }] },
-            { role: "model", parts: [{ text: "Okay, I understand. I will act as Ling and respond in the required JSON format, including grammar corrections." }] }, // AI 응답 수정
+            { role: "model", parts: [{ text: "Okay, I understand. I will act as Ling and respond in the required JSON format, including grammar corrections." }] },
             ...history,
             { role: "user", parts: [{ text: text }] }
         ];
