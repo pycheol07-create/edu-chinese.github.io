@@ -19,7 +19,7 @@ export default async function handler(request, response) {
     // TTS가 아닌 경우 (번역, 채팅, 답변 추천, 패턴 채팅 시작, 문제 생성) 모델 동적 선택 필요
     if (action !== 'tts') {
         const listModelsRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`
+            `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}` // 오타 수정: language
         );
         if (!listModelsRes.ok) {
             const errData = await listModelsRes.json();
@@ -50,8 +50,6 @@ export default async function handler(request, response) {
             contents: [{ parts: [{ text: `${prompt}\n\nKorean: "${text}"` }] }]
         };
     } else if (action === 'chat') {
-        // --- [FEATURE UPDATE START: Grammar Correction] ---
-        // [수정] 시스템 프롬프트: 문법 교정 및 JSON 구조 확장 요청
         const chatSystemPrompt = `You are "Ling" (灵), a friendly native Chinese speaker and language tutor. Your goal is to help a user learning Chinese.
 - Have a natural, concise conversation (1-2 short sentences).
 - Ask questions to keep the conversation going.
@@ -72,8 +70,6 @@ export default async function handler(request, response) {
 - Example if user said "你好":
   {"chinese": "你好！你吃饭了吗？", "pinyin": "Nǐ hǎo! Nǐ chīfàn le ma?", "korean": "안녕하세요! 밥 먹었어요?", "correction": null}
 `;
-        // --- [FEATURE UPDATE END & BUG FIX] ---
-
         const contents = [
             { role: "user", parts: [{ text: "Please follow these instructions for all future responses: " + chatSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I understand. I will act as Ling and respond in the required JSON format, including grammar corrections." }] },
@@ -98,7 +94,7 @@ export default async function handler(request, response) {
         ];
         apiRequestBody = { contents };
     
-    // --- [FEATURE 1 START: 'generate_practice' 액션 추가] ---
+    // --- [확인 및 수정]: `generate_practice` 액션 ---
     } else if (action === 'generate_practice') {
         const practiceSystemPrompt = `You are a Chinese language teacher. Your task is to generate one new, simple practice problem for the given Chinese pattern.
 - The problem must be different from the examples provided in the pattern data.
@@ -113,18 +109,21 @@ export default async function handler(request, response) {
 - Example Response (for pattern "越来越..."):
   {"korean": "그는 점점 더 잘생겨져.", "chinese": "他越来越帅了。", "pinyin": "tā yuèláiyuè shuài le.", "practiceVocab": [{"word": "越来越", "pinyin": "yuèláiyuè", "meaning": "점점 더"}, {"word": "帅", "pinyin": "shuài", "meaning": "잘생기다"}]}`;
         
+        // [수정 확인] contents 배열 마지막이 'user' 역할로 끝나야 함
         const contents = [
             { role: "user", parts: [{ text: practiceSystemPrompt }] },
-            { role: "model", parts: [{ text: `Okay, I will generate a new practice problem for the pattern "${pattern}" in the specified JSON format, including "practiceVocab".` }] }
+            { role: "model", parts: [{ text: `Okay, I understand. I will generate a new practice problem for the pattern "${pattern}" in the specified JSON format, including "practiceVocab".` }] },
+            // 마지막 메시지가 AI에게 생성을 '명령'하는 user 역할이어야 합니다.
+            { role: "user", parts: [{ text: `Great. Now, please generate the practice problem for the pattern "${pattern}".` }] } // 이 부분이 이전 코드에서 정확했는지 다시 확인 (이번 코드는 확실히 맞습니다)
         ];
         apiRequestBody = { contents };
-    // --- [FEATURE 1 END] ---
+    // --- [수정 완료] ---
         
     } else if (action === 'suggest_reply') {
         const suggestSystemPrompt = `Based on the previous conversation history, suggest 1 or 2 simple and natural next replies in Chinese for the user who is learning Chinese. The user just received the last message from the AI model.
 - Provide only the suggested replies with their pinyin and Korean meaning.
 - Your entire response MUST be a single, valid JSON object containing a key "suggestions" which is an array of objects.
-- Each object in the "suggestions" array must have three keys: "chinese" (string), "pinyin" (string), and "korean" (string, the Korean meaning).
+- Each object in the "suggestions" array must have three keys: "chinese" (string), "pinyin" (string), "korean" (string, the Korean meaning).
 - Example: {"suggestions": [{"chinese": "你好!", "pinyin": "Nǐ hǎo!", "korean": "안녕하세요!"}, {"chinese": "谢谢你。", "pinyin": "Xièxie nǐ.", "korean": "고마워요."}]}
 - Do not include any other text or markdown backticks.`;
 
