@@ -6,65 +6,101 @@ let isRecognizing = false;
 function cleanupOldStorage() {
   const now = Date.now();
   const last = +localStorage.getItem('storageCleanTime') || 0;
-  if (!last || now - last > 1000*60*60*24*30) {
+  if (!last || now - last > 1000 * 60 * 60 * 24 * 30) {
     localStorage.removeItem('dailyChinesePatterns');
     localStorage.setItem('storageCleanTime', String(now));
-    console.log('🧹 old localStorage cleaned');
+    console.log('🧹 오래된 패턴 데이터 정리 완료');
   }
 }
 cleanupOldStorage();
 
-function showAlert(msg){alert(msg);}
-
-async function callGeminiAPI(action, body){
-  const res = await fetch('/api/gemini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...body})});
-  if(!res.ok){const err=await res.json();throw new Error(err.error||'API 오류');}
+async function callGeminiAPI(action, body) {
+  const res = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...body })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'API 오류');
+  }
   return res.json();
 }
 
-// Speech recognition handling
-function initSpeechRecognition(){
-  const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){console.warn('SpeechRecognition not supported');return;}
+function initSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return console.warn('SpeechRecognition not supported.');
   recognition = new SR();
-  recognition.lang='zh-CN'; recognition.interimResults=false; recognition.maxAlternatives=1;
-  recognition.onresult=e=>{console.log('Result',e.results[0][0].transcript);};
-  recognition.onerror=e=>{console.error('Speech error',e);isRecognizing=false;document.getElementById('mic-btn')?.classList.remove('is-recording');showAlert('음성 인식 오류: '+e.error);};
-  recognition.onend=()=>{console.log('Recognition ended');isRecognizing=false;document.getElementById('mic-btn')?.classList.remove('is-recording');};
-  console.log('SpeechRecognition ready');
+  recognition.lang = 'zh-CN';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (e) => {
+    const result = e.results[0][0].transcript;
+    document.getElementById('chat-input')?.value = result;
+  };
+  recognition.onerror = (e) => {
+    console.error('Speech recognition error:', e);
+    isRecognizing = false;
+    document.getElementById('mic-btn')?.classList.remove('is-recording');
+    alert('음성 인식 오류: ' + e.error);
+  };
+  recognition.onend = () => {
+    console.log('Speech recognition ended.');
+    isRecognizing = false;
+    document.getElementById('mic-btn')?.classList.remove('is-recording');
+  };
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
+async function handleCorrection() {
+  const input = document.getElementById('correction-input').value.trim();
+  const resultDiv = document.getElementById('correction-result');
+  if (!input) return alert('교정할 문장을 입력하세요.');
+  resultDiv.innerHTML = 'AI 교정 중...';
+  try {
+    const data = await callGeminiAPI('correction', { text: input });
+    const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let parsed;
+    try {
+      parsed = JSON.parse(txt);
+    } catch {
+      parsed = { corrected: txt, pinyin: '(JSON 파싱 오류)', explanation: 'AI 응답을 이해하지 못했습니다.' };
+    }
+    resultDiv.innerHTML = `<p><b>교정:</b> ${parsed.corrected}</p><p>${parsed.pinyin}</p><p>${parsed.explanation}</p>`;
+  } catch (e) {
+    resultDiv.innerHTML = `<p class='text-red-500'>교정 오류: ${e.message}</p>`;
+  }
+}
+
+function renderPatterns() {
+  const container = document.getElementById('pattern-container');
+  if (!patternsData.length) return (container.innerHTML = '<p>패턴 데이터를 불러오지 못했습니다.</p>');
+  container.innerHTML = patternsData.slice(0, 2).map(p => `
+    <div class='bg-white p-6 rounded-lg shadow mb-4'>
+      <h2 class='text-2xl font-bold chinese-text mb-1'>${p.pattern}</h2>
+      <p class='text-blue-700 font-semibold mb-2'>${p.meaning}</p>
+      ${(p.examples||[]).map(ex => `<div class='mb-2'><p class='chinese-text'>${ex.chinese}</p><p class='text-sm text-gray-500'>${ex.pinyin}</p><p class='text-sm text-gray-600'>${ex.korean}</p></div>`).join('')}
+    </div>`).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderPatterns();
   initSpeechRecognition();
-  document.getElementById('mic-btn')?.addEventListener('click',()=>{
-    if(!recognition)return showAlert('음성 인식이 지원되지 않습니다.');
-    if(isRecognizing){recognition.stop();return;}
-    try{
+
+  const micBtn = document.getElementById('mic-btn');
+  micBtn?.addEventListener('click', () => {
+    if (!recognition) return alert('음성 인식이 지원되지 않습니다.');
+    if (isRecognizing) { recognition.stop(); return; }
+    try {
       recognition.start();
-      isRecognizing=true;
-      document.getElementById('mic-btn').classList.add('is-recording');
-    }catch(e){
-      console.error('Speech start error',e);
-      isRecognizing=false;
-      document.getElementById('mic-btn').classList.remove('is-recording');
-      showAlert('음성 인식 시작 실패: '+e.message);
+      isRecognizing = true;
+      micBtn.classList.add('is-recording');
+    } catch (e) {
+      console.error('Speech start error:', e);
+      isRecognizing = false;
+      micBtn.classList.remove('is-recording');
+      alert('음성 인식 시작 실패: ' + e.message);
     }
   });
 
-  // Correction feature
-  const correctionBtn=document.getElementById('correction-btn');
-  const correctionInput=document.getElementById('correction-input');
-  const correctionResult=document.getElementById('correction-result');
-  correctionBtn?.addEventListener('click',async()=>{
-    const text=correctionInput.value.trim();
-    if(!text)return showAlert('교정할 문장을 입력하세요.');
-    correctionResult.textContent='AI 교정 중...';
-    try{
-      const res=await callGeminiAPI('correction',{text});
-      const part=res.candidates?.[0]?.content?.parts?.[0]?.text||'';
-      let data;
-      try{data=JSON.parse(part);}catch{data={corrected:part,pinyin:'(JSON 오류)',explanation:'AI 응답을 이해하지 못했습니다. 다시 시도해주세요.'};}
-      correctionResult.innerHTML=`<p><b>교정:</b> ${data.corrected}</p><p>${data.pinyin}</p><p>${data.explanation}</p>`;
-    }catch(e){showAlert('교정 오류: '+e.message);}
-  });
+  document.getElementById('correction-btn')?.addEventListener('click', handleCorrection);
 });
