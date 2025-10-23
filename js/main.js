@@ -326,20 +326,49 @@ async function handleSendMessage() {
     try {
         conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
         const result = await callGeminiAPI('chat', { text: userInput, history: conversationHistory });
+        
         let aiResponseData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const aiResponseText = result.candidates[0].content.parts[0].text;
-            try {
-                aiResponseData = JSON.parse(aiResponseText);
-                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
-            } catch (e) {
-                console.error("AI response is not valid JSON:", aiResponseText);
-                aiResponseData = { chinese: aiResponseText, pinyin: "(JSON 파싱 오류)", korean: "(번역 오류)" };
-                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+            
+            // --- [FIX 1 START: JSON 파싱 안정성 강화] ---
+            // 1. 응답이 비어있거나 JSON 형태({)가 아닌지 먼저 확인
+            if (!aiResponseText || !aiResponseText.trim().startsWith('{')) {
+                console.error("AI response is not valid JSON (or is empty):", aiResponseText);
+                // 2. 사용자에게 친절한 오류 메시지 표시
+                aiResponseData = { 
+                    chinese: "哎呀，我好像走神了...", 
+                    pinyin: "Āiyā, wǒ hǎoxiàng zǒushén le...", 
+                    korean: "어머, 제가 잠시 딴생각을 했나 봐요. 다시 한 번 말씀해 주시겠어요?" 
+                };
+                // 참고: 이 '오류' 응답은 대화 기록에 저장하지 않습니다. (사용자 재시도 유도)
+            } else {
+                // 3. 유효한 JSON 형태일 때만 파싱 시도
+                try {
+                    aiResponseData = JSON.parse(aiResponseText);
+                    // 성공한 경우에만 대화 기록에 저장
+                    conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+                } catch (e) {
+                    console.error("AI response looked like JSON but failed to parse:", aiResponseText, e);
+                    // 2. 사용자에게 친절한 오류 메시지 표시
+                    aiResponseData = { 
+                        chinese: "糟糕... (zāogāo)", 
+                        pinyin: "", 
+                        korean: "이런... 응답 형식을 처리하는 데 실패했어요. 다시 시도해주세요."
+                    };
+                    // 파싱 실패한 텍스트도 기록에 남겨서 디버깅을 돕습니다.
+                    conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+                }
             }
+            // --- [FIX 1 END] ---
+
         } else {
              console.error("Invalid response structure from chat API:", result);
-             aiResponseData = { chinese: "(유효하지 않은 응답)", pinyin: "", korean: "" };
+             aiResponseData = { 
+                chinese: "(응답 없음)", 
+                pinyin: "", 
+                korean: "AI로부터 유효한 응답을 받지 못했습니다."
+             };
         }
         addMessageToHistory('ai', aiResponseData);
     } catch (error) {
@@ -652,11 +681,23 @@ function setupEventListeners() {
     // AI 채팅 모달 이벤트 (chatBtn은 이제 플로팅 버튼 ID 참조)
     chatBtn.addEventListener('click', () => {
         chatModal.classList.remove('hidden');
-        if (conversationHistory.length === 0) {
-            const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };
-            addMessageToHistory('ai', firstMsg);
-            conversationHistory.push({ role: 'model', parts: [{ text: JSON.stringify(firstMsg) }] });
-        }
+        
+        // --- [FIX 2 START: 플로팅 버튼 클릭 시 항상 새 대화 시작] ---
+        // if (conversationHistory.length === 0) { // <-- 이 조건을 제거
+        
+        // 1. 채팅 기록 UI와 데이터 모두 비우기
+        chatHistory.innerHTML = ''; 
+        conversationHistory = []; 
+        chatInput.value = '';
+        chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
+        
+        // 2. 항상 첫 번째 인사말 추가
+        const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };
+        addMessageToHistory('ai', firstMsg);
+        conversationHistory.push({ role: 'model', parts: [{ text: JSON.stringify(firstMsg) }] });
+        
+        // } // <-- 조건 제거
+        // --- [FIX 2 END] ---
     });
     closeChatBtn.addEventListener('click', () => {
         chatModal.classList.add('hidden');
