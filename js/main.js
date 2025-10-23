@@ -7,7 +7,7 @@ let currentAudio = null;
 let currentPlayingButton = null;
 let wakeLock = null;
 let conversationHistory = []; // AI 채팅 기록
-let correctionHistory = []; // [추가] 작문 교정 기록
+let correctionHistory = []; // 작문 교정 기록
 
 // DOM Elements
 let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translatorModal,
@@ -18,15 +18,15 @@ let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translato
     dailyQuizBtn, quizModal, closeQuizBtn, quizContent,
     openCorrectionBtn, correctionModal, closeCorrectionBtn, correctionInput,
     correctWritingBtn, correctionResult, getTopicBtn, writingTopicDisplay,
-    correctionHistoryModal, openCorrectionHistoryBtn, closeCorrectionHistoryBtn, // [추가]
-    correctionHistoryList, clearCorrectionHistoryBtn, // [추가]
-    fabContainer, fabMainBtn; // [FAB 기능 추가]
+    correctionHistoryModal, openCorrectionHistoryBtn, closeCorrectionHistoryBtn, 
+    correctionHistoryList, clearCorrectionHistoryBtn, 
+    fabContainer, fabMainBtn; 
 
 // 음성 인식 관련
 let recognition = null;
 let isRecognizing = false;
-let currentRecognitionTargetInput = null; // 음성 인식 결과를 넣을 input 요소
-let currentRecognitionMicButton = null;   // 현재 녹음 중인 마이크 버튼
+let currentRecognitionTargetInput = null; 
+let currentRecognitionMicButton = null;   
 
 // --- 퀴즈 상태 변수 ---
 let quizQuestions = [];
@@ -56,7 +56,7 @@ function initializeDOM() {
     chatHistory = document.getElementById('chat-history');
     chatInput = document.getElementById('chat-input');
     sendChatBtn = document.getElementById('send-chat-btn');
-    micBtn = document.getElementById('mic-btn'); // Chat mic
+    micBtn = document.getElementById('mic-btn'); 
     suggestReplyBtn = document.getElementById('suggest-reply-btn');
 
     dailyQuizBtn = document.getElementById('daily-quiz-btn');
@@ -71,21 +71,17 @@ function initializeDOM() {
     correctWritingBtn = document.getElementById('correct-writing-btn');
     correctionResult = document.getElementById('correction-result');
     
-    // [추가] 작문 주제
     getTopicBtn = document.getElementById('get-topic-btn');
     writingTopicDisplay = document.getElementById('writing-topic-display');
     
-    // [추가] 교정 노트
     correctionHistoryModal = document.getElementById('correction-history-modal');
     openCorrectionHistoryBtn = document.getElementById('open-correction-history-btn');
     closeCorrectionHistoryBtn = document.getElementById('close-correction-history-btn');
     correctionHistoryList = document.getElementById('correction-history-list');
     clearCorrectionHistoryBtn = document.getElementById('clear-correction-history-btn');
 
-    // [FAB 기능 추가]
     fabContainer = document.getElementById('fab-container');
     fabMainBtn = document.getElementById('fab-main-btn');
-    // [FAB 추가 완료]
 }
 
 // --- 커스텀 알림 함수 ---
@@ -120,7 +116,7 @@ async function playTTS(text, buttonElement) {
         }
     }
     currentPlayingButton = buttonElement;
-     if(buttonElement) buttonElement.classList.add('is-playing'); // Add null check
+     if(buttonElement) buttonElement.classList.add('is-playing'); 
     try {
         let audioData = audioCache[text];
         if (!audioData) {
@@ -160,7 +156,7 @@ function saveCounts() {
     localStorage.setItem('chineseLearningCounts', JSON.stringify(learningCounts));
 }
 
-// --- [추가] 교정 내역 저장/로드 ---
+// --- 교정 내역 저장/로드 ---
 function initializeCorrectionHistory() {
     const storedHistory = localStorage.getItem('chineseCorrectionHistory');
     correctionHistory = storedHistory ? JSON.parse(storedHistory) : [];
@@ -169,9 +165,7 @@ function saveCorrectionHistory() {
     localStorage.setItem('chineseCorrectionHistory', JSON.stringify(correctionHistory));
 }
 function addCorrectionToHistory(original, corrected, explanation) {
-    // 새 항목을 맨 위에 추가
     correctionHistory.unshift({ original, corrected, explanation, date: new Date().toISOString() });
-    // 50개 항목 제한 (오래된 것부터 삭제)
     if (correctionHistory.length > 50) {
         correctionHistory = correctionHistory.slice(0, 50);
     }
@@ -206,7 +200,6 @@ function renderCorrectionHistory() {
         correctionHistoryList.appendChild(itemEl);
     });
 }
-// --- [추가 완료] ---
 
 
 // --- 날짜 및 패턴 렌더링 함수 ---
@@ -254,16 +247,20 @@ function renderPatterns(patterns, showIndex = false) {
 
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
 
+        // [수정] 직접 말해보기 섹션 HTML
         const practiceHtml = p.practice ? `
             <div class="mt-6">
-                <h3 class="text-lg font-bold text-gray-700 border-b pb-1">✍️ AI 연습 문제 (5개)</h3>
+                <h3 class="text-lg font-bold text-gray-700 border-b pb-1">🗣️ 직접 말해보기</h3> 
                 <div id="practice-container-${index}" class="mt-3 bg-sky-50 p-4 rounded-lg relative" data-spree-count="0" data-spree-goal="5">
                     <button id="show-hint-btn-${index}" title="힌트 보기" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-3 right-3 bg-gray-300 hover:bg-gray-400 text-gray-700 p-1.5 rounded-full" style="display: none;">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 pointer-events-none text-yellow-500">
+                          <path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69a.75.75 0 0 1 .981.981A10.503 10.503 0 0 1 12 20.25a10.5 10.5 0 0 1-10.5-10.5 10.5 10.5 0 0 1 8.3-10.165.75.75 0 0 1 .981-.167Z" clip-rule="evenodd" />
+                          <path fill-rule="evenodd" d="M12.556 8.354a.75.75 0 0 0-1.112 0l-3 3a.75.75 0 0 0 1.112 1.004L11.25 10.6v3.15a.75.75 0 0 0 1.5 0v-3.15l1.694 1.708a.75.75 0 0 0 1.112-1.004l-3-3Z" clip-rule="evenodd" />
+                        </svg>
                     </button>
                     <p class="text-md text-gray-700 mb-2">다음 문장을 중국어로 입력해보세요:</p>
                     <p id="practice-korean-${index}" class="text-md font-semibold text-sky-800 mb-3">""</p>
-                    <div class="flex items-center space-x-2">
+                    <div class="flex items-center space-x-2 min-w-0"> 
                         <button id="practice-mic-btn-${index}" title="음성 입력" data-practice-index="${index}" class="practice-mic-btn mic-btn p-2 rounded-full text-gray-500 hover:bg-gray-200 flex-shrink-0" style="display: none;">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6V7.5a6 6 0 0 0-12 0v5.25a6 6 0 0 0 6 6Z" />
@@ -271,7 +268,7 @@ function renderPatterns(patterns, showIndex = false) {
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 18.75a8.25 8.25 0 0 0 10.5 0" />
                             </svg>
                         </button>
-                        <input type="text" id="practice-input-${index}" class="flex-grow p-2 border border-gray-300 rounded-md chinese-text" placeholder="중국어를 입력하세요..." disabled>
+                        <input type="text" id="practice-input-${index}" class="flex-1 p-2 border border-gray-300 rounded-md chinese-text min-w-0" placeholder="중국어를 입력하세요..." disabled> 
                         <button id="check-practice-btn-${index}" data-answer="" data-pinyin="" data-input-id="practice-input-${index}" class="check-practice-btn bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap flex-shrink-0" style="display: none;">정답 확인</button>
                     </div>
                     <div id="practice-hint-${index}" class="mt-3"></div>
@@ -279,6 +276,7 @@ function renderPatterns(patterns, showIndex = false) {
                     <div id="practice-counter-${index}" class="text-sm text-gray-500 mt-2 text-center">AI 연습문제 로딩 중...</div>
                 </div>
             </div>` : '';
+        // [수정 완료]
 
         card.innerHTML = `
             <div class="flex items-center justify-between mb-3">
@@ -471,7 +469,7 @@ async function handleSendMessage() {
 }
 async function handleStartChatWithPattern(patternString) {
     chatModal.classList.remove('hidden'); 
-    if (fabContainer) fabContainer.classList.remove('is-open'); // [FAB 수정] FAB 닫기
+    if (fabContainer) fabContainer.classList.remove('is-open'); 
     chatHistory.innerHTML = ''; 
     conversationHistory = []; 
     chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove()); 
@@ -654,9 +652,12 @@ IMPORTANT: After translating, analyze your Chinese translation. If it uses one o
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const translationText = result.candidates[0].content.parts[0].text;
             try {
-                translationData = JSON.parse(translationText);
+                // [수정] JSON 파싱 시 ```json 마크다운 제거
+                const cleanedText = translationText.trim().replace(/^```json\s*|\s*```$/g, '');
+                translationData = JSON.parse(cleanedText);
             } catch (e) {
-                console.error("AI translation response is not valid JSON:", translationText);
+                console.error("AI translation response is not valid JSON:", translationText, e);
+                // JSON 파싱 실패 시 원본 텍스트라도 보여주도록 수정
                 translationData = { chinese: translationText, pinyin: "(JSON 파싱 오류)", alternatives: [], explanation: "(설명 파싱 오류)", usedPattern: null };
             }
         } else {
@@ -679,7 +680,7 @@ IMPORTANT: After translating, analyze your Chinese translation. If it uses one o
             <div class="flex items-center">
                 <p class="text-xl chinese-text font-bold text-gray-800">${translationData.chinese}</p>
                 <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${translationData.chinese}">
-                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                     <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
                 </button>
             </div>
             <p class="text-md text-gray-500">${translationData.pinyin || '(병음 정보 없음)'}</p>
@@ -726,13 +727,9 @@ async function handleCorrectWriting() {
              correctionData = { corrected_sentence: "(유효하지 않은 응답)", explanation: "AI로부터 유효한 응답을 받지 못했습니다." };
         }
 
-        // [수정] 교정 내역 저장
-        // AI가 완벽하다고 칭찬한 경우(즉, 수정본이 원본과 동일한 경우)에도 저장합니다. 복습에 유용합니다.
         if (correctionData.corrected_sentence && correctionData.explanation) {
              addCorrectionToHistory(text, correctionData.corrected_sentence, correctionData.explanation);
         }
-        // [수정 완료]
-
 
         let explanationHtml = '';
         if (correctionData.explanation) {
@@ -747,7 +744,7 @@ async function handleCorrectWriting() {
                 <div class="flex items-center mt-1 p-3 bg-green-50 rounded-lg">
                     <p class="text-lg chinese-text font-bold text-green-800">${correctionData.corrected_sentence}</p>
                     <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${correctionData.corrected_sentence}">
-                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                         <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
                     </button>
                 </div>
                 ${explanationHtml}
@@ -761,7 +758,7 @@ async function handleCorrectWriting() {
     }
 }
 
-// --- [추가] 작문 주제 추천 함수 ---
+// --- 작문 주제 추천 함수 ---
 async function handleGetWritingTopic() {
     getTopicBtn.disabled = true;
     getTopicBtn.textContent = '주제 생성 중...';
@@ -809,7 +806,7 @@ async function handleGetWritingTopic() {
 }
 
 
-// --- 음성 인식 초기화 (자동 제출 기능 포함) ---
+// --- 음성 인식 초기화 ---
 function initializeSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -1099,7 +1096,7 @@ function setupEventListeners() {
              if (vocabSource && vocabSource.length > 0) {
                 const shuffledVocab = [...vocabSource].sort(() => 0.5 - Math.random());
                 const hintsHtml = shuffledVocab.map(hint => `<div class="flex items-baseline" style="line-height: 1.3;"><span class="inline-block w-[40%] font-medium chinese-text pr-2">${hint?.word || '?'}</span><span class="inline-block w-[40%] text-sm text-gray-500 pr-2">${hint?.pinyin || '?'}</span><span class="inline-block w-[20%] text-sm text-gray-600">${hint?.meaning || '?'}</span></div>`).join('');
-                hintDiv.innerHTML = `<div class="bg-white/50 rounded-md p-2 text-left"><div class="flex items-center mb-1"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-0.5 text-yellow-500"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg><span class="font-semibold text-sm text-gray-700">힌트</span></div><div class="border-t border-gray-300/50 pt-1">${hintsHtml}</div></div>`;
+                hintDiv.innerHTML = `<div class="bg-yellow-50/50 rounded-md p-2 text-left"><div class="flex items-center mb-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 mr-0.5 text-yellow-500"><path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69a.75.75 0 0 1 .981.981A10.503 10.503 0 0 1 12 20.25a10.5 10.5 0 0 1-10.5-10.5 10.5 10.5 0 0 1 8.3-10.165.75.75 0 0 1 .981-.167Z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M12.556 8.354a.75.75 0 0 0-1.112 0l-3 3a.75.75 0 0 0 1.112 1.004L11.25 10.6v3.15a.75.75 0 0 0 1.5 0v-3.15l1.694 1.708a.75.75 0 0 0 1.112-1.004l-3-3Z" clip-rule="evenodd" /></svg><span class="font-semibold text-sm text-gray-700">힌트</span></div><div class="border-t border-gray-300/50 pt-1">${hintsHtml}</div></div>`;
             } else {
                 console.log("No vocab found for hint.");
                 hintDiv.innerHTML = `<p class="text-sm text-gray-500">이 문장에 대한 핵심 단어 정보가 없습니다.</p>`;
@@ -1146,24 +1143,24 @@ function setupEventListeners() {
         }
     });
 
-    // 번역기 모달 이벤트 (FAB 닫기 추가)
+    // 번역기 모달 이벤트 
     openTranslatorBtn.addEventListener('click', () => {
         translatorModal.classList.remove('hidden');
-        if (fabContainer) fabContainer.classList.remove('is-open'); // [FAB 수정]
+        if (fabContainer) fabContainer.classList.remove('is-open'); 
     });
     closeTranslatorBtn.addEventListener('click', () => { translatorModal.classList.add('hidden'); if (currentAudio) currentAudio.pause(); });
     translateBtn.addEventListener('click', handleTranslation);
     koreanInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTranslation(); } });
     translationResult.addEventListener('click', (e) => { const ttsButton = e.target.closest('.tts-btn'); if (ttsButton) { const textToSpeak = ttsButton.dataset.text; if (textToSpeak) playTTS(textToSpeak, ttsButton); } });
 
-    // 작문 교정 모달 이벤트 (FAB 닫기 추가)
+    // 작문 교정 모달 이벤트
     openCorrectionBtn.addEventListener('click', () => {
         correctionModal.classList.remove('hidden');
-        if (fabContainer) fabContainer.classList.remove('is-open'); // [FAB 수정]
+        if (fabContainer) fabContainer.classList.remove('is-open'); 
     });
     closeCorrectionBtn.addEventListener('click', () => { correctionModal.classList.add('hidden'); if (currentAudio) currentAudio.pause(); });
     correctWritingBtn.addEventListener('click', handleCorrectWriting);
-    getTopicBtn.addEventListener('click', handleGetWritingTopic); // 주제 추천
+    getTopicBtn.addEventListener('click', handleGetWritingTopic); 
     correctionResult.addEventListener('click', (e) => {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
@@ -1172,7 +1169,7 @@ function setupEventListeners() {
         }
     });
 
-    // [추가] 교정 노트 모달 이벤트
+    // 교정 노트 모달 이벤트
     openCorrectionHistoryBtn.addEventListener('click', () => {
         renderCorrectionHistory();
         correctionHistoryModal.classList.remove('hidden');
@@ -1187,7 +1184,6 @@ function setupEventListeners() {
             renderCorrectionHistory();
         }
     });
-    // 교정 노트 목록 내 TTS
     correctionHistoryList.addEventListener('click', (e) => {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
@@ -1195,7 +1191,6 @@ function setupEventListeners() {
             if (textToSpeak) playTTS(textToSpeak, ttsButton);
         }
     });
-    // [추가 완료]
 
 
     // 커스텀 알림
@@ -1217,10 +1212,10 @@ function setupEventListeners() {
         }
     });
 
-    // AI 채팅 모달 이벤트 (FAB 닫기 추가)
+    // AI 채팅 모달 이벤트
     chatBtn.addEventListener('click', () => {
         chatModal.classList.remove('hidden');
-        if (fabContainer) fabContainer.classList.remove('is-open'); // [FAB 수정]
+        if (fabContainer) fabContainer.classList.remove('is-open'); 
 
         chatHistory.innerHTML = '';
         conversationHistory = [];
@@ -1289,23 +1284,20 @@ function setupEventListeners() {
         }
     });
 
-    // --- [새 기능 추가]: Expandable FAB (플로팅 버튼 그룹) ---
+    // Expandable FAB (플로팅 버튼 그룹)
     if (fabMainBtn && fabContainer) {
         fabMainBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // 이벤트 버블링 중단
+            e.stopPropagation(); 
             fabContainer.classList.toggle('is-open');
         });
     }
-    // FAB 외부 클릭 시 닫기
     document.addEventListener('click', (e) => {
         if (fabContainer && fabContainer.classList.contains('is-open')) {
-            // 클릭된 요소가 fabContainer 또는 그 자손이 아닌 경우
             if (!fabContainer.contains(e.target)) {
                 fabContainer.classList.remove('is-open');
             }
         }
     });
-    // --- [FAB 추가 완료] ---
 }
 
 // --- 음성 인식 시작 헬퍼 함수 ---
@@ -1355,7 +1347,7 @@ export function initializeApp(patterns) {
         initializeDOM();
         displayDate();
         initializeCounts();
-        initializeCorrectionHistory(); // [추가] 교정 내역 로드
+        initializeCorrectionHistory(); 
         loadDailyPatterns(); 
         renderAllPatternsList();
         setupScreenWakeLock();
@@ -1367,4 +1359,4 @@ export function initializeApp(patterns) {
 // --- 앱 실행 ---
 initializeApp(patternsData);
 
-// v.2025.10.23_1445
+// v.2025.10.24_0832
