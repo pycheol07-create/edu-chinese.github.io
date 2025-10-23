@@ -176,11 +176,11 @@ function renderPatterns(patterns, showIndex = false) {
 
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
 
-        // --- [FEATURE 1 START: "새 문제 받기" 버튼 추가 및 ID 부여] ---
+        // --- [FEATURE 1 (Spree) START: 버튼 텍스트 변경 및 카운터 추가] ---
         const practiceHtml = p.practice ? `
             <div class="mt-6">
                 <h3 class="text-lg font-bold text-gray-700 border-b pb-1">✍️ 직접 말해보기</h3>
-                <div id="practice-container-${index}" class="mt-3 bg-sky-50 p-4 rounded-lg relative">
+                <div id="practice-container-${index}" class="mt-3 bg-sky-50 p-4 rounded-lg relative" data-spree-count="0" data-spree-goal="5">
                     <button id="show-hint-btn-${index}" title="힌트 보기" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-3 right-3 bg-gray-300 hover:bg-gray-400 text-gray-700 p-1.5 rounded-full">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg>
                     </button>
@@ -192,13 +192,14 @@ function renderPatterns(patterns, showIndex = false) {
                     </div>
                     <div id="practice-hint-${index}" class="mt-3"></div>
                     <div id="practice-result-${index}" class="mt-3 text-center"></div>
+                    <div id="practice-counter-${index}" class="text-sm text-gray-500 mt-2 text-center"></div>
                     <button id="new-practice-btn-${index}" data-pattern-string="${p.pattern}" data-practice-index="${index}" class="new-practice-btn mt-4 text-sm text-sky-600 hover:text-sky-800 w-full text-left flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0 0 11.667 0l3.181-3.183m-4.991 0l.04.04m-10.607 0l.04.04m0 0l.04.04m-7.608 4.28l.04.04m.009-4.28l.04.04" /></svg>
-                        🔄 새 문제 받기 (AI 생성)
+                        🔄 AI 연습 5문제 시작
                     </button>
                 </div>
             </div>` : '';
-        // --- [FEATURE 1 END] ---
+        // --- [FEATURE 1 (Spree) END] ---
 
         card.innerHTML = `
             <div class="flex items-center justify-between mb-3">
@@ -461,7 +462,7 @@ async function handleSuggestReply() {
     }
 }
 
-// --- [FEATURE 1 START: 새 연습문제 요청 함수] ---
+// --- [FEATURE 1 (Spree) START: 새 연습문제 요청 함수 수정] ---
 async function handleNewPracticeRequest(patternString, practiceIndex) {
     const newPracticeBtn = document.getElementById(`new-practice-btn-${practiceIndex}`);
     const koreanEl = document.getElementById(`practice-korean-${practiceIndex}`);
@@ -470,10 +471,20 @@ async function handleNewPracticeRequest(patternString, practiceIndex) {
     const hintBtn = document.getElementById(`show-hint-btn-${practiceIndex}`);
     const resultEl = document.getElementById(`practice-result-${practiceIndex}`);
     const hintDataEl = document.getElementById(`practice-hint-${practiceIndex}`);
+    
+    // --- [Spree] 카운터 로직 추가 ---
+    const practiceContainer = document.getElementById(`practice-container-${practiceIndex}`);
+    const counterEl = document.getElementById(`practice-counter-${practiceIndex}`);
+    let count = parseInt(practiceContainer.dataset.spreeCount, 10);
+    const goal = parseInt(practiceContainer.dataset.spreeGoal, 10);
+    count++; // 문제 카운트 증가
+    practiceContainer.dataset.spreeCount = count;
+    // --- [Spree] ---
 
     // 로딩 상태 표시
     newPracticeBtn.disabled = true;
-    newPracticeBtn.innerHTML = '<div class="loader-sm mr-1"></div> AI가 새 문제를 만들고 있어요...';
+    newPracticeBtn.style.display = 'none'; // "연습 시작" 버튼 숨기기
+    counterEl.innerHTML = `<div class="loader-sm mx-auto"></div> AI가 문제 ${count}번을 만들고 있어요...`;
     koreanEl.textContent = '...';
     inputEl.value = '';
     resultEl.innerHTML = '';
@@ -488,7 +499,6 @@ async function handleNewPracticeRequest(patternString, practiceIndex) {
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const practiceText = result.candidates[0].content.parts[0].text;
             try {
-                // AI 응답이 JSON인지 확인
                 if (!practiceText || !practiceText.trim().startsWith('{')) {
                     throw new Error("AI response for practice is not valid JSON.");
                 }
@@ -507,25 +517,36 @@ async function handleNewPracticeRequest(patternString, practiceIndex) {
                 hintBtn.style.display = '';
                 hintBtn.disabled = false;
                 hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                
+                // --- [Spree] 카운터 업데이트 ---
+                counterEl.textContent = `문제 ${count} / ${goal}`;
 
             } catch (e) {
                 console.error("Failed to parse practice data:", practiceText, e);
                 koreanEl.textContent = "오류: 새 문제를 불러오지 못했습니다.";
+                counterEl.textContent = '오류 발생';
+                newPracticeBtn.style.display = ''; // 오류 시 "연습 시작" 버튼 다시 표시
+                practiceContainer.dataset.spreeCount = 0; // 카운트 초기화
             }
         } else {
             console.error("Invalid response structure from generate_practice API:", result);
             koreanEl.textContent = "오류: AI 응답이 없습니다.";
+            counterEl.textContent = '오류 발생';
+            newPracticeBtn.style.display = '';
+            practiceContainer.dataset.spreeCount = 0;
         }
     } catch (error) {
         console.error('New practice request error:', error);
         koreanEl.textContent = `오류: ${error.message}`;
+        counterEl.textContent = '오류 발생';
+        newPracticeBtn.style.display = '';
+        practiceContainer.dataset.spreeCount = 0;
     } finally {
-        // 로딩 상태 해제
+        // 로딩 상태 해제 (버튼 표시는 성공/실패 로직 내부에서 처리)
         newPracticeBtn.disabled = false;
-        newPracticeBtn.innerHTML = '🔄 새 문제 받기 (AI 생성)';
     }
 }
-// --- [FEATURE 1 END] ---
+// --- [FEATURE 1 (Spree) END] ---
 
 // --- 번역기 함수 ---
 async function handleTranslation() {
@@ -753,13 +774,32 @@ function setupEventListeners() {
                 handleStartChatWithPattern(patternString);
             }
         
-        // --- [FEATURE 1 START: 새 문제 받기 버튼 리스너] ---
+        // --- [FEATURE 1 (Spree) START: "연습 시작" 버튼 리스너] ---
         } else if (target.closest('.new-practice-btn')) { 
             const button = target.closest('.new-practice-btn');
             const patternString = button.dataset.patternString;
             const practiceIndex = button.dataset.practiceIndex;
+            
+            // 카운트 초기화
+            const practiceContainer = document.getElementById(`practice-container-${practiceIndex}`);
+            practiceContainer.dataset.spreeCount = '0';
+            const counterEl = document.getElementById(`practice-counter-${practiceIndex}`);
+            counterEl.textContent = ''; // 카운터 표시 초기화
+            
+            // 첫 문제 요청
             handleNewPracticeRequest(patternString, practiceIndex);
-        // --- [FEATURE 1 END] ---
+        // --- [FEATURE 1 (Spree) END] ---
+            
+        // --- [FEATURE 1 (Spree) START: "다음 문제" 버튼 리스너] ---
+        } else if (target.closest('.next-practice-btn')) {
+            const button = target.closest('.next-practice-btn');
+            const practiceIndex = button.dataset.practiceIndex;
+            const startButton = document.getElementById(`new-practice-btn-${practiceIndex}`);
+            const patternString = startButton.dataset.patternString;
+            
+            // 다음 문제 요청
+            handleNewPracticeRequest(patternString, practiceIndex);
+        // --- [FEATURE 1 (Spree) END] ---
             
         } else if (target.classList.contains('check-practice-btn')) { // 정답 확인
             const button = target;
@@ -772,13 +812,35 @@ function setupEventListeners() {
             const normalize = (str) => str.replace(/[.,。，？！？!]/g, '').replace(/\s+/g, '');
             let resultMessageHtml = '';
             const answerHtml = `<div class="mt-2 p-2 bg-gray-100 rounded text-left"><p class="text-sm">정답:</p><div class="flex items-center"><p class="text-md chinese-text font-semibold text-gray-800">${correctAnswer}</p><button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${correctAnswer}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg></button></div><p class="text-sm text-gray-500">${correctPinyin}</p></div>`;
-            if (normalize(userInput) === normalize(correctAnswer)) { resultMessageHtml = `<p class="text-green-600 font-bold text-lg">🎉 정답입니다!</p>` + answerHtml; }
-            else { resultMessageHtml = `<p class="text-red-500 font-bold text-lg">🤔 아쉽네요, 다시 시도해보세요.</p>${answerHtml}`; }
-            resultDiv.innerHTML = `${resultMessageHtml}<button class="retry-practice-btn mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">다시하기</button>`;
+            
+            // --- [FEATURE 1 (Spree) START: 정답 확인 로직 수정] ---
+            const practiceContainer = document.getElementById(`practice-container-${index}`);
+            const spreeCount = parseInt(practiceContainer.dataset.spreeCount, 10);
+            const spreeGoal = parseInt(practiceContainer.dataset.spreeGoal, 10);
+
+            if (normalize(userInput) === normalize(correctAnswer)) { 
+                resultMessageHtml = `<p class="text-green-600 font-bold text-lg">🎉 정답입니다!</p>` + answerHtml;
+                
+                if (spreeCount < spreeGoal) {
+                    // "다음 문제" 버튼 추가
+                    resultMessageHtml += `<button class="next-practice-btn mt-3 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">➡️ 다음 문제 (${spreeCount + 1}/${spreeGoal})</button>`;
+                } else {
+                    // "완료" 메시지 및 "새로 시작" 버튼 표시
+                    resultMessageHtml += `<p class="text-green-600 font-bold text-lg mt-3">🎉 ${spreeGoal}문제 완료! 수고하셨습니다!</p>`;
+                    document.getElementById(`new-practice-btn-${index}`).style.display = ''; // "연습 시작" 버튼 다시 표시
+                    document.getElementById(`practice-counter-${index}`).textContent = ''; // 카운터 초기화
+                }
+            } else { 
+                resultMessageHtml = `<p class="text-red-500 font-bold text-lg">🤔 아쉽네요, 다시 시도해보세요.</p>${answerHtml}`;
+                // "다시하기" 버튼 추가
+                resultMessageHtml += `<button class="retry-practice-btn mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">다시하기</button>`;
+            }
+            // --- [FEATURE 1 (Spree) END] ---
+
+            resultDiv.innerHTML = `${resultMessageHtml}`;
             button.style.display = 'none';
             const hintButton = document.getElementById(`show-hint-btn-${index}`); if(hintButton) hintButton.style.display = 'none';
         
-        // --- [FEATURE 1 START: 힌트 보기 로직 수정] ---
         } else if (target.closest('.show-hint-btn')) {
             const button = target.closest('.show-hint-btn');
             const newVocab = button.dataset.newVocab; // AI가 생성한 새 단어
@@ -789,9 +851,13 @@ function setupEventListeners() {
             let vocabSource = null;
 
             if (newVocab) { // 새 단어가 있으면
-                vocabSource = JSON.parse(newVocab);
+                try {
+                    vocabSource = JSON.parse(newVocab);
+                } catch(e) { console.error("Failed to parse newVocab JSON", e); vocabSource = null; }
                 console.log("Using new AI-generated vocab for hint.");
-            } else { // 없으면 원본 패턴에서 찾기
+            }
+            
+            if (!vocabSource) { // 새 단어가 없거나 파싱 실패 시 원본 패턴에서 찾기
                 const patternData = allPatterns.find(p => p.pattern === patternString);
                 if (patternData && patternData.practiceVocab && patternData.practiceVocab.length > 0) {
                     vocabSource = patternData.practiceVocab;
@@ -808,8 +874,6 @@ function setupEventListeners() {
                 hintDiv.innerHTML = `<p class="text-sm text-gray-500">이 문장에 대한 핵심 단어 정보가 없습니다.</p>`;
             }
             button.disabled = true; button.classList.add('opacity-50', 'cursor-not-allowed');
-        // --- [FEATURE 1 END] ---
-
         } else if (target.classList.contains('retry-practice-btn')) { // 다시하기
             const index = target.dataset.practiceIndex;
             document.getElementById(`practice-input-${index}`).value = '';
@@ -817,7 +881,6 @@ function setupEventListeners() {
             document.getElementById(`practice-hint-${index}`).innerHTML = '';
             document.getElementById(`check-practice-btn-${index}`).style.display = '';
             const hintBtn = document.getElementById(`show-hint-btn-${index}`); hintBtn.style.display = ''; hintBtn.disabled = false; hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            // '다시하기'는 새 힌트 데이터(data-new-vocab)를 지우지 않습니다.
         } else if (target.closest('.tts-btn')) { // TTS
             const ttsButton = target.closest('.tts-btn');
             const textToSpeak = ttsButton.dataset.text; if (textToSpeak) playTTS(textToSpeak, ttsButton);
