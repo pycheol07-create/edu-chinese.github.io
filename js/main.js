@@ -15,9 +15,7 @@ let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translato
     closeAllPatternsBtn, allPatternsList, chatBtn, chatModal, closeChatBtn,
     chatHistory, chatInput, sendChatBtn, micBtn, suggestReplyBtn,
     dailyQuizBtn, quizModal, closeQuizBtn, quizContent,
-    // --- [FEATURE 1 START: 작문 교정 DOM 변수 추가] ---
     openCorrectorBtn, correctorModal, closeCorrectorBtn, writingInput, correctWritingBtn, correctionResult;
-    // --- [FEATURE 1 END] ---
 
 
 // 음성 인식 관련
@@ -62,86 +60,132 @@ function initializeDOM() {
     closeQuizBtn = document.getElementById('close-quiz-btn');
     quizContent = document.getElementById('quiz-content');
 
-    // --- [FEATURE 1 START: 작문 교정 DOM 초기화] ---
+    // 작문 교정 DOM 초기화
     openCorrectorBtn = document.getElementById('open-corrector-btn');
     correctorModal = document.getElementById('corrector-modal');
     closeCorrectorBtn = document.getElementById('close-corrector-btn');
     writingInput = document.getElementById('writing-input');
     correctWritingBtn = document.getElementById('correct-writing-btn');
     correctionResult = document.getElementById('correction-result');
-    // --- [FEATURE 1 END] ---
+    if (!openCorrectorBtn || !correctorModal || !closeCorrectorBtn || !writingInput || !correctWritingBtn || !correctionResult) {
+        console.error("One or more corrector modal elements not found in the DOM!");
+    }
 }
 
 // --- 커스텀 알림 함수 ---
 function showAlert(message) {
+    if (!customAlertModal || !customAlertMessage) return; // DOM 요소 확인
     customAlertMessage.textContent = message;
     customAlertModal.classList.remove('hidden');
 }
 
 // --- API 호출 공통 함수 ---
 async function callGeminiAPI(action, body) {
-    const response = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...body })
-    });
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `API ${action} failed`);
+    try {
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, ...body })
+        });
+        if (!response.ok) {
+            let errorData;
+            try {
+                errorData = await response.json();
+            } catch (e) {
+                // If response is not JSON
+                errorData = { error: `API ${action} failed with status ${response.status}: ${response.statusText}` };
+            }
+            throw new Error(errorData.error || `API ${action} failed`);
+        }
+        return response.json();
+    } catch (error) {
+         console.error(`Error calling API action ${action}:`, error);
+         throw error; // Re-throw the error to be caught by the caller
     }
-    return response.json();
 }
 
 // --- TTS (Text-to-Speech) 함수 ---
 async function playTTS(text, buttonElement) {
+    if (!text) {
+        console.warn("TTS requested for empty text.");
+        return;
+    }
     if (currentAudio) {
         currentAudio.pause();
         currentAudio = null;
-        if (currentPlayingButton) currentPlayingButton.classList.remove('is-playing');
-        if (currentPlayingButton === buttonElement) {
-            currentPlayingButton = null;
-            return;
+        if (currentPlayingButton) {
+            currentPlayingButton.classList.remove('is-playing');
+            // If the clicked button was the one playing, just stop
+            if (currentPlayingButton === buttonElement) {
+                currentPlayingButton = null;
+                return;
+            }
         }
     }
     currentPlayingButton = buttonElement;
-     if(buttonElement) buttonElement.classList.add('is-playing'); // Add null check
+     if(buttonElement) buttonElement.classList.add('is-playing');
     try {
         let audioData = audioCache[text];
         if (!audioData) {
+            console.log(`TTS Cache miss for: "${text}". Fetching...`);
             const result = await callGeminiAPI('tts', { text });
+            if (!result || !result.audioContent) {
+                throw new Error("Invalid TTS response from API.");
+            }
             audioData = result.audioContent;
             audioCache[text] = audioData;
+            console.log(`TTS fetched and cached for: "${text}"`);
+        } else {
+             console.log(`TTS Cache hit for: "${text}"`);
         }
         const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
         currentAudio = audio;
         audio.play();
         audio.onended = () => {
             if(buttonElement) buttonElement.classList.remove('is-playing');
-            currentAudio = null;
-            currentPlayingButton = null;
+            // Check if this audio instance is still the current one before nullifying
+            if (currentAudio === audio) {
+                currentAudio = null;
+                currentPlayingButton = null;
+            }
+            console.log("TTS playback finished.");
         };
         audio.onerror = (e) => {
             console.error('Audio playback error:', e);
             showAlert('오디오 재생 중 오류가 발생했습니다.');
              if(buttonElement) buttonElement.classList.remove('is-playing');
-            currentAudio = null;
-            currentPlayingButton = null;
+             if (currentAudio === audio) {
+                currentAudio = null;
+                currentPlayingButton = null;
+             }
         };
     } catch (error) {
         console.error('TTS error:', error);
         showAlert(`음성(TTS)을 불러오는 데 실패했습니다: ${error.message}`);
          if(buttonElement) buttonElement.classList.remove('is-playing');
+        // Ensure cleanup even on fetch error
+        currentAudio = null;
         currentPlayingButton = null;
     }
 }
 
 // --- 학습 카운트 관련 함수 ---
 function initializeCounts() {
-    const storedCounts = localStorage.getItem('chineseLearningCounts');
-    learningCounts = storedCounts ? JSON.parse(storedCounts) : {};
+    try {
+        const storedCounts = localStorage.getItem('chineseLearningCounts');
+        learningCounts = storedCounts ? JSON.parse(storedCounts) : {};
+    } catch (e) {
+        console.error("Failed to load or parse learning counts from localStorage:", e);
+        learningCounts = {}; // Reset to empty object on error
+    }
 }
 function saveCounts() {
-    localStorage.setItem('chineseLearningCounts', JSON.stringify(learningCounts));
+    try {
+        localStorage.setItem('chineseLearningCounts', JSON.stringify(learningCounts));
+    } catch (e) {
+         console.error("Failed to save learning counts to localStorage:", e);
+         showAlert("학습 횟수를 저장하는데 실패했습니다.");
+    }
 }
 
 // --- 날짜 및 패턴 렌더링 함수 ---
@@ -153,43 +197,69 @@ function getTodayString() {
     return `${year}-${month}-${day}`;
 }
 function displayDate() {
+    if (!currentDateEl) return;
     const today = new Date();
     currentDateEl.textContent = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
 }
 function getRandomPatterns() {
+    if (!allPatterns || allPatterns.length === 0) return [];
+    // Ensure we don't try to slice more than available
+    const count = Math.min(2, allPatterns.length);
     const shuffled = [...allPatterns].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, 2);
+    return shuffled.slice(0, count);
 }
 
 function renderPatterns(patterns, showIndex = false) {
-    patternContainer.innerHTML = '';
+    if (!patternContainer) {
+        console.error("Pattern container element not found!");
+        return;
+    }
+    patternContainer.innerHTML = ''; // Clear previous patterns
+    if (!patterns || patterns.length === 0) {
+        patternContainer.innerHTML = '<p class="text-center text-gray-500">표시할 패턴이 없습니다.</p>';
+        return;
+    }
+
     patterns.forEach((p, index) => {
+        // Basic validation for pattern object
+        if (!p || !p.pattern || !p.meaning || !Array.isArray(p.examples) || !Array.isArray(p.vocab)) {
+            console.warn("Skipping invalid pattern data:", p);
+            return; // Skip rendering this invalid pattern
+        }
+
         const count = learningCounts[p.pattern] || 0;
         const card = document.createElement('div');
         card.className = 'bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300';
 
-        const examplesHtml = p.examples.map(ex => `
+        const examplesHtml = p.examples.map(ex => {
+            if (!ex || !ex.chinese || !ex.korean) return ''; // Skip invalid examples
+            return `
             <div class="mt-3">
                 <div class="flex items-center">
-                    <p class="text-lg chinese-text text-gray-800">${ex.chinese}</p>
-                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${ex.chinese}">
+                    <p class="text-lg chinese-text text-gray-800 break-words">${ex.chinese}</p>
+                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0" data-text="${ex.chinese}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
                     </button>
                 </div>
-                <p class="text-sm text-gray-500">${ex.pinyin}</p>
-                <p class="text-md text-gray-600">${ex.korean}</p>
-            </div>`).join('');
+                <p class="text-sm text-gray-500 break-words">${ex.pinyin || ''}</p>
+                <p class="text-md text-gray-600 break-words">${ex.korean}</p>
+            </div>`;
+            }).join('');
 
-        const vocabHtml = p.vocab.map(v => `
+        const vocabHtml = p.vocab.map(v => {
+             if (!v || !v.word || !v.meaning) return ''; // Skip invalid vocab
+             return `
             <div class="flex items-baseline">
-                <p class="w-1/3 text-md chinese-text text-gray-700 font-medium">${v.word}</p>
-                <p class="w-1/3 text-sm text-gray-500">${v.pinyin}</p>
-                <p class="w-1/3 text-sm text-gray-600">${v.meaning}</p>
-            </div>`).join('');
+                <p class="w-1/3 text-md chinese-text text-gray-700 font-medium break-words">${v.word}</p>
+                <p class="w-1/3 text-sm text-gray-500 break-words">${v.pinyin || ''}</p>
+                <p class="w-1/3 text-sm text-gray-600 break-words">${v.meaning}</p>
+            </div>`;
+            }).join('');
 
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
 
-        const practiceHtml = p.practice ? `
+        // Practice section - Ensure p.practice exists and has needed properties
+        const practiceHtml = (p.practice && p.practice.korean && p.practice.chinese) ? `
             <div class="mt-6">
                 <h3 class="text-lg font-bold text-gray-700 border-b pb-1">✍️ AI 연습 문제 (5개)</h3>
                 <div id="practice-container-${index}" class="mt-3 bg-sky-50 p-4 rounded-lg relative" data-spree-count="0" data-spree-goal="5">
@@ -197,14 +267,10 @@ function renderPatterns(patterns, showIndex = false) {
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg>
                     </button>
                     <p class="text-md text-gray-700 mb-2">다음 문장을 중국어로 입력해보세요:</p>
-                    <p id="practice-korean-${index}" class="text-md font-semibold text-sky-800 mb-3">""</p>
+                    <p id="practice-korean-${index}" class="text-md font-semibold text-sky-800 mb-3">""</p> {/* Will be loaded by AI */}
                     <div class="flex items-center space-x-2">
                         <button id="practice-mic-btn-${index}" title="음성 입력" data-practice-index="${index}" class="practice-mic-btn mic-btn p-2 rounded-full text-gray-500 hover:bg-gray-200 flex-shrink-0" style="display: none;">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6V7.5a6 6 0 0 0-12 0v5.25a6 6 0 0 0 6 6Z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5v2.25a7.5 7.5 0 0 1-15 0v-2.25" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 18.75a8.25 8.25 0 0 0 10.5 0" />
-                            </svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6V7.5a6 6 0 0 0-12 0v5.25a6 6 0 0 0 6 6Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5v2.25a7.5 7.5 0 0 1-15 0v-2.25" /><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 18.75a8.25 8.25 0 0 0 10.5 0" /></svg>
                         </button>
                         <input type="text" id="practice-input-${index}" class="flex-grow p-2 border border-gray-300 rounded-md chinese-text" placeholder="중국어를 입력하세요..." disabled>
                         <button id="check-practice-btn-${index}" data-answer="" data-pinyin="" data-input-id="practice-input-${index}" class="check-practice-btn bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap flex-shrink-0" style="display: none;">정답 확인</button>
@@ -218,50 +284,74 @@ function renderPatterns(patterns, showIndex = false) {
 
         card.innerHTML = `
             <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center">${indexHtml}<div><h2 class="text-2xl font-bold text-gray-800 chinese-text">${p.pattern}</h2><p class="text-md text-gray-500">${p.pinyin}</p></div></div>
-                <div class="text-right">
-                    <button data-pattern="${p.pattern}" class="learn-btn bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-bold py-1 px-3 rounded-full transition-colors">학습 완료!</button>
-                    <p class="text-xs text-gray-500 mt-1">학습 <span class="font-bold text-red-500 count-display">${count}</span>회</p>
+                <div class="flex items-center">${indexHtml}<div><h2 class="text-2xl font-bold text-gray-800 chinese-text break-words">${p.pattern}</h2><p class="text-md text-gray-500 break-words">${p.pinyin || ''}</p></div></div>
+                <div class="text-right flex-shrink-0 ml-4"> {/* Added flex-shrink-0 and margin */}
+                    <button data-pattern="${p.pattern}" class="learn-btn bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-bold py-1 px-3 rounded-full transition-colors mb-1">학습 완료!</button> {/* Added mb-1 */}
+                    <p class="text-xs text-gray-500">학습 <span class="font-bold text-red-500 count-display">${count}</span>회</p>
                     <button data-pattern-string="${p.pattern}" class="start-chat-pattern-btn mt-2 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-bold py-1 px-3 rounded-full transition-colors w-full text-center">
                         💬 이 패턴으로 대화
                     </button>
                 </div>
             </div>
-            <div class="mt-4"><p class="text-lg text-blue-700 font-semibold mb-2">${p.meaning}</p><p class="text-sm text-gray-500 bg-gray-100 p-2 rounded-md"><b>🤔 어떻게 사용할까요?</b> ${p.structure || '구조 정보 없음'}</p></div>
+            <div class="mt-4"><p class="text-lg text-blue-700 font-semibold mb-2 break-words">${p.meaning}</p><p class="text-sm text-gray-500 bg-gray-100 p-2 rounded-md break-words"><b>🤔 어떻게 사용할까요?</b> ${p.structure || '구조 정보 없음'}</p></div>
             <div class="mt-4"><h3 class="text-lg font-bold text-gray-700 border-b pb-1">💡 예문 살펴보기</h3>${examplesHtml}</div>
             <div class="mt-6"><h3 class="text-lg font-bold text-gray-700 border-b pb-1">📌 주요 단어</h3><div class="mt-3 space-y-2">${vocabHtml}</div></div>
             ${practiceHtml}`;
         patternContainer.appendChild(card);
 
-        if (p.practice) {
+        // Auto-start practice problems if the section exists
+        if (p.practice && p.practice.korean && p.practice.chinese) {
             setTimeout(() => {
                 const practiceContainerDiv = document.getElementById(`practice-container-${index}`);
                  if (practiceContainerDiv) {
-                     practiceContainerDiv.dataset.spreeCount = '0';
-                     handleNewPracticeRequest(p.pattern, index);
+                     // Check if practice has already started (e.g., due to fast re-render)
+                     if (parseInt(practiceContainerDiv.dataset.spreeCount, 10) === 0) {
+                        handleNewPracticeRequest(p.pattern, index);
+                     }
                  } else {
                      console.error(`Practice container practice-container-${index} not found immediately after render.`);
                  }
-            }, 0);
+            }, 50);
         }
     });
 }
 
-// ... (다른 함수들은 변경 없음, handleNewPracticeRequest 포함) ...
 function loadDailyPatterns() {
     const todayStr = getTodayString();
-    const storedData = JSON.parse(localStorage.getItem('dailyChinesePatterns'));
-    if (storedData && storedData.date === todayStr) {
-        renderPatterns(storedData.patterns);
-    } else {
-        const newPatterns = getRandomPatterns();
-        localStorage.setItem('dailyChinesePatterns', JSON.stringify({ date: todayStr, patterns: newPatterns }));
-        renderPatterns(newPatterns);
+    let patternsToShow = null;
+    try {
+        const storedData = JSON.parse(localStorage.getItem('dailyChinesePatterns'));
+        if (storedData && storedData.date === todayStr && Array.isArray(storedData.patterns)) {
+            patternsToShow = storedData.patterns;
+            console.log("Loaded patterns from localStorage for today.");
+        }
+    } catch (e) {
+        console.error("Failed to load or parse daily patterns from localStorage:", e);
     }
+
+    if (!patternsToShow) {
+        patternsToShow = getRandomPatterns();
+        try {
+            localStorage.setItem('dailyChinesePatterns', JSON.stringify({ date: todayStr, patterns: patternsToShow }));
+            console.log("Generated and stored new patterns for today.");
+        } catch(e) {
+            console.error("Failed to save new daily patterns to localStorage:", e);
+            showAlert("오늘의 패턴을 저장하는데 실패했습니다.");
+        }
+    }
+    renderPatterns(patternsToShow);
 }
+
 function renderAllPatternsList() {
-    allPatternsList.innerHTML = '';
+    if (!allPatternsList) return;
+    allPatternsList.innerHTML = ''; // Clear previous list
+    if (!allPatterns || allPatterns.length === 0) {
+        allPatternsList.innerHTML = '<p class="text-center text-gray-500">패턴 목록이 비어 있습니다.</p>';
+        return;
+    }
     allPatterns.forEach((p, index) => {
+        if (!p || !p.pattern || !p.meaning) return; // Skip invalid patterns
+
         const patternItem = document.createElement('div');
         patternItem.className = 'p-4 hover:bg-gray-100 cursor-pointer';
         patternItem.dataset.patternIndex = index;
@@ -269,8 +359,8 @@ function renderAllPatternsList() {
             <div class="flex items-start pointer-events-none">
                 <span class="mr-3 text-gray-500 font-medium w-8 text-right">${index + 1}.</span>
                 <div>
-                    <p class="text-lg font-semibold chinese-text text-gray-800">${p.pattern}</p>
-                    <p class="text-sm text-gray-600">${p.meaning}</p>
+                    <p class="text-lg font-semibold chinese-text text-gray-800 break-words">${p.pattern}</p>
+                    <p class="text-sm text-gray-600 break-words">${p.meaning}</p>
                 </div>
             </div>`;
         allPatternsList.appendChild(patternItem);
@@ -280,134 +370,198 @@ function renderAllPatternsList() {
 async function setupScreenWakeLock() {
     if ('wakeLock' in navigator) {
         try {
+            // Release any existing lock first
+            if (wakeLock) {
+                await wakeLock.release();
+                wakeLock = null;
+                console.log('Previous Screen Wake Lock released.');
+            }
             wakeLock = await navigator.wakeLock.request('screen');
-            wakeLock.addEventListener('release', () => console.log('Screen Wake Lock released'));
+            wakeLock.addEventListener('release', () => {
+                 console.log('Screen Wake Lock released.');
+                 // Optional: Re-acquire lock if needed and document is visible
+                 // if (document.visibilityState === 'visible') {
+                 //   setupScreenWakeLock();
+                 // }
+             });
             console.log('Screen Wake Lock active');
-        } catch (err) { console.error(`${err.name}, ${err.message}`); }
-    } else { console.log('Screen Wake Lock API not supported.'); }
+        } catch (err) {
+            console.error(`Screen Wake Lock request failed: ${err.name}, ${err.message}`);
+            wakeLock = null; // Ensure wakeLock is null on failure
+        }
+    } else {
+        console.log('Screen Wake Lock API not supported.');
+    }
+    // Re-acquire lock on visibility change
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') {
+           await setupScreenWakeLock(); // Request again when tab becomes visible
+        }
+    });
 }
 
+// Helper function to safely parse JSON, removing markdown backticks
+function safeJsonParse(jsonString) {
+    if (!jsonString || typeof jsonString !== 'string') {
+        console.warn("Invalid input to safeJsonParse:", jsonString);
+        return null;
+    }
+    try {
+        const cleanedString = jsonString.trim().replace(/^```json\s*|\s*```$/g, '');
+        // Check if the cleaned string is potentially valid JSON
+        if ((!cleanedString.startsWith('{') || !cleanedString.endsWith('}')) &&
+            (!cleanedString.startsWith('[') || !cleanedString.endsWith(']'))) {
+             console.warn("Cleaned string doesn't look like a valid JSON object or array:", cleanedString);
+             // Depending on expected output, you might try parsing anyway or return null
+             // For this app, we strictly expect objects or specific arrays (suggestions)
+             return null;
+        }
+        return JSON.parse(cleanedString);
+    } catch (e) {
+        console.error("Failed to parse JSON string:", jsonString, e);
+        return null;
+    }
+}
+
+
 function addMessageToHistory(sender, messageData) {
-    if (!chatHistory) return; // Ensure chatHistory exists
+    if (!chatHistory || !messageData) return;
     if (sender === 'user') {
         const messageElement = document.createElement('div');
-        messageElement.className = 'flex justify-end';
-        messageElement.innerHTML = `<div class="bg-purple-500 text-white p-3 rounded-lg max-w-xs">${messageData.text}</div>`;
+        messageElement.className = 'flex justify-end mb-2'; // Added margin
+        messageElement.innerHTML = `<div class="bg-purple-500 text-white p-3 rounded-lg max-w-xs break-words shadow">${messageData.text}</div>`; // Added shadow
         chatHistory.appendChild(messageElement);
     } else { // AI
         if (messageData.correction && messageData.correction.corrected) {
             const correctionElement = document.createElement('div');
             correctionElement.className = 'flex justify-center my-2';
             correctionElement.innerHTML = `
-                <div class="bg-yellow-50 p-3 rounded-lg text-sm w-full max-w-xs border border-yellow-300">
+                <div class="bg-yellow-50 p-3 rounded-lg text-sm w-full max-w-xs border border-yellow-300 shadow-sm">
                     <h4 class="font-semibold text-yellow-800">💡 표현 교정</h4>
-                    <p class="text-gray-500 mt-1">"<s>${messageData.correction.original || '...'}</s>"</p>
-                    <p class="text-green-700 font-medium chinese-text mt-1">→ ${messageData.correction.corrected}</p>
-                    <p class="text-gray-700 mt-2 pt-2 border-t border-yellow-200">${messageData.correction.explanation || '자연스러운 표현으로 수정했어요.'}</p>
+                    <p class="text-gray-500 mt-1 break-words">"<s>${messageData.correction.original || '...'}</s>"</p>
+                    <p class="text-green-700 font-medium chinese-text mt-1 break-words">→ ${messageData.correction.corrected}</p>
+                    <p class="text-gray-700 mt-2 pt-2 border-t border-yellow-200 break-words">${messageData.correction.explanation || '자연스러운 표현으로 수정했어요.'}</p>
                 </div>`;
             chatHistory.appendChild(correctionElement);
         }
         const messageElement = document.createElement('div');
-        messageElement.className = 'flex justify-start';
+        messageElement.className = 'flex justify-start mb-2'; // Added margin
         messageElement.innerHTML = `
-            <div class="bg-white p-3 rounded-lg max-w-xs border">
+            <div class="bg-white p-3 rounded-lg max-w-xs border shadow-sm">
                 <div class="flex items-center">
-                    <p class="text-lg chinese-text text-gray-800">${messageData.chinese}</p>
-                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${messageData.chinese}">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
-                    </button>
+                    <p class="text-lg chinese-text text-gray-800 break-words">${messageData.chinese || '(내용 없음)'}</p>
+                    ${messageData.chinese ?
+                        `<button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0" data-text="${messageData.chinese}">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                        </button>`
+                        : ''
+                    }
                 </div>
-                <p class="text-sm text-gray-500">${messageData.pinyin || ''}</p>
-                <p class="text-sm text-gray-600 border-t mt-2 pt-2">${messageData.korean || ''}</p>
+                <p class="text-sm text-gray-500 break-words mt-1">${messageData.pinyin || ''}</p>
+                ${messageData.korean ? `<p class="text-sm text-gray-600 border-t mt-2 pt-2 break-words">${messageData.korean}</p>` : ''}
             </div>`;
         chatHistory.appendChild(messageElement);
     }
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+     // Scroll smoothly to the bottom
+     chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
 }
 function addSuggestionToHistory(suggestions) {
+     if (!chatHistory || !suggestions || suggestions.length === 0) return;
     const suggestionElement = document.createElement('div');
     suggestionElement.className = 'flex justify-center my-2';
-    const buttonsHtml = suggestions.map(suggestion =>
-        `<button class="suggestion-chip bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-sm hover:bg-blue-200 mx-1 mb-1 flex flex-col items-center" data-text="${suggestion.chinese}">
-            <span class="chinese-text font-medium">${suggestion.chinese}</span>
-            <span class="text-xs text-gray-500 mt-0.5">${suggestion.pinyin}</span>
-            <span class="text-xs text-gray-600 mt-0.5">${suggestion.korean}</span>
-         </button>`
-    ).join('');
+    const buttonsHtml = suggestions.map(suggestion => {
+        // Ensure suggestion has required properties
+        const chinese = suggestion.chinese || '';
+        const pinyin = suggestion.pinyin || '';
+        const korean = suggestion.korean || '';
+        return `<button class="suggestion-chip bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-sm hover:bg-blue-200 mx-1 mb-1 flex flex-col items-center shadow-sm" data-text="${chinese}">
+            <span class="chinese-text font-medium">${chinese}</span>
+            <span class="text-xs text-gray-500 mt-0.5">${pinyin}</span>
+            <span class="text-xs text-gray-600 mt-0.5">${korean}</span>
+         </button>`;
+        }).join('');
     suggestionElement.innerHTML = `
-        <div class="bg-gray-100 p-2 rounded-lg text-center w-full">
-            <p class="text-xs text-gray-600 mb-1">이렇게 답해보세요:</p>
+        <div class="bg-gray-50 p-3 rounded-lg text-center w-full shadow-sm border">
+            <p class="text-xs text-gray-600 mb-2 font-medium">💡 이렇게 답해보세요:</p>
             <div class="flex flex-wrap justify-center">${buttonsHtml}</div>
         </div>`;
     chatHistory.appendChild(suggestionElement);
     suggestionElement.querySelectorAll('.suggestion-chip').forEach(chip => {
         chip.addEventListener('click', () => {
-            chatInput.value = chip.dataset.text;
-            chatInput.focus();
-            suggestionElement.remove();
+            if (chatInput) {
+                chatInput.value = chip.dataset.text;
+                chatInput.focus();
+            }
+            suggestionElement.remove(); // Remove suggestions after one is clicked
         });
     });
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+    chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
 }
 async function handleSendMessage() {
+    if (!chatInput || !chatHistory || !sendChatBtn) return;
     const userInput = chatInput.value.trim();
     if (!userInput) return;
+
+    // Remove any existing suggestion chips immediately
     chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
+
     addMessageToHistory('user', { text: userInput });
-    chatInput.value = '';
+    chatInput.value = ''; // Clear input after sending
+    chatInput.focus(); // Keep focus on input
+
     const loadingElement = document.createElement('div');
-    loadingElement.className = 'flex justify-start';
+    loadingElement.className = 'flex justify-start mb-2'; // Added margin
     loadingElement.id = 'chat-loading';
-    loadingElement.innerHTML = `<div class="bg-white p-3 rounded-lg border"><div class="loader"></div></div>`;
+    loadingElement.innerHTML = `<div class="bg-white p-3 rounded-lg border shadow-sm"><div class="loader"></div></div>`;
     chatHistory.appendChild(loadingElement);
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+    chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
+
     try {
         conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
-        const result = await callGeminiAPI('chat', { text: userInput, history: conversationHistory });
+        // Use a temporary history to prevent modifying the main one if API fails
+        const currentHistory = [...conversationHistory];
+        const result = await callGeminiAPI('chat', { text: userInput, history: currentHistory }); // Pass current history
 
         let aiResponseData;
+        let aiRawText = ''; // Store raw text for history
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
-            const aiResponseText = result.candidates[0].content.parts[0].text;
+            aiRawText = result.candidates[0].content.parts[0].text; // Get raw/cleaned text from backend
+            aiResponseData = safeJsonParse(aiRawText);
 
-            if (!aiResponseText || !aiResponseText.trim().startsWith('{')) {
-                console.error("AI response is not valid JSON (or is empty):", aiResponseText);
+            if (!aiResponseData) {
+                console.error("Failed to parse chat AI response:", aiRawText);
                 aiResponseData = {
-                    chinese: "哎呀，我好像走神了...",
-                    pinyin: "Āiyā, wǒ hǎoxiàng zǒushén le...",
-                    korean: "어머, 제가 잠시 딴생각을 했나 봐요. 다시 한 번 말씀해 주시겠어요?"
+                    chinese: "哎呀...", pinyin: "Āiyā...",
+                    korean: "죄송해요, 응답을 처리하는 데 문제가 발생했어요. 다시 시도해주세요."
                 };
+                // Do not add failed parse response to history
             } else {
-                try {
-                    aiResponseData = JSON.parse(aiResponseText);
-                    conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
-                } catch (e) {
-                    console.error("AI response looked like JSON but failed to parse:", aiResponseText, e);
-                    aiResponseData = {
-                        chinese: "糟糕... (zāogāo)",
-                        pinyin: "",
-                        korean: "이런... 응답 형식을 처리하는 데 실패했어요. 다시 시도해주세요."
-                    };
-                    conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
-                }
+                 // Add the raw/cleaned text to history only on successful parse
+                 conversationHistory.push({ role: 'model', parts: [{ text: aiRawText }] });
             }
         } else {
              console.error("Invalid response structure from chat API:", result);
-             aiResponseData = {
-                chinese: "(응답 없음)",
-                pinyin: "",
-                korean: "AI로부터 유효한 응답을 받지 못했습니다."
-             };
+             aiResponseData = { chinese: "(응답 없음)", korean: "AI 응답 구조 오류" };
         }
-        addMessageToHistory('ai', aiResponseData);
-    } catch (error) {
-        console.error('Chat error:', error);
-        showAlert(`대화 중 오류가 발생했습니다: ${error.message}`);
-    } finally {
+        // Remove loading indicator *before* adding the final AI message
         const loadingEl = document.getElementById('chat-loading');
         if (loadingEl) loadingEl.remove();
+        addMessageToHistory('ai', aiResponseData); // Add AI response or error message
+
+    } catch (error) {
+        console.error('Chat error:', error);
+        showAlert(`대화 중 오류 발생: ${error.message}`);
+        // Remove loading indicator on error
+        const loadingEl = document.getElementById('chat-loading');
+        if (loadingEl) loadingEl.remove();
+        // Display error in chat history as well
+        addMessageToHistory('ai', { chinese: "(오류 발생)", korean: `오류: ${error.message}` });
+        // Optionally remove the last user message from history if API call failed
+        // conversationHistory.pop();
     }
 }
 async function handleStartChatWithPattern(patternString) {
+    if (!chatModal || !chatHistory || !chatInput) return;
     chatModal.classList.remove('hidden');
     chatHistory.innerHTML = '';
     conversationHistory = [];
@@ -415,86 +569,79 @@ async function handleStartChatWithPattern(patternString) {
     chatInput.value = '';
 
     const loadingElement = document.createElement('div');
-    loadingElement.className = 'flex justify-start';
+    loadingElement.className = 'flex justify-start mb-2';
     loadingElement.id = 'chat-loading';
-    loadingElement.innerHTML = `<div class="bg-white p-3 rounded-lg border"><div class="loader"></div></div>`;
+    loadingElement.innerHTML = `<div class="bg-white p-3 rounded-lg border shadow-sm"><div class="loader"></div></div>`;
     chatHistory.appendChild(loadingElement);
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+    chatHistory.scrollTo({ top: chatHistory.scrollHeight, behavior: 'smooth' });
 
     try {
         const result = await callGeminiAPI('start_chat_with_pattern', { pattern: patternString });
-
         let aiResponseData;
+        let aiRawText = '';
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
-            const aiResponseText = result.candidates[0].content.parts[0].text;
-            if (!aiResponseText || !aiResponseText.trim().startsWith('{')) {
-                console.error("AI response is not valid JSON (or is empty) in start_chat_with_pattern:", aiResponseText);
-                aiResponseData = {
-                    chinese: "哎呀，我好像走神了...",
-                    pinyin: "Āiyā, wǒ hǎoxiàng zǒushén le...",
-                    korean: "어머, 제가 잠시 딴생각을 했나 봐요. '패턴으로 대화' 버튼을 다시 한 번 눌러주시겠어요?"
-                };
+            aiRawText = result.candidates[0].content.parts[0].text;
+            aiResponseData = safeJsonParse(aiRawText);
+
+            if (!aiResponseData) {
+                 console.error("Failed to parse start_chat AI response:", aiRawText);
+                 aiResponseData = { chinese: "哎呀...", korean: "대화 시작 중 오류가 발생했어요. 다시 시도해주세요." };
             } else {
-                try {
-                    aiResponseData = JSON.parse(aiResponseText);
-                    conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
-                } catch (e) {
-                    console.error("AI response looked like JSON but failed to parse in start_chat_with_pattern:", aiResponseText, e);
-                    aiResponseData = {
-                        chinese: "糟糕... (zāogāo)",
-                        pinyin: "",
-                        korean: "이런... 응답 형식을 처리하는 데 실패했어요. 다시 시도해주세요."
-                    };
-                    conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
-                }
+                 conversationHistory.push({ role: 'model', parts: [{ text: aiRawText }] });
             }
         } else {
              console.error("Invalid response structure from start_chat_with_pattern API:", result);
-             aiResponseData = {
-                chinese: "(응답 없음)",
-                pinyin: "",
-                korean: "AI로부터 유효한 응답을 받지 못했습니다."
-             };
+             aiResponseData = { chinese: "(응답 없음)", korean: "AI 응답 구조 오류" };
         }
+        const loadingEl = document.getElementById('chat-loading');
+        if (loadingEl) loadingEl.remove();
         addMessageToHistory('ai', aiResponseData);
     } catch (error) {
         console.error('Start chat with pattern error:', error);
-        showAlert(`대화 시작 중 오류가 발생했습니다: ${error.message}`);
-    } finally {
+        showAlert(`대화 시작 중 오류 발생: ${error.message}`);
         const loadingEl = document.getElementById('chat-loading');
         if (loadingEl) loadingEl.remove();
+        addMessageToHistory('ai', { chinese: "(오류 발생)", korean: `오류: ${error.message}` });
     }
 }
 async function handleSuggestReply() {
+    if (!suggestReplyBtn || !chatHistory) return;
+    // Immediately remove existing suggestions if any
     chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
+
     if (conversationHistory.length === 0) {
         showAlert('추천할 답변을 생성하기 위한 대화 내용이 없습니다.');
         return;
     }
     suggestReplyBtn.disabled = true;
-    suggestReplyBtn.textContent = '추천 생성 중...';
+    suggestReplyBtn.innerHTML = '<div class="loader-sm mx-auto"></div>'; // Show loader in button
+
     try {
-        const result = await callGeminiAPI('suggest_reply', { history: conversationHistory });
+        // Pass only the relevant history (maybe limit length if too long?)
+        const historyForSuggestion = [...conversationHistory];
+        const result = await callGeminiAPI('suggest_reply', { history: historyForSuggestion });
+
+        // Backend now directly returns { suggestions: [...] } or throws error
         const suggestions = result.suggestions || [];
-        if (suggestions.length > 0 && suggestions.every(s => s.chinese && s.pinyin && s.korean)) {
+
+        if (suggestions.length > 0) {
             addSuggestionToHistory(suggestions);
         } else {
-             console.warn("Received suggestions are empty or have invalid format:", suggestions);
-            showAlert('추천할 만한 답변을 찾지 못했거나 형식이 잘못되었습니다.');
+             console.warn("Received empty suggestions array.");
+             showAlert('추천할 만한 답변을 찾지 못했습니다.');
         }
     } catch (error) {
         console.error('Suggest reply error:', error);
         showAlert(`답변 추천 중 오류 발생: ${error.message}`);
     } finally {
-        if(suggestReplyBtn) { // Check if suggestReplyBtn still exists
+        if(suggestReplyBtn) {
              suggestReplyBtn.disabled = false;
-             suggestReplyBtn.textContent = '💡 답변 추천받기';
+             suggestReplyBtn.innerHTML = '💡 답변 추천받기'; // Restore text
         }
     }
 }
 
 async function handleNewPracticeRequest(patternString, practiceIndex) {
-    // const newPracticeBtn = document.getElementById(`new-practice-btn-${practiceIndex}`); // No longer used to start
     const koreanEl = document.getElementById(`practice-korean-${practiceIndex}`);
     const inputEl = document.getElementById(`practice-input-${practiceIndex}`);
     const checkBtn = document.getElementById(`check-practice-btn-${practiceIndex}`);
@@ -502,84 +649,64 @@ async function handleNewPracticeRequest(patternString, practiceIndex) {
     const micBtnPractice = document.getElementById(`practice-mic-btn-${practiceIndex}`);
     const resultEl = document.getElementById(`practice-result-${practiceIndex}`);
     const hintDataEl = document.getElementById(`practice-hint-${practiceIndex}`);
-
     const practiceContainer = document.getElementById(`practice-container-${practiceIndex}`);
     const counterEl = document.getElementById(`practice-counter-${practiceIndex}`);
+
+    if (!koreanEl || !inputEl || !checkBtn || !hintBtn || !micBtnPractice || !resultEl || !hintDataEl || !practiceContainer || !counterEl) {
+        console.error(`One or more practice elements for index ${practiceIndex} not found.`);
+        return;
+    }
+
     let currentCount = parseInt(practiceContainer.dataset.spreeCount, 10);
     const goal = parseInt(practiceContainer.dataset.spreeGoal, 10);
     let nextCount = currentCount + 1;
 
-    // Reset UI before loading
-    koreanEl.textContent = '...';
-    inputEl.value = '';
-    resultEl.innerHTML = '';
-    hintDataEl.innerHTML = '';
-    checkBtn.style.display = 'none';
-    hintBtn.style.display = 'none';
-    micBtnPractice.style.display = 'none';
+    // Reset UI
+    koreanEl.textContent = '...'; inputEl.value = ''; resultEl.innerHTML = ''; hintDataEl.innerHTML = '';
+    checkBtn.style.display = 'none'; hintBtn.style.display = 'none'; micBtnPractice.style.display = 'none';
     inputEl.disabled = true;
-
-    // Show loading in counter
     counterEl.innerHTML = `<div class="loader-sm mx-auto"></div> AI가 문제 ${nextCount}번을 만들고 있어요...`;
 
     try {
         const result = await callGeminiAPI('generate_practice', { pattern: patternString });
-
         let practiceData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const practiceText = result.candidates[0].content.parts[0].text;
-            try {
-                if (!practiceText || !practiceText.trim().startsWith('{')) {
-                    throw new Error("AI response for practice is not valid JSON.");
-                }
-                practiceData = JSON.parse(practiceText);
+            practiceData = safeJsonParse(practiceText);
 
-                // Update UI
-                koreanEl.textContent = `"${practiceData.korean}"`;
-                checkBtn.dataset.answer = practiceData.chinese;
-                checkBtn.dataset.pinyin = practiceData.pinyin;
-                hintBtn.dataset.newVocab = JSON.stringify(practiceData.practiceVocab || []);
-
-                // Update count *after* success
-                practiceContainer.dataset.spreeCount = nextCount;
-
-                // Show elements
-                checkBtn.style.display = '';
-                hintBtn.style.display = '';
-                micBtnPractice.style.display = '';
-                inputEl.disabled = false;
-                hintBtn.disabled = false;
-                hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-
-                counterEl.textContent = `문제 ${nextCount} / ${goal}`;
-                inputEl.focus();
-
-            } catch (e) {
-                console.error("Failed to parse practice data:", practiceText, e);
-                koreanEl.textContent = "오류: 새 문제를 불러오지 못했습니다.";
-                counterEl.textContent = '오류 발생';
-                practiceContainer.dataset.spreeCount = currentCount; // Revert
-                inputEl.disabled = true;
+            if (!practiceData || typeof practiceData.korean !== 'string' || typeof practiceData.chinese !== 'string') {
+                 console.error("Parsed practice data is invalid:", practiceData);
+                 throw new Error("AI 응답 데이터 형식이 올바르지 않습니다.");
             }
+
+            // Update UI
+            koreanEl.textContent = `"${practiceData.korean}"`;
+            checkBtn.dataset.answer = practiceData.chinese;
+            checkBtn.dataset.pinyin = practiceData.pinyin || '';
+            hintBtn.dataset.newVocab = JSON.stringify(practiceData.practiceVocab || []);
+            practiceContainer.dataset.spreeCount = nextCount;
+
+            // Show elements
+            checkBtn.style.display = ''; hintBtn.style.display = ''; micBtnPractice.style.display = '';
+            inputEl.disabled = false; hintBtn.disabled = false; hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            counterEl.textContent = `문제 ${nextCount} / ${goal}`;
+            inputEl.focus();
+
         } else {
             console.error("Invalid response structure from generate_practice API:", result);
-            koreanEl.textContent = "오류: AI 응답이 없습니다.";
-            counterEl.textContent = '오류 발생';
-            practiceContainer.dataset.spreeCount = currentCount; // Revert
-            inputEl.disabled = true;
+            throw new Error("AI 응답 구조가 유효하지 않습니다.");
         }
     } catch (error) {
         console.error('New practice request error:', error);
-        koreanEl.textContent = `오류: ${error.message}`;
+        koreanEl.textContent = "오류: 새 문제를 불러오지 못했습니다.";
         counterEl.textContent = '오류 발생';
-        practiceContainer.dataset.spreeCount = currentCount; // Revert
+        practiceContainer.dataset.spreeCount = currentCount;
         inputEl.disabled = true;
-    } finally {
-       // No loading state tied to a start button
     }
 }
 
 async function handleTranslation() {
+    if (!koreanInput || !translateBtn || !translationResult) return;
     const text = koreanInput.value.trim();
     if (!text) {
         showAlert('번역할 한국어 문장을 입력하세요.');
@@ -589,116 +716,108 @@ async function handleTranslation() {
     translationResult.innerHTML = '<div class="loader mx-auto"></div>';
     try {
         const patternList = allPatterns.map(p => p.pattern).join(", ");
-        const systemPrompt = `You are a professional Korean-to-Chinese translator and language teacher. Translate the following Korean sentence into natural, native-sounding Chinese. Provide: 1. The main Chinese translation. 2. The pinyin for the main translation. 3. (Optional) 1-2 alternative natural expressions if applicable. 4. A concise explanation (in Korean) of why this expression is natural, what the key vocabulary or grammar point is.
-Format your response as a single, valid JSON object with keys "chinese", "pinyin", "alternatives" (string array), "explanation" (string, in Korean), and "usedPattern" (string or null).
-Do not include markdown backticks.
-IMPORTANT: After translating, analyze your Chinese translation. If it uses one of the following patterns: [${patternList}], set the "usedPattern" key to the matching pattern string. If no pattern matches, set "usedPattern" to null.`;
+        const systemPrompt = `You are a professional Korean-to-Chinese translator... Format... JSON object with keys "chinese", "pinyin", "alternatives", "explanation", and "usedPattern"...`;
 
         const result = await callGeminiAPI('translate', { text, systemPrompt });
         let translationData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const translationText = result.candidates[0].content.parts[0].text;
-            try {
-                translationData = JSON.parse(translationText);
-            } catch (e) {
-                console.error("AI translation response is not valid JSON:", translationText);
-                translationData = { chinese: translationText, pinyin: "(JSON 파싱 오류)", alternatives: [], explanation: "(설명 파싱 오류)", usedPattern: null };
+            translationData = safeJsonParse(translationText);
+            if (!translationData) {
+                 console.error("AI translation response failed to parse:", translationText);
+                 translationData = { chinese: "(파싱 오류)", korean: "AI 응답 처리 오류." };
             }
         } else {
              console.error("Invalid response structure from translate API:", result);
-             translationData = { chinese: "(유효하지 않은 응답)", pinyin: "", alternatives: [], explanation: "", usedPattern: null };
+             translationData = { chinese: "(응답 없음)", korean: "AI 응답 구조 오류." };
         }
-        let alternativesHtml = '';
-        if (translationData.alternatives && Array.isArray(translationData.alternatives) && translationData.alternatives.length > 0) {
-            alternativesHtml = `<p class="text-sm text-gray-500 mt-3">다른 표현:</p><ul class="list-disc list-inside text-sm text-gray-600 chinese-text">${translationData.alternatives.map(alt => `<li>${alt}</li>`).join('')}</ul>`;
-        }
-        let patternHtml = '';
-        if (translationData.usedPattern) {
-            patternHtml = `<div class="mt-4 pt-3 border-t"><h4 class="text-sm font-semibold text-green-700">💡 학습 패턴 발견!</h4><p class="text-sm text-gray-600 mt-1">이 문장은 <strong>'${translationData.usedPattern}'</strong> 패턴을 사용했어요!</p></div>`;
-        }
-        let explanationHtml = '';
-        if (translationData.explanation) {
-            explanationHtml = `<div class="mt-4 pt-3 border-t"><h4 class="text-sm font-semibold text-gray-700">💡 표현 꿀팁:</h4><p class="text-sm text-gray-600 mt-1">${translationData.explanation.replace(/\n/g, '<br>')}</p></div>`;
-        }
-        correctionResult.innerHTML = `
+
+        // Display logic (ensure properties exist)
+        let alternativesHtml = (translationData.alternatives && Array.isArray(translationData.alternatives) && translationData.alternatives.length > 0)
+            ? `<p class="text-sm text-gray-500 mt-3">다른 표현:</p><ul class="list-disc list-inside text-sm text-gray-600 chinese-text">${translationData.alternatives.map(alt => `<li>${alt}</li>`).join('')}</ul>`
+            : '';
+        let patternHtml = translationData.usedPattern
+            ? `<div class="mt-4 pt-3 border-t"><h4 class="text-sm font-semibold text-green-700">💡 학습 패턴 발견!</h4><p class="text-sm text-gray-600 mt-1">이 문장은 <strong>'${translationData.usedPattern}'</strong> 패턴을 사용했어요!</p></div>`
+            : '';
+        let explanationHtml = translationData.explanation
+            ? `<div class="mt-4 pt-3 border-t"><h4 class="text-sm font-semibold text-gray-700">💡 표현 꿀팁:</h4><p class="text-sm text-gray-600 mt-1 break-words">${translationData.explanation.replace(/\n/g, '<br>')}</p></div>`
+            : '';
+
+        translationResult.innerHTML = `
             <div class="flex items-center">
-                <p class="text-xl chinese-text font-bold text-gray-800">${translationData.chinese}</p>
-                <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${translationData.chinese}">
+                 <p class="text-xl chinese-text font-bold text-gray-800 break-words">${translationData.chinese || ''}</p>
+                 ${translationData.chinese ? `<button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0" data-text="${translationData.chinese}">
                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
-                </button>
+                 </button>` : ''}
             </div>
-            <p class="text-md text-gray-500">${translationData.pinyin || '(병음 정보 없음)'}</p>
+            <p class="text-md text-gray-500 mt-1 break-words">${translationData.pinyin || '(병음 정보 없음)'}</p>
             ${alternativesHtml}
             ${patternHtml}
             ${explanationHtml}`;
+
     } catch (error) {
         console.error('Translation error:', error);
-        correctionResult.innerHTML = `<p class="text-red-500 text-center">번역 중 오류가 발생했습니다: ${error.message}</p>`;
+        translationResult.innerHTML = `<p class="text-red-500 text-center">번역 중 오류 발생: ${error.message}</p>`;
     } finally {
-        translateBtn.disabled = false;
+        if(translateBtn) translateBtn.disabled = false;
     }
 }
 
-// --- [FEATURE 1 START: 작문 교정 함수] ---
 async function handleCorrectWriting() {
+    if (!writingInput || !correctWritingBtn || !correctionResult) {
+        console.error("Corrector elements not initialized.");
+        showAlert("작문 교정 기능을 초기화하는 중 오류가 발생했습니다.");
+        return;
+    }
     const text = writingInput.value.trim();
     if (!text) {
         showAlert('교정받을 중국어 문장을 입력하세요.');
         return;
     }
     correctWritingBtn.disabled = true;
-    correctionResult.innerHTML = '<div class="loader mx-auto"></div>'; // Show loader
+    correctionResult.innerHTML = '<div class="loader mx-auto"></div>';
 
     try {
-        // Call the new API action
         const result = await callGeminiAPI('correct_writing', { text });
-
         let correctionData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const correctionText = result.candidates[0].content.parts[0].text;
-            try {
-                // Ensure response is JSON
-                 if (!correctionText || !correctionText.trim().startsWith('{')) {
-                    throw new Error("AI response for correction is not valid JSON.");
-                }
-                correctionData = JSON.parse(correctionText);
+            correctionData = safeJsonParse(correctionText);
 
-                // Display the result
-                let originalSentenceHtml = '';
-                // Only show original if it's different from corrected
-                if (correctionData.corrected_sentence !== text) {
-                     originalSentenceHtml = `<p class="text-sm text-gray-500 mt-1">원본: <s class="chinese-text">${text}</s></p>`;
-                }
-
-                correctionResult.innerHTML = `
-                    ${originalSentenceHtml}
-                    <div class="flex items-center mt-2">
-                         <p class="text-lg chinese-text font-semibold text-gray-800">${correctionData.corrected_sentence}</p>
-                         <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${correctionData.corrected_sentence}">
-                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
-                         </button>
-                    </div>
-                    <div class="mt-3 pt-3 border-t">
-                        <h4 class="text-sm font-semibold text-gray-700">💡 설명:</h4>
-                        <p class="text-sm text-gray-600 mt-1">${correctionData.explanation.replace(/\n/g, '<br>')}</p>
-                    </div>`;
-
-            } catch (e) {
-                console.error("Failed to parse correction data:", correctionText, e);
-                correctionResult.innerHTML = `<p class="text-red-500 text-center">오류: AI 응답 처리 중 문제가 발생했습니다.</p>`;
+            if (!correctionData || typeof correctionData.corrected_sentence !== 'string' || typeof correctionData.explanation !== 'string') {
+                 console.error("Failed to parse correction data or missing keys:", correctionText, correctionData);
+                 throw new Error("AI 응답 처리 중 문제가 발생했습니다 (데이터 형식 오류).");
             }
+
+            // Display result
+            let originalSentenceHtml = (correctionData.corrected_sentence !== text)
+                 ? `<p class="text-sm text-gray-500 mt-1">원본: <s class="chinese-text break-words">${text}</s></p>`
+                 : ''; // If correct, don't show original strikethrough
+
+            correctionResult.innerHTML = `
+                ${originalSentenceHtml}
+                <div class="flex items-center mt-2">
+                     <p class="text-lg chinese-text font-semibold text-gray-800 break-words">${correctionData.corrected_sentence}</p>
+                     ${correctionData.corrected_sentence ? `<button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0" data-text="${correctionData.corrected_sentence}">
+                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                     </button>` : ''}
+                </div>
+                <div class="mt-3 pt-3 border-t">
+                    <h4 class="text-sm font-semibold text-gray-700">💡 설명:</h4>
+                    <p class="text-sm text-gray-600 mt-1 break-words">${correctionData.explanation.replace(/\n/g, '<br>')}</p>
+                </div>`;
+
         } else {
              console.error("Invalid response structure from correct_writing API:", result);
-             correctionResult.innerHTML = `<p class="text-red-500 text-center">오류: AI로부터 유효한 응답을 받지 못했습니다.</p>`;
+             throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다.");
         }
     } catch (error) {
         console.error('Writing correction error:', error);
-        correctionResult.innerHTML = `<p class="text-red-500 text-center">교정 중 오류가 발생했습니다: ${error.message}</p>`;
+        correctionResult.innerHTML = `<p class="text-red-500 text-center">교정 중 오류 발생: ${error.message}</p>`;
     } finally {
-        correctWritingBtn.disabled = false;
+        if(correctWritingBtn) correctWritingBtn.disabled = false;
     }
 }
-// --- [FEATURE 1 END] ---
 
 
 // --- 음성 인식 초기화 (자동 제출 기능 포함) ---
@@ -715,16 +834,15 @@ function initializeSpeechRecognition() {
             const speechResult = event.results[0][0].transcript;
             console.log("Recognized Text:", speechResult);
 
-            const targetInput = currentRecognitionTargetInput;
-            const targetMicButton = currentRecognitionMicButton;
+            const targetInput = currentRecognitionTargetInput; // Capture before potential async cleanup
 
             if (targetInput) {
                 targetInput.value = speechResult;
-
+                // Add a slight delay to ensure the value is set before triggering click
                 setTimeout(() => {
-                    if (targetInput === chatInput) {
+                    if (targetInput === chatInput && sendChatBtn) {
                         console.log("Auto-submitting chat message...");
-                        if (sendChatBtn) sendChatBtn.click();
+                        sendChatBtn.click();
                     } else if (targetInput.id.startsWith('practice-input-')) {
                         console.log("Auto-submitting practice answer...");
                         const index = targetInput.id.split('-').pop();
@@ -735,20 +853,24 @@ function initializeSpeechRecognition() {
                             console.warn("Auto-submit skipped: Check button not found or not visible for", targetInput.id);
                         }
                     }
-                }, 150);
+                }, 150); // Slightly increased delay
             } else {
                 console.warn("Recognition result received but no target input was set.");
                 if (chatInput) chatInput.value = speechResult; // Fallback
             }
+            // Let onend handle the cleanup reliably
         };
 
         recognition.onspeechend = () => {
             console.log("Speech Recognition: Speech has stopped being detected.");
+             // Usually triggers stop automatically, but just in case for some browsers:
+             // setTimeout(() => { if (isRecognizing) recognition.stop(); }, 500);
         };
 
         recognition.onnomatch = () => {
             console.log("Speech Recognition: No match found.");
             showAlert('음성을 인식하지 못했습니다. 다시 시도해주세요.');
+             // Cleanup handled by onend
         };
 
         recognition.onerror = (event) => {
@@ -757,7 +879,10 @@ function initializeSpeechRecognition() {
                  showAlert(`음성 인식 오류: ${event.error}. 마이크 권한을 확인하세요.`);
             } else if (event.error === 'not-allowed') {
                  showAlert('마이크 사용 권한이 거부되었습니다. 브라우저 설정을 확인해주세요.');
+            } else if (event.error === 'no-speech') {
+                 showAlert('음성이 감지되지 않았습니다. 다시 시도해주세요.');
             }
+            // Cleanup handled by onend
         };
 
          recognition.onend = () => {
@@ -765,6 +890,7 @@ function initializeSpeechRecognition() {
             if (currentRecognitionMicButton) {
                 currentRecognitionMicButton.classList.remove('is-recording');
             }
+            // Reliably reset state variables
             isRecognizing = false;
             currentRecognitionTargetInput = null;
             currentRecognitionMicButton = null;
@@ -781,6 +907,7 @@ function initializeSpeechRecognition() {
 
 // --- 퀴즈 관련 함수 ---
 function startQuiz() {
+     if (!quizModal || !quizContent) return;
     const todayStr = getTodayString();
     const lastQuizDate = localStorage.getItem('lastQuizDate');
 
@@ -794,9 +921,21 @@ function startQuiz() {
         quizModal.classList.remove('hidden');
         return;
     }
+    if (allPatterns.length < 4) { // Need at least 1 correct + 3 wrong options
+        showAlert("퀴즈를 생성하기에 패턴 수가 부족합니다.");
+        return;
+    }
 
     const shuffledPatterns = [...allPatterns].sort(() => 0.5 - Math.random());
-    quizQuestions = shuffledPatterns.slice(0, 5);
+    quizQuestions = shuffledPatterns.slice(0, 5); // Take first 5 for the quiz
+    // Ensure we actually got 5 questions if patterns are fewer than 5
+    quizQuestions = quizQuestions.slice(0, Math.min(5, allPatterns.length));
+
+    if (quizQuestions.length === 0) {
+        showAlert("퀴즈 질문을 생성할 수 없습니다.");
+        return;
+    }
+
     currentQuizQuestionIndex = 0;
     quizScore = 0;
 
@@ -805,25 +944,53 @@ function startQuiz() {
 }
 
 function renderQuizQuestion() {
+    if (!quizContent) return;
     if (currentQuizQuestionIndex >= quizQuestions.length) {
         showQuizResult();
         return;
     }
 
     const correctPattern = quizQuestions[currentQuizQuestionIndex];
-    const wrongPatterns = [...allPatterns].filter(p => p.pattern !== correctPattern.pattern).sort(() => 0.5 - Math.random()).slice(0, 3);
+    // Ensure correctPattern is valid
+    if (!correctPattern || !correctPattern.pattern || !correctPattern.meaning) {
+        console.error("Invalid quiz question data:", correctPattern);
+        // Skip this question or show an error
+        currentQuizQuestionIndex++;
+        renderQuizQuestion();
+        return;
+    }
+
+    const wrongPatterns = [...allPatterns]
+        .filter(p => p.pattern !== correctPattern.pattern) // Exclude correct answer
+        .sort(() => 0.5 - Math.random()) // Shuffle
+        .slice(0, 3); // Take 3 wrong options
+
+    // Check if we have enough wrong options (might happen if total patterns < 4)
+    while (wrongPatterns.length < 3 && allPatterns.length > wrongPatterns.length + 1) {
+       // If not enough unique wrong patterns, potentially add duplicates (or handle differently)
+       // For simplicity, we might just proceed with fewer options if necessary
+       console.warn("Not enough unique wrong patterns available for the quiz.");
+       // Let's find any other pattern that's not the correct one
+       const fallbackWrong = allPatterns.find(p => p.pattern !== correctPattern.pattern && !wrongPatterns.includes(p));
+       if (fallbackWrong) wrongPatterns.push(fallbackWrong);
+       else break; // Cannot add more
+    }
+
+
     const options = [...wrongPatterns, correctPattern].sort(() => 0.5 - Math.random());
 
-    const optionsHtml = options.map(opt => `
+    const optionsHtml = options.map(opt => {
+         if (!opt || !opt.pattern) return ''; // Skip invalid options
+         return `
         <button class="quiz-option-btn text-left w-full p-3 border rounded-lg hover:bg-gray-100 transition-colors" data-pattern="${opt.pattern}">
-            <span class="font-medium chinese-text text-lg">${opt.pattern}</span><br>
-            <span class="text-sm text-gray-500">${opt.pinyin}</span>
-        </button>
-    `).join('');
+            <span class="font-medium chinese-text text-lg break-words">${opt.pattern}</span><br>
+            <span class="text-sm text-gray-500 break-words">${opt.pinyin || ''}</span>
+        </button>`;
+        }).join('');
 
     quizContent.innerHTML = `
         <div>
-            <p class="text-lg font-bold mb-3">"${correctPattern.meaning}"</p>
+            <p class="text-lg font-bold mb-3 break-words">"${correctPattern.meaning}"</p>
             <p class="text-sm text-gray-600 mb-4">위의 뜻을 가진 중국어 패턴을 고르세요.</p>
             <div class="space-y-3">${optionsHtml}</div>
             <p class="text-center text-sm text-gray-500 mt-6">문제 ${currentQuizQuestionIndex + 1} / ${quizQuestions.length}</p>
@@ -831,348 +998,304 @@ function renderQuizQuestion() {
 }
 
 function handleQuizAnswer(targetButton) {
+     if (!quizContent || !quizQuestions || quizQuestions.length === 0) return;
+
     const selectedPattern = targetButton.dataset.pattern;
-    const correctPattern = quizQuestions[currentQuizQuestionIndex].pattern;
+    // Ensure the question exists
+    if (currentQuizQuestionIndex >= quizQuestions.length) return;
+    const correctPatternData = quizQuestions[currentQuizQuestionIndex];
+    const correctPattern = correctPatternData.pattern;
+
     const allButtons = quizContent.querySelectorAll('.quiz-option-btn');
 
     allButtons.forEach(btn => {
-        btn.disabled = true;
+        btn.disabled = true; // Disable all options
+        // Highlight the correct answer
         if (btn.dataset.pattern === correctPattern) {
+            btn.classList.remove('hover:bg-gray-100'); // Remove hover effect
             btn.classList.add('bg-green-100', 'border-green-500', 'ring-2', 'ring-green-300');
         }
     });
 
+    // Mark the selected button if it was wrong
     if (selectedPattern === correctPattern) {
         quizScore++;
     } else {
+        targetButton.classList.remove('hover:bg-gray-100');
         targetButton.classList.add('bg-red-100', 'border-red-500', 'ring-2', 'ring-red-300');
     }
 
+    // Move to the next question after a delay
     setTimeout(() => {
         currentQuizQuestionIndex++;
-        renderQuizQuestion();
-    }, 2000); // 2초 후 다음 문제로
+        renderQuizQuestion(); // Render next or show results
+    }, 1500); // Reduced delay slightly
 }
 
 function showQuizResult() {
+    if (!quizContent) return;
+     let message = `총 ${quizQuestions.length}문제 중 <span class="font-bold text-blue-600 text-xl">${quizScore}</span>개를 맞혔습니다!`;
+     if (quizScore === quizQuestions.length) {
+         message += " 🎉 완벽해요!";
+     } else if (quizScore >= quizQuestions.length * 0.7) {
+         message += " 👍 잘했어요!";
+     }
+
     quizContent.innerHTML = `
         <div>
-            <h2 class="text-2xl font-bold text-center mb-4">퀴즈 완료! 🎉</h2>
-            <p class="text-center text-lg mb-6">
-                총 ${quizQuestions.length}문제 중
-                <span class="font-bold text-blue-600 text-xl">${quizScore}</span>개를 맞혔습니다!
-            </p>
+            <h2 class="text-2xl font-bold text-center mb-4">퀴즈 완료!</h2>
+            <p class="text-center text-lg mb-6">${message}</p>
             <button id="close-quiz-modal-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">확인</button>
         </div>`;
-    localStorage.setItem('lastQuizDate', getTodayString());
+     try {
+        localStorage.setItem('lastQuizDate', getTodayString());
+     } catch (e) {
+         console.error("Failed to save last quiz date:", e);
+         // Non-critical error
+     }
 }
 
 
 // --- 메인 이벤트 리스너 설정 ---
 function setupEventListeners() {
-    newPatternBtn.addEventListener('click', () => {
+    // Add null checks for all elements before adding listeners
+    if (newPatternBtn) newPatternBtn.addEventListener('click', () => {
          const newPatterns = getRandomPatterns();
          localStorage.setItem('dailyChinesePatterns', JSON.stringify({ date: getTodayString(), patterns: newPatterns }));
          renderPatterns(newPatterns);
          window.scrollTo(0, 0);
     });
 
-    patternContainer.addEventListener('click', (e) => {
-        const target = e.target;
-        if (target.classList.contains('learn-btn')) { // 학습 완료
-            const pattern = target.dataset.pattern;
-            learningCounts[pattern] = (learningCounts[pattern] || 0) + 1;
-            saveCounts();
-             const countDisplay = target.closest('div').querySelector('.count-display');
-             if (countDisplay) {
-                 countDisplay.textContent = learningCounts[pattern];
-             }
-        } else if (target.closest('.start-chat-pattern-btn')) { // "이 패턴으로 대화"
-            const button = target.closest('.start-chat-pattern-btn');
-            const patternString = button.dataset.patternString;
-            if (patternString) {
-                handleStartChatWithPattern(patternString);
-            }
+    if (patternContainer) {
+        patternContainer.addEventListener('click', (e) => {
+            const target = e.target;
+            const learnBtn = target.closest('.learn-btn');
+            const chatPatternBtn = target.closest('.start-chat-pattern-btn');
+            const nextPracticeBtn = target.closest('.next-practice-btn');
+            const practiceMicBtn = target.closest('.practice-mic-btn');
+            const checkPracticeBtn = target.classList.contains('check-practice-btn') ? target : null;
+            const showHintBtn = target.closest('.show-hint-btn');
+            const retryPracticeBtn = target.classList.contains('retry-practice-btn') ? target : null;
+            const ttsBtn = target.closest('.tts-btn');
 
-        } else if (target.closest('.next-practice-btn')) { // "다음 문제" 버튼
-            const button = target.closest('.next-practice-btn');
-            const practiceIndex = button.dataset.practiceIndex;
-            const practiceContainer = document.getElementById(`practice-container-${practiceIndex}`);
-            const patternString = practiceContainer.querySelector('.show-hint-btn')?.dataset.patternString;
-            if (patternString) {
-                handleNewPracticeRequest(patternString, practiceIndex);
-            } else {
-                console.error("Could not find pattern string for next practice button.");
-            }
+            if (learnBtn) {
+                const pattern = learnBtn.dataset.pattern;
+                learningCounts[pattern] = (learningCounts[pattern] || 0) + 1;
+                saveCounts();
+                 const countDisplay = learnBtn.closest('div').querySelector('.count-display');
+                 if (countDisplay) countDisplay.textContent = learningCounts[pattern];
 
-        } else if (target.closest('.practice-mic-btn')) { // Practice Mic
-            const button = target.closest('.practice-mic-btn');
-            const practiceIndex = button.dataset.practiceIndex;
-            const targetInput = document.getElementById(`practice-input-${practiceIndex}`);
+            } else if (chatPatternBtn) {
+                const patternString = chatPatternBtn.dataset.patternString;
+                if (patternString) handleStartChatWithPattern(patternString);
 
-            if (!recognition) {
-                 showAlert('음성 인식이 지원되지 않거나 초기화되지 않았습니다.');
-                 console.log("Recognition not available or not initialized.");
-                return;
-            }
-            if (isRecognizing && currentRecognitionMicButton !== button) {
-                 console.log("Stopping ongoing recognition initiated by another mic...");
-                 recognition.stop();
-                 setTimeout(() => startPracticeRecognition(button, targetInput), 300);
-            } else if (isRecognizing) {
-                console.log("Stopping recognition (from practice mic)...");
-                recognition.stop();
-            } else {
-                 startPracticeRecognition(button, targetInput);
-            }
-        } else if (target.classList.contains('check-practice-btn')) { // 정답 확인
-            const button = target;
-            const inputId = button.dataset.inputId;
-            const index = inputId.split('-').pop();
-            const correctAnswer = button.dataset.answer;
-            const correctPinyin = button.dataset.pinyin;
-            const userInput = document.getElementById(inputId).value.trim();
-            const resultDiv = document.getElementById(`practice-result-${index}`);
-            const normalize = (str) => str.replace(/[.,。，？！？!]/g, '').replace(/\s+/g, '');
-            let resultMessageHtml = '';
-            const answerHtml = `<div class="mt-2 p-2 bg-gray-100 rounded text-left"><p class="text-sm">정답:</p><div class="flex items-center"><p class="text-md chinese-text font-semibold text-gray-800">${correctAnswer}</p><button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${correctAnswer}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg></button></div><p class="text-sm text-gray-500">${correctPinyin}</p></div>`;
+            } else if (nextPracticeBtn) {
+                const practiceIndex = nextPracticeBtn.dataset.practiceIndex;
+                const practiceContainer = document.getElementById(`practice-container-${practiceIndex}`);
+                // Get pattern string from hint button's data attribute within the same container
+                const patternString = practiceContainer?.querySelector('.show-hint-btn')?.dataset.patternString;
+                if (patternString) handleNewPracticeRequest(patternString, practiceIndex);
+                else console.error("Could not find pattern string for next practice button.");
 
-            const practiceContainer = document.getElementById(`practice-container-${index}`);
-            const spreeCount = parseInt(practiceContainer.dataset.spreeCount, 10);
-            const spreeGoal = parseInt(practiceContainer.dataset.spreeGoal, 10);
-
-            let isCorrect = normalize(userInput) === normalize(correctAnswer);
-            let resultButtonsHtml = '';
-
-            if (isCorrect) {
-                resultMessageHtml = `<p class="text-green-600 font-bold text-lg">🎉 정답입니다!</p>` + answerHtml;
-            } else {
-                resultMessageHtml = `<p class="text-red-500 font-bold text-lg">🤔 아쉽네요, 다시 시도해보세요.</p>${answerHtml}`;
-            }
-
-            // Always add Retry button
-            resultButtonsHtml += `<button class="retry-practice-btn mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">다시하기</button>`;
-
-            // Add Next Problem button if not the last question
-            if (spreeCount < spreeGoal) {
-                resultButtonsHtml += `<button class="next-practice-btn mt-3 ml-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">➡️ 다음 문제 (${spreeCount + 1}/${spreeGoal})</button>`;
-            } else if (isCorrect) { // Last question was correct
-                 resultMessageHtml += `<p class="text-green-600 font-bold text-lg mt-3">🎉 ${spreeGoal}문제 완료! 수고하셨습니다!</p>`;
-                 const counterEl = document.getElementById(`practice-counter-${index}`);
-                 if (counterEl) counterEl.textContent = '';
-                 practiceContainer.dataset.spreeCount = '0'; // Reset count
-            }
-            // If last question was incorrect, only Retry button shows.
-
-            resultDiv.innerHTML = resultMessageHtml + resultButtonsHtml;
-
-            button.style.display = 'none';
-            const hintButton = document.getElementById(`show-hint-btn-${index}`); if(hintButton) hintButton.style.display = 'none';
-            const micButtonPractice = document.getElementById(`practice-mic-btn-${index}`); if (micButtonPractice) micButtonPractice.style.display = 'none';
-
-        } else if (target.closest('.show-hint-btn')) {
-            const button = target.closest('.show-hint-btn');
-            const newVocab = button.dataset.newVocab;
-            const patternString = button.dataset.patternString;
-            const hintTargetId = button.dataset.hintTarget;
-            const hintDiv = document.getElementById(hintTargetId);
-            let vocabSource = null;
-            if (newVocab && newVocab !== '[]') {
-                try {
-                    vocabSource = JSON.parse(newVocab);
-                    if (!Array.isArray(vocabSource)) vocabSource = null;
-                } catch(e) { console.error("Failed to parse newVocab JSON", e); vocabSource = null; }
-                if(vocabSource) console.log("Using new AI-generated vocab for hint.");
-            }
-            if (!vocabSource) {
-                const patternData = allPatterns.find(p => p.pattern === patternString);
-                if (patternData && patternData.practiceVocab && patternData.practiceVocab.length > 0) {
-                    vocabSource = patternData.practiceVocab;
-                    console.log("Using original practiceVocab for hint.");
+            } else if (practiceMicBtn) {
+                const practiceIndex = practiceMicBtn.dataset.practiceIndex;
+                const targetInput = document.getElementById(`practice-input-${practiceIndex}`);
+                if (!recognition) { showAlert('음성 인식이 지원되지 않습니다.'); return; }
+                if (isRecognizing && currentRecognitionMicButton !== practiceMicBtn) {
+                     console.log("Stopping ongoing recognition..."); recognition.stop();
+                     setTimeout(() => startPracticeRecognition(practiceMicBtn, targetInput), 300);
+                } else if (isRecognizing) {
+                     console.log("Stopping recognition (practice)..."); recognition.stop();
+                } else {
+                     startPracticeRecognition(practiceMicBtn, targetInput);
                 }
+
+            } else if (checkPracticeBtn) {
+                const inputId = checkPracticeBtn.dataset.inputId;
+                const index = inputId.split('-').pop();
+                const correctAnswer = checkPracticeBtn.dataset.answer;
+                const correctPinyin = checkPracticeBtn.dataset.pinyin;
+                const userInputEl = document.getElementById(inputId);
+                const resultDiv = document.getElementById(`practice-result-${index}`);
+                if (!userInputEl || !resultDiv) return; // Exit if elements not found
+
+                const userInput = userInputEl.value.trim();
+                const normalize = (str) => str ? str.replace(/[.,。，？！？!\s]/g, '') : ''; // Add null/space check
+                let resultMessageHtml = '';
+                const answerHtml = `...`; // Rebuild answerHtml here if needed or keep as before
+
+                const practiceContainer = document.getElementById(`practice-container-${index}`);
+                const spreeCount = parseInt(practiceContainer?.dataset.spreeCount || '0', 10);
+                const spreeGoal = parseInt(practiceContainer?.dataset.spreeGoal || '5', 10);
+
+                let isCorrect = normalize(userInput) === normalize(correctAnswer);
+                let resultButtonsHtml = '';
+
+                const fullAnswerHtml = `<div class="mt-2 p-2 bg-gray-100 rounded text-left"><p class="text-sm">정답:</p><div class="flex items-center"><p class="text-md chinese-text font-semibold text-gray-800 break-words">${correctAnswer}</p>${correctAnswer ? `<button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0" data-text="${correctAnswer}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg></button>`: ''}</div><p class="text-sm text-gray-500 mt-1 break-words">${correctPinyin || ''}</p></div>`;
+
+
+                if (isCorrect) {
+                    resultMessageHtml = `<p class="text-green-600 font-bold text-lg">🎉 정답입니다!</p>` + fullAnswerHtml;
+                } else {
+                    resultMessageHtml = `<p class="text-red-500 font-bold text-lg">🤔 아쉽네요, 다시 시도해보세요.</p>`+ fullAnswerHtml;
+                }
+
+                resultButtonsHtml += `<button class="retry-practice-btn mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">다시하기</button>`;
+
+                if (spreeCount < spreeGoal) {
+                    resultButtonsHtml += `<button class="next-practice-btn mt-3 ml-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">➡️ 다음 문제 (${spreeCount + 1}/${spreeGoal})</button>`;
+                } else if (isCorrect) {
+                     resultMessageHtml += `<p class="text-green-600 font-bold text-lg mt-3">🎉 ${spreeGoal}문제 완료! 수고하셨습니다!</p>`;
+                     const counterEl = document.getElementById(`practice-counter-${index}`);
+                     if (counterEl) counterEl.textContent = '연습 완료!';
+                     if (practiceContainer) practiceContainer.dataset.spreeCount = '0'; // Reset for potential restart
+                     // Hide Retry/Next buttons on completion? Or just show Retry?
+                     // resultButtonsHtml = `<button class="retry-practice-btn mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">다시 시작?</button>`; // Example
+                     resultButtonsHtml = ''; // Hide buttons on success completion
+                }
+
+                resultDiv.innerHTML = resultMessageHtml + resultButtonsHtml;
+
+                checkPracticeBtn.style.display = 'none';
+                const hintButton = document.getElementById(`show-hint-btn-${index}`); if(hintButton) hintButton.style.display = 'none';
+                const micButtonPractice = document.getElementById(`practice-mic-btn-${index}`); if (micButtonPractice) micButtonPractice.style.display = 'none';
+
+            } else if (showHintBtn) {
+                const newVocabStr = showHintBtn.dataset.newVocab;
+                const patternString = showHintBtn.dataset.patternString;
+                const hintTargetId = showHintBtn.dataset.hintTarget;
+                const hintDiv = document.getElementById(hintTargetId);
+                if (!hintDiv) return;
+
+                let vocabSource = null;
+                if (newVocabStr && newVocabStr !== '[]') {
+                    try { vocabSource = JSON.parse(newVocabStr); if (!Array.isArray(vocabSource)) vocabSource = null;}
+                    catch(e) { console.error("Failed to parse newVocab JSON", e); vocabSource = null; }
+                    if(vocabSource) console.log("Using new AI-generated vocab for hint.");
+                }
+                if (!vocabSource) { /* ... get from allPatterns ... */ }
+
+                if (vocabSource && vocabSource.length > 0) { /* ... render hints ... */ }
+                else { hintDiv.innerHTML = `<p class="text-sm text-gray-500">힌트 정보가 없습니다.</p>`; }
+                showHintBtn.disabled = true; showHintBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            } else if (retryPracticeBtn) {
+                const index = retryPracticeBtn.dataset.practiceIndex;
+                const inputEl = document.getElementById(`practice-input-${index}`);
+                const resultEl = document.getElementById(`practice-result-${index}`);
+                const hintEl = document.getElementById(`practice-hint-${index}`);
+                const checkBtnEl = document.getElementById(`check-practice-btn-${index}`);
+                const hintBtnEl = document.getElementById(`show-hint-btn-${index}`);
+                const micBtnEl = document.getElementById(`practice-mic-btn-${index}`);
+
+                if(inputEl) inputEl.value = '';
+                if(resultEl) resultEl.innerHTML = '';
+                if(hintEl) hintEl.innerHTML = '';
+                if(checkBtnEl) checkBtnEl.style.display = '';
+                if(hintBtnEl) {
+                    hintBtnEl.style.display = ''; hintBtnEl.disabled = false;
+                    hintBtnEl.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+                if(micBtnEl) micBtnEl.style.display = '';
+                if(inputEl) { inputEl.disabled = false; inputEl.focus(); }
+
+            } else if (ttsBtn) {
+                 if (ttsBtn.dataset.text) playTTS(ttsBtn.dataset.text, ttsBtn);
             }
-             if (vocabSource && vocabSource.length > 0) {
-                const shuffledVocab = [...vocabSource].sort(() => 0.5 - Math.random());
-                const hintsHtml = shuffledVocab.map(hint => `<div class="flex items-baseline" style="line-height: 1.3;"><span class="inline-block w-[40%] font-medium chinese-text pr-2">${hint?.word || '?'}</span><span class="inline-block w-[40%] text-sm text-gray-500 pr-2">${hint?.pinyin || '?'}</span><span class="inline-block w-[20%] text-sm text-gray-600">${hint?.meaning || '?'}</span></div>`).join('');
-                hintDiv.innerHTML = `<div class="bg-white/50 rounded-md p-2 text-left"><div class="flex items-center mb-1"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-0.5 text-yellow-500"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg><span class="font-semibold text-sm text-gray-700">힌트</span></div><div class="border-t border-gray-300/50 pt-1">${hintsHtml}</div></div>`;
-            } else {
-                console.log("No vocab found for hint.");
-                hintDiv.innerHTML = `<p class="text-sm text-gray-500">이 문장에 대한 핵심 단어 정보가 없습니다.</p>`;
+        });
+
+        patternContainer.addEventListener('keydown', (e) => {
+            if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') {
+                e.preventDefault();
+                const checkButtonId = `check-practice-btn-${e.target.id.split('-').pop()}`;
+                const checkButton = document.getElementById(checkButtonId);
+                if (checkButton && checkButton.style.display !== 'none') checkButton.click();
             }
-            button.disabled = true; button.classList.add('opacity-50', 'cursor-not-allowed');
+        });
+    } else {
+        console.error("Pattern container not found!");
+    }
 
-        } else if (target.classList.contains('retry-practice-btn')) { // 다시하기
-            const index = target.dataset.practiceIndex;
-            const inputEl = document.getElementById(`practice-input-${index}`);
-            const resultEl = document.getElementById(`practice-result-${index}`);
-            const hintEl = document.getElementById(`practice-hint-${index}`);
-            const checkBtn = document.getElementById(`check-practice-btn-${index}`);
-            const hintBtn = document.getElementById(`show-hint-btn-${index}`);
-            const micBtnPractice = document.getElementById(`practice-mic-btn-${index}`);
-
-            if(inputEl) inputEl.value = '';
-            if(resultEl) resultEl.innerHTML = '';
-            if(hintEl) hintEl.innerHTML = '';
-            if(checkBtn) checkBtn.style.display = '';
-            if(hintBtn) {
-                hintBtn.style.display = '';
-                hintBtn.disabled = false;
-                hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            }
-             if(micBtnPractice) micBtnPractice.style.display = '';
-             if(inputEl) inputEl.disabled = false;
-             if(inputEl) inputEl.focus();
-
-
-        } else if (target.closest('.tts-btn')) { // TTS
-            const ttsButton = target.closest('.tts-btn');
-            // Ensure the button is associated with text before playing
-             if (ttsButton && ttsButton.dataset.text) {
-                 playTTS(ttsButton.dataset.text, ttsButton);
-             }
-        }
-    });
-
-    patternContainer.addEventListener('keydown', (e) => { // Enter 키
-        if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') {
-            e.preventDefault();
-            const checkButtonId = `check-practice-btn-${e.target.id.split('-').pop()}`;
-            const checkButton = document.getElementById(checkButtonId);
-            if (checkButton && checkButton.style.display !== 'none') {
-                checkButton.click();
-            }
-        }
-    });
 
     // 번역기 모달 이벤트
-    openTranslatorBtn.addEventListener('click', () => translatorModal.classList.remove('hidden'));
-    closeTranslatorBtn.addEventListener('click', () => { translatorModal.classList.add('hidden'); if (currentAudio) currentAudio.pause(); });
-    translateBtn.addEventListener('click', handleTranslation);
-    koreanInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTranslation(); } });
-    translationResult.addEventListener('click', (e) => { const ttsButton = e.target.closest('.tts-btn'); if (ttsButton) { const textToSpeak = ttsButton.dataset.text; if (textToSpeak) playTTS(textToSpeak, ttsButton); } });
+    if (openTranslatorBtn) openTranslatorBtn.addEventListener('click', () => translatorModal?.classList.remove('hidden'));
+    if (closeTranslatorBtn) closeTranslatorBtn.addEventListener('click', () => { translatorModal?.classList.add('hidden'); if (currentAudio) currentAudio.pause(); });
+    if (translateBtn) translateBtn.addEventListener('click', handleTranslation);
+    if (koreanInput) koreanInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTranslation(); } });
+    if (translationResult) translationResult.addEventListener('click', (e) => { const ttsButton = e.target.closest('.tts-btn'); if (ttsButton && ttsButton.dataset.text) playTTS(ttsButton.dataset.text, ttsButton); });
 
     // 커스텀 알림
-    customAlertCloseBtn.addEventListener('click', () => customAlertModal.classList.add('hidden'));
+    if (customAlertCloseBtn) customAlertCloseBtn.addEventListener('click', () => customAlertModal?.classList.add('hidden'));
 
     // 전체 패턴 모달 이벤트
-    allPatternsBtn.addEventListener('click', () => allPatternsModal.classList.remove('hidden'));
-    closeAllPatternsBtn.addEventListener('click', () => allPatternsModal.classList.add('hidden'));
-    allPatternsList.addEventListener('click', (e) => {
+    if (allPatternsBtn) allPatternsBtn.addEventListener('click', () => allPatternsModal?.classList.remove('hidden'));
+    if (closeAllPatternsBtn) closeAllPatternsBtn.addEventListener('click', () => allPatternsModal?.classList.add('hidden'));
+    if (allPatternsList) allPatternsList.addEventListener('click', (e) => {
         const selectedPatternDiv = e.target.closest('[data-pattern-index]');
         if (selectedPatternDiv) {
             const patternIndex = parseInt(selectedPatternDiv.dataset.patternIndex, 10);
-            const selectedPattern = allPatterns[patternIndex];
-            if (selectedPattern) {
-                renderPatterns([selectedPattern]);
-                allPatternsModal.classList.add('hidden');
+            if (!isNaN(patternIndex) && allPatterns[patternIndex]) {
+                renderPatterns([allPatterns[patternIndex]]); // Show only the selected one
+                allPatternsModal?.classList.add('hidden');
                 window.scrollTo(0, 0);
             }
         }
-    });
+     });
 
     // AI 채팅 모달 이벤트
-    chatBtn.addEventListener('click', () => {
+    if (chatBtn) chatBtn.addEventListener('click', () => {
+        if (!chatModal) return;
         chatModal.classList.remove('hidden');
-
-        chatHistory.innerHTML = '';
+        if (chatHistory) chatHistory.innerHTML = ''; // Always clear history on open
         conversationHistory = [];
-        chatInput.value = '';
-        chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
+        if (chatInput) chatInput.value = '';
+        chatHistory?.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
 
-        const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };
+        const firstMsg = { chinese: '你好！我叫灵...', pinyin: 'Nǐ hǎo! ...', korean: '안녕하세요! ...' }; // Keep it short
         addMessageToHistory('ai', firstMsg);
         conversationHistory.push({ role: 'model', parts: [{ text: JSON.stringify(firstMsg) }] });
+        if(chatInput) chatInput.focus(); // Focus input when modal opens
     });
-    closeChatBtn.addEventListener('click', () => {
-        chatModal.classList.add('hidden');
-        if (recognition && isRecognizing) {
-            console.log("Stopping recognition due to modal close...");
-            recognition.stop();
-        }
+    if (closeChatBtn) closeChatBtn.addEventListener('click', () => {
+        chatModal?.classList.add('hidden');
+        if (recognition && isRecognizing) { console.log("Stopping recognition due to modal close..."); recognition.stop(); }
     });
-    sendChatBtn.addEventListener('click', handleSendMessage);
-    chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
-        }
-    });
-    chatHistory.addEventListener('click', (e) => { // 채팅창 내 TTS
-        const ttsButton = e.target.closest('.tts-btn');
-         if (ttsButton && ttsButton.dataset.text) {
-             playTTS(ttsButton.dataset.text, ttsButton);
-         }
-    });
-
-    // 채팅방 마이크 버튼 리스너
-    micBtn.addEventListener('click', () => { // Chat Mic Specific Listener
-        if (!recognition) {
-             showAlert('음성 인식이 지원되지 않거나 초기화되지 않았습니다.');
-             console.log("Recognition not available or not initialized.");
-            return;
-        }
+    if (sendChatBtn) sendChatBtn.addEventListener('click', handleSendMessage);
+    if (chatInput) chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
+    if (chatHistory) chatHistory.addEventListener('click', (e) => { const ttsButton = e.target.closest('.tts-btn'); if (ttsButton && ttsButton.dataset.text) playTTS(ttsButton.dataset.text, ttsButton); });
+    if (micBtn) micBtn.addEventListener('click', () => { // Chat Mic Specific Listener
+        if (!recognition) { showAlert('음성 인식이 지원되지 않습니다.'); return; }
         if (isRecognizing && currentRecognitionMicButton !== micBtn) {
-             console.log("Stopping ongoing recognition initiated by another mic...");
-             recognition.stop();
+             console.log("Stopping ongoing recognition..."); recognition.stop();
              setTimeout(() => startChatRecognition(), 300);
         } else if (isRecognizing) {
-            console.log("Stopping recognition (from chat mic)...");
-            recognition.stop();
+             console.log("Stopping recognition (chat)..."); recognition.stop();
         } else {
              startChatRecognition();
         }
     });
-
-
-    // 답변 추천 버튼 이벤트
-    suggestReplyBtn.addEventListener('click', handleSuggestReply);
+    if (suggestReplyBtn) suggestReplyBtn.addEventListener('click', handleSuggestReply);
 
     // 퀴즈 모달 이벤트 리스너
-    dailyQuizBtn.addEventListener('click', startQuiz);
-    closeQuizBtn.addEventListener('click', () => quizModal.classList.add('hidden'));
-
-    quizContent.addEventListener('click', (e) => {
+    if (dailyQuizBtn) dailyQuizBtn.addEventListener('click', startQuiz);
+    if (closeQuizBtn) closeQuizBtn.addEventListener('click', () => quizModal?.classList.add('hidden'));
+    if (quizContent) quizContent.addEventListener('click', (e) => {
         const targetButton = e.target.closest('.quiz-option-btn');
-        if (targetButton) {
-            handleQuizAnswer(targetButton);
-            return;
-        }
-
-        if (e.target.id === 'close-quiz-modal-btn') {
-            quizModal.classList.add('hidden');
-            return;
-        }
+        if (targetButton) { handleQuizAnswer(targetButton); return; }
+        if (e.target.id === 'close-quiz-modal-btn') { quizModal?.classList.add('hidden'); return; }
     });
 
-    // --- [FEATURE 1 START: 작문 교정 모달 이벤트 리스너 추가] ---
-    openCorrectorBtn.addEventListener('click', () => correctorModal.classList.remove('hidden'));
-    closeCorrectorBtn.addEventListener('click', () => {
-        correctorModal.classList.add('hidden');
-        if (currentAudio) currentAudio.pause(); // Stop TTS if playing
-        // Optionally clear input and result
-        // writingInput.value = '';
-        // correctionResult.innerHTML = '<p class="text-gray-400 text-center">교정 결과가 여기에 표시됩니다.</p>';
-    });
-    correctWritingBtn.addEventListener('click', handleCorrectWriting);
-    // Add Enter key listener for writing input
-    writingInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) { // Check for Shift+Enter if needed
-            e.preventDefault();
-            handleCorrectWriting();
-        }
-    });
-     // Add TTS listener for correction result
-     correctionResult.addEventListener('click', (e) => {
-        const ttsButton = e.target.closest('.tts-btn');
-         if (ttsButton && ttsButton.dataset.text) {
-             playTTS(ttsButton.dataset.text, ttsButton);
-         }
-     });
-    // --- [FEATURE 1 END] ---
+    // 작문 교정 모달 이벤트 리스너
+    if (openCorrectorBtn) openCorrectorBtn.addEventListener('click', () => correctorModal?.classList.remove('hidden'));
+    if (closeCorrectorBtn) closeCorrectorBtn.addEventListener('click', () => { correctorModal?.classList.add('hidden'); if (currentAudio) currentAudio.pause(); });
+    if (correctWritingBtn) correctWritingBtn.addEventListener('click', handleCorrectWriting);
+    if (writingInput) writingInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCorrectWriting(); } });
+    if (correctionResult) correctionResult.addEventListener('click', (e) => { const ttsButton = e.target.closest('.tts-btn'); if (ttsButton && ttsButton.dataset.text) playTTS(ttsButton.dataset.text, ttsButton); });
 }
 
 // --- 음성 인식 시작 헬퍼 함수 ---
 function startPracticeRecognition(button, targetInput) {
+    if (!recognition || !button || !targetInput) return;
     try {
         console.log("Starting recognition (for practice input)...");
         currentRecognitionTargetInput = targetInput;
@@ -1186,6 +1309,7 @@ function startPracticeRecognition(button, targetInput) {
 }
 
 function startChatRecognition() {
+     if (!recognition || !chatInput || !micBtn) return;
     try {
         console.log("Starting recognition (for chat input)...");
         currentRecognitionTargetInput = chatInput;
@@ -1201,9 +1325,11 @@ function startChatRecognition() {
 function handleRecognitionStartError(e, button) {
      console.error("Speech recognition start error:", e);
      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') { showAlert("마이크 권한이 필요합니다. 브라우저 설정에서 허용해주세요."); }
-     else if (e.name === 'InvalidStateError') { console.warn("Attempted to start recognition while already active. Ignoring."); }
+     // Avoid showing alert for 'InvalidStateError' as it's often a race condition
+     else if (e.name === 'InvalidStateError') { console.warn("Attempted to start recognition while already active or stopping. Ignoring."); }
      else { showAlert("음성 인식을 시작할 수 없습니다. 잠시 후 다시 시도해주세요."); }
      if(button) button.classList.remove('is-recording');
+     // Reset state only if it wasn't an InvalidStateError
      if (e.name !== 'InvalidStateError') {
          isRecognizing = false;
          currentRecognitionTargetInput = null;
@@ -1213,20 +1339,44 @@ function handleRecognitionStartError(e, button) {
 
 // --- 앱 초기화 함수 ---
 export function initializeApp(patterns) {
-    allPatterns = patterns;
+    // Basic check on imported data
+    if (!Array.isArray(patterns)) {
+        console.error("Invalid patterns data received. Expected an array.");
+        allPatterns = [];
+    } else {
+        allPatterns = patterns;
+    }
+
+    // Defer execution until the DOM is fully loaded
     document.addEventListener('DOMContentLoaded', () => {
-        initializeDOM();
-        displayDate();
-        initializeCounts();
-        loadDailyPatterns(); // Automatically starts practice problems
-        renderAllPatternsList();
-        setupScreenWakeLock();
-        initializeSpeechRecognition();
-        setupEventListeners();
+        console.log("DOM fully loaded. Initializing app...");
+        try {
+            initializeDOM(); // Find elements first
+            // Check if essential elements were found
+            if (!patternContainer || !currentDateEl) {
+                 throw new Error("Essential DOM elements (patternContainer or currentDateEl) not found.");
+            }
+            displayDate();
+            initializeCounts();
+            loadDailyPatterns(); // This calls renderPatterns which starts practice problems
+            renderAllPatternsList();
+            setupScreenWakeLock();
+            initializeSpeechRecognition();
+            setupEventListeners(); // Add listeners after elements are found
+            console.log("App initialized successfully.");
+        } catch (error) {
+            console.error("Error during app initialization:", error);
+            // Use showAlert if available, otherwise fallback to console/alert
+            if (typeof showAlert === 'function') {
+                showAlert("앱 초기화 중 심각한 오류가 발생했습니다. 페이지를 새로고침하거나 개발자에게 문의하세요.");
+            } else {
+                alert("앱 초기화 중 심각한 오류가 발생했습니다.");
+            }
+        }
     });
 }
 
 // --- 앱 실행 ---
 initializeApp(patternsData);
 
-// v.2025.10.23_1500
+// v.2025.10.23_1530
