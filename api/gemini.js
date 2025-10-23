@@ -1,4 +1,4 @@
-// Gemini API Handler with model caching & correction feature
+// Gemini API Handler with caching and correction feature
 let cachedModel = null;
 
 export default async function handler(request, response) {
@@ -13,9 +13,9 @@ export default async function handler(request, response) {
 
     if (action !== 'tts') {
       if (!cachedModel) {
-        const listModelsRes = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
-        const modelData = await listModelsRes.json();
-        const models = modelData.models || [];
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
+        const data = await res.json();
+        const models = data.models || [];
         cachedModel =
           models.find(m => /flash/i.test(m.name)) ||
           models.find(m => /gemini-1\.5.*pro/i.test(m.name)) ||
@@ -26,7 +26,7 @@ export default async function handler(request, response) {
     }
 
     if (action === 'translate') {
-      const prompt = systemPrompt || `Translate this Korean text to Chinese: ${text}`;
+      const prompt = systemPrompt || `Translate Korean to Chinese: ${text}`;
       apiRequestBody = { contents: [{ parts: [{ text: `${prompt}\n\nKorean: "${text}"` }] }] };
     } else if (action === 'chat') {
       const contents = [...(history || []), { role: "user", parts: [{ text }] }];
@@ -35,7 +35,7 @@ export default async function handler(request, response) {
       const contents = [{ role: "user", parts: [{ text: "Suggest replies with pinyin and Korean meaning." }] }, ...(history || [])];
       apiRequestBody = { contents };
     } else if (action === 'correction') {
-      const prompt = `Please correct this Chinese sentence and explain in Korean. Respond ONLY as JSON with keys: corrected, pinyin, explanation.`;
+      const prompt = `Please correct this Chinese sentence and explain in Korean. Respond as JSON with keys: corrected, pinyin, explanation.`;
       apiRequestBody = { contents: [{ parts: [{ text: `${prompt}\nSentence: ${text}` }] }] };
     } else if (action === 'tts') {
       apiUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
