@@ -236,12 +236,31 @@ async function setupScreenWakeLock() {
 
 // --- AI 채팅 관련 함수 ---
 function addMessageToHistory(sender, messageData) {
-    const messageElement = document.createElement('div');
+    // --- [FEATURE UPDATE START: Grammar Correction Rendering] ---
     if (sender === 'user') {
+        const messageElement = document.createElement('div');
         messageElement.className = 'flex justify-end';
         messageElement.innerHTML = `<div class="bg-purple-500 text-white p-3 rounded-lg max-w-xs">${messageData.text}</div>`;
+        chatHistory.appendChild(messageElement);
     } else { // AI
-        messageElement.className = 'flex justify-start';
+        
+        // [수정] 1. 교정 내용이 있는지 확인하고 먼저 표시합니다.
+        if (messageData.correction && messageData.correction.corrected) {
+            const correctionElement = document.createElement('div');
+            correctionElement.className = 'flex justify-center my-2'; // 중앙 정렬
+            correctionElement.innerHTML = `
+                <div class="bg-yellow-50 p-3 rounded-lg text-sm w-full max-w-xs border border-yellow-300">
+                    <h4 class="font-semibold text-yellow-800">💡 표현 교정</h4>
+                    <p class="text-gray-500 mt-1">"<s>${messageData.correction.original || '...'}</s>"</p>
+                    <p class="text-green-700 font-medium chinese-text mt-1">→ ${messageData.correction.corrected}</p>
+                    <p class="text-gray-700 mt-2 pt-2 border-t border-yellow-200">${messageData.correction.explanation || '자연스러운 표현으로 수정했어요.'}</p>
+                </div>`;
+            chatHistory.appendChild(correctionElement); // 교정 카드 먼저 추가
+        }
+
+        // [수정] 2. AI의 대화 답변을 별도로 표시합니다.
+        const messageElement = document.createElement('div');
+        messageElement.className = 'flex justify-start'; // AI 답변 (왼쪽 정렬)
         messageElement.innerHTML = `
             <div class="bg-white p-3 rounded-lg max-w-xs border">
                 <div class="flex items-center">
@@ -253,8 +272,10 @@ function addMessageToHistory(sender, messageData) {
                 <p class="text-sm text-gray-500">${messageData.pinyin || ''}</p>
                 <p class="text-sm text-gray-600 border-t mt-2 pt-2">${messageData.korean || ''}</p>
             </div>`;
+        chatHistory.appendChild(messageElement); // AI 답변 카드 추가
     }
-    chatHistory.appendChild(messageElement);
+    // --- [FEATURE UPDATE END] ---
+
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 function addSuggestionToHistory(suggestions) {
