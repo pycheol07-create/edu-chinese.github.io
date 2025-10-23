@@ -91,7 +91,7 @@ async function playTTS(text, buttonElement) {
         }
     }
     currentPlayingButton = buttonElement;
-    buttonElement.classList.add('is-playing');
+     if(buttonElement) buttonElement.classList.add('is-playing'); // Add null check
     try {
         let audioData = audioCache[text];
         if (!audioData) {
@@ -103,7 +103,7 @@ async function playTTS(text, buttonElement) {
         currentAudio = audio;
         audio.play();
         audio.onended = () => {
-            if(buttonElement) buttonElement.classList.remove('is-playing'); // Check if buttonElement still exists
+            if(buttonElement) buttonElement.classList.remove('is-playing');
             currentAudio = null;
             currentPlayingButton = null;
         };
@@ -176,35 +176,38 @@ function renderPatterns(patterns, showIndex = false) {
 
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
 
+        // --- [FEATURE 3 (Auto Start) START: Remove Start button, ensure no comments] ---
         const practiceHtml = p.practice ? `
             <div class="mt-6">
-                <h3 class="text-lg font-bold text-gray-700 border-b pb-1">✍️ 직접 말해보기</h3>
+                <h3 class="text-lg font-bold text-gray-700 border-b pb-1">✍️ AI 연습 문제 (5개)</h3>
+                {/* Ensure data-spree-count is initialized to 0 */}
                 <div id="practice-container-${index}" class="mt-3 bg-sky-50 p-4 rounded-lg relative" data-spree-count="0" data-spree-goal="5">
-                    <button id="show-hint-btn-${index}" title="힌트 보기" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-3 right-3 bg-gray-300 hover:bg-gray-400 text-gray-700 p-1.5 rounded-full">
+                    <button id="show-hint-btn-${index}" title="힌트 보기" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-3 right-3 bg-gray-300 hover:bg-gray-400 text-gray-700 p-1.5 rounded-full" style="display: none;"> {/* Initially hidden */}
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg>
                     </button>
                     <p class="text-md text-gray-700 mb-2">다음 문장을 중국어로 입력해보세요:</p>
-                    <p id="practice-korean-${index}" class="text-md font-semibold text-sky-800 mb-3">"${p.practice.korean}"</p>
+                    {/* Korean text will be loaded by AI */}
+                    <p id="practice-korean-${index}" class="text-md font-semibold text-sky-800 mb-3">""</p>
                     <div class="flex items-center space-x-2">
-                        <button id="practice-mic-btn-${index}" title="음성 입력" data-practice-index="${index}" class="practice-mic-btn mic-btn p-2 rounded-full text-gray-500 hover:bg-gray-200 flex-shrink-0"> {/* flex-shrink-0 추가 */}
+                        <button id="practice-mic-btn-${index}" title="음성 입력" data-practice-index="${index}" class="practice-mic-btn mic-btn p-2 rounded-full text-gray-500 hover:bg-gray-200 flex-shrink-0" style="display: none;"> {/* Initially hidden */}
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6V7.5a6 6 0 0 0-12 0v5.25a6 6 0 0 0 6 6Z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5v2.25a7.5 7.5 0 0 1-15 0v-2.25" />
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 18.75a8.25 8.25 0 0 0 10.5 0" />
                             </svg>
                         </button>
-                        <input type="text" id="practice-input-${index}" class="flex-grow p-2 border border-gray-300 rounded-md chinese-text" placeholder="중국어를 입력하세요..."> {/* flex-grow 추가 */}
-                        <button id="check-practice-btn-${index}" data-answer="${p.practice.chinese}" data-pinyin="${p.practice.pinyin}" data-input-id="practice-input-${index}" class="check-practice-btn bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap flex-shrink-0">정답 확인</button> {/* flex-shrink-0 추가 */}
+                        <input type="text" id="practice-input-${index}" class="flex-grow p-2 border border-gray-300 rounded-md chinese-text" placeholder="중국어를 입력하세요..." disabled> {/* Initially disabled */}
+                        {/* Check button data updated by AI */}
+                        <button id="check-practice-btn-${index}" data-answer="" data-pinyin="" data-input-id="practice-input-${index}" class="check-practice-btn bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap flex-shrink-0" style="display: none;">정답 확인</button> {/* Initially hidden */}
                     </div>
                     <div id="practice-hint-${index}" class="mt-3"></div>
                     <div id="practice-result-${index}" class="mt-3 text-center"></div>
-                    <div id="practice-counter-${index}" class="text-sm text-gray-500 mt-2 text-center"></div>
-                    <button id="new-practice-btn-${index}" data-pattern-string="${p.pattern}" data-practice-index="${index}" class="new-practice-btn mt-4 text-sm text-sky-600 hover:text-sky-800 w-full text-left flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0 0 11.667 0l3.181-3.183m-4.991 0l.04.04m-10.607 0l.04.04m0 0l.04.04m-7.608 4.28l.04.04m.009-4.28l.04.04" /></svg>
-                        🔄 AI 연습 5문제 시작
-                    </button>
+                    {/* Counter is updated dynamically */}
+                    <div id="practice-counter-${index}" class="text-sm text-gray-500 mt-2 text-center">AI 연습문제 로딩 중...</div>
+                     {/* Removed the 'new-practice-btn' start button */}
                 </div>
             </div>` : '';
+        // --- [FEATURE 3 (Auto Start) END] ---
 
         card.innerHTML = `
             <div class="flex items-center justify-between mb-3">
@@ -220,12 +223,18 @@ function renderPatterns(patterns, showIndex = false) {
             <div class="mt-4"><p class="text-lg text-blue-700 font-semibold mb-2">${p.meaning}</p><p class="text-sm text-gray-500 bg-gray-100 p-2 rounded-md"><b>🤔 어떻게 사용할까요?</b> ${p.structure || '구조 정보 없음'}</p></div>
             <div class="mt-4"><h3 class="text-lg font-bold text-gray-700 border-b pb-1">💡 예문 살펴보기</h3>${examplesHtml}</div>
             <div class="mt-6"><h3 class="text-lg font-bold text-gray-700 border-b pb-1">📌 주요 단어</h3><div class="mt-3 space-y-2">${vocabHtml}</div></div>
-            ${practiceHtml}`;
+            ${practiceHtml}`; // This now includes the modified practice section
         patternContainer.appendChild(card);
+
+        // --- [FEATURE 3 (Auto Start) START: Call request after render] ---
+        if (p.practice) {
+            // Use setTimeout to ensure the element is fully in the DOM before access
+            setTimeout(() => handleNewPracticeRequest(p.pattern, index), 0);
+        }
+        // --- [FEATURE 3 (Auto Start) END] ---
     });
 }
 
-// ... (다른 함수들은 변경 없음) ...
 function loadDailyPatterns() {
     const todayStr = getTodayString();
     const storedData = JSON.parse(localStorage.getItem('dailyChinesePatterns'));
@@ -266,6 +275,7 @@ async function setupScreenWakeLock() {
 }
 
 function addMessageToHistory(sender, messageData) {
+    // ... (unchanged)
     if (sender === 'user') {
         const messageElement = document.createElement('div');
         messageElement.className = 'flex justify-end';
@@ -299,9 +309,10 @@ function addMessageToHistory(sender, messageData) {
             </div>`;
         chatHistory.appendChild(messageElement); // AI 답변 카드 추가
     }
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+    if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight; // Add null check for safety
 }
 function addSuggestionToHistory(suggestions) {
+    // ... (unchanged)
     const suggestionElement = document.createElement('div');
     suggestionElement.className = 'flex justify-center my-2';
     const buttonsHtml = suggestions.map(suggestion =>
@@ -327,6 +338,7 @@ function addSuggestionToHistory(suggestions) {
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 async function handleSendMessage() {
+    // ... (unchanged, includes JSON parsing safety)
     const userInput = chatInput.value.trim();
     if (!userInput) return;
     chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
@@ -380,10 +392,12 @@ async function handleSendMessage() {
         console.error('Chat error:', error);
         showAlert(`대화 중 오류가 발생했습니다: ${error.message}`);
     } finally {
-        document.getElementById('chat-loading')?.remove();
+        const loadingEl = document.getElementById('chat-loading');
+        if (loadingEl) loadingEl.remove();
     }
 }
 async function handleStartChatWithPattern(patternString) {
+    // ... (unchanged, includes JSON parsing safety)
     chatModal.classList.remove('hidden'); // 모달 열기
     chatHistory.innerHTML = ''; // 채팅 기록 UI 비우기
     conversationHistory = []; // 채팅 기록 배열 비우기
@@ -437,10 +451,12 @@ async function handleStartChatWithPattern(patternString) {
         console.error('Start chat with pattern error:', error);
         showAlert(`대화 시작 중 오류가 발생했습니다: ${error.message}`);
     } finally {
-        document.getElementById('chat-loading')?.remove();
+        const loadingEl = document.getElementById('chat-loading');
+        if (loadingEl) loadingEl.remove();
     }
 }
 async function handleSuggestReply() {
+    // ... (unchanged)
     chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
     if (conversationHistory.length === 0) {
         showAlert('추천할 답변을 생성하기 위한 대화 내용이 없습니다.');
@@ -466,32 +482,36 @@ async function handleSuggestReply() {
     }
 }
 
+// --- [FEATURE 3 (Auto Start) MODIFY: No start button logic needed] ---
 async function handleNewPracticeRequest(patternString, practiceIndex) {
-    const newPracticeBtn = document.getElementById(`new-practice-btn-${practiceIndex}`);
+    // No start button to handle
     const koreanEl = document.getElementById(`practice-korean-${practiceIndex}`);
     const inputEl = document.getElementById(`practice-input-${practiceIndex}`);
     const checkBtn = document.getElementById(`check-practice-btn-${practiceIndex}`);
     const hintBtn = document.getElementById(`show-hint-btn-${practiceIndex}`);
+    const micBtnPractice = document.getElementById(`practice-mic-btn-${practiceIndex}`); // Mic button
     const resultEl = document.getElementById(`practice-result-${practiceIndex}`);
     const hintDataEl = document.getElementById(`practice-hint-${practiceIndex}`);
 
     const practiceContainer = document.getElementById(`practice-container-${practiceIndex}`);
     const counterEl = document.getElementById(`practice-counter-${practiceIndex}`);
-    let count = parseInt(practiceContainer.dataset.spreeCount, 10);
+    // Read count *before* incrementing for display logic
+    let currentCount = parseInt(practiceContainer.dataset.spreeCount, 10);
     const goal = parseInt(practiceContainer.dataset.spreeGoal, 10);
-    count++; // 문제 카운트 증가
-    practiceContainer.dataset.spreeCount = count;
+    let nextCount = currentCount + 1; // This will be the number for the *new* problem
 
-    // 로딩 상태 표시
-    newPracticeBtn.disabled = true;
-    newPracticeBtn.style.display = 'none'; // "연습 시작" 버튼 숨기기
-    counterEl.innerHTML = `<div class="loader-sm mx-auto"></div> AI가 문제 ${count}번을 만들고 있어요...`;
+    // Reset UI elements before loading
     koreanEl.textContent = '...';
     inputEl.value = '';
     resultEl.innerHTML = '';
     hintDataEl.innerHTML = '';
-    checkBtn.style.display = 'none'; // 정답 확인 버튼 숨김
-    hintBtn.style.display = 'none'; // 힌트 버튼 숨김
+    checkBtn.style.display = 'none';
+    hintBtn.style.display = 'none';
+    micBtnPractice.style.display = 'none'; // Hide mic button while loading
+    inputEl.disabled = true; // Disable input while loading
+
+    // Show loading message in counter
+    counterEl.innerHTML = `<div class="loader-sm mx-auto"></div> AI가 문제 ${nextCount}번을 만들고 있어요...`;
 
     try {
         const result = await callGeminiAPI('generate_practice', { pattern: patternString });
@@ -505,48 +525,57 @@ async function handleNewPracticeRequest(patternString, practiceIndex) {
                 }
                 practiceData = JSON.parse(practiceText);
 
-                // UI 업데이트
+                // Update UI with new data
                 koreanEl.textContent = `"${practiceData.korean}"`;
                 checkBtn.dataset.answer = practiceData.chinese;
                 checkBtn.dataset.pinyin = practiceData.pinyin;
 
-                // 새 힌트 데이터 저장
+                // Store new hint data
                 hintBtn.dataset.newVocab = JSON.stringify(practiceData.practiceVocab || []);
 
-                // UI 초기화
+                // Update spree count *after* successful load
+                practiceContainer.dataset.spreeCount = nextCount;
+
+                // Show elements needed for interaction
                 checkBtn.style.display = '';
                 hintBtn.style.display = '';
+                micBtnPractice.style.display = ''; // Show mic button
+                inputEl.disabled = false; // Enable input
                 hintBtn.disabled = false;
                 hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
 
-                counterEl.textContent = `문제 ${count} / ${goal}`;
+                counterEl.textContent = `문제 ${nextCount} / ${goal}`;
+                inputEl.focus(); // Focus input for typing/speaking
 
             } catch (e) {
                 console.error("Failed to parse practice data:", practiceText, e);
                 koreanEl.textContent = "오류: 새 문제를 불러오지 못했습니다.";
                 counterEl.textContent = '오류 발생';
-                newPracticeBtn.style.display = ''; // 오류 시 "연습 시작" 버튼 다시 표시
-                practiceContainer.dataset.spreeCount = 0; // 카운트 초기화
+                // Don't update count on error
+                practiceContainer.dataset.spreeCount = currentCount; // Revert count
+                // Re-enable input/buttons for retry? Maybe just show error.
+                inputEl.disabled = true;
             }
         } else {
             console.error("Invalid response structure from generate_practice API:", result);
             koreanEl.textContent = "오류: AI 응답이 없습니다.";
             counterEl.textContent = '오류 발생';
-            newPracticeBtn.style.display = '';
-            practiceContainer.dataset.spreeCount = 0;
+            practiceContainer.dataset.spreeCount = currentCount; // Revert count
+            inputEl.disabled = true;
         }
     } catch (error) {
         console.error('New practice request error:', error);
         koreanEl.textContent = `오류: ${error.message}`;
         counterEl.textContent = '오류 발생';
-        newPracticeBtn.style.display = '';
-        practiceContainer.dataset.spreeCount = 0;
+        practiceContainer.dataset.spreeCount = currentCount; // Revert count
+        inputEl.disabled = true;
     } finally {
-        newPracticeBtn.disabled = false;
+        // No loading state tied to the non-existent start button
     }
 }
 
 async function handleTranslation() {
+    // ... (unchanged)
     const text = koreanInput.value.trim();
     if (!text) {
         showAlert('번역할 한국어 문장을 입력하세요.');
@@ -606,7 +635,7 @@ IMPORTANT: After translating, analyze your Chinese translation. If it uses one o
     }
 }
 
-// --- 음성 인식 초기화 (자동 제출 기능 추가) ---
+// --- 음성 인식 초기화 (자동 제출 기능 포함) ---
 function initializeSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -615,52 +644,51 @@ function initializeSpeechRecognition() {
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
-        // --- [FEATURE 3 (Auto Submit) START] ---
         recognition.onresult = (event) => {
             console.log("Speech Recognition Result:", event.results);
             const speechResult = event.results[0][0].transcript;
             console.log("Recognized Text:", speechResult);
 
-            if (currentRecognitionTargetInput) {
-                currentRecognitionTargetInput.value = speechResult;
+            const targetInput = currentRecognitionTargetInput; // Store locally before potential nulling in onend
+            const targetMicButton = currentRecognitionMicButton; // Store locally
+
+            if (targetInput) {
+                targetInput.value = speechResult;
 
                 // 자동 제출 로직
-                if (currentRecognitionTargetInput === chatInput) {
-                    console.log("Auto-submitting chat message...");
-                    // 짧은 딜레이 후 클릭 (선택사항, 입력값 반영 시간 확보)
-                    setTimeout(() => sendChatBtn.click(), 100);
-                } else if (currentRecognitionTargetInput.id.startsWith('practice-input-')) {
-                    console.log("Auto-submitting practice answer...");
-                    // 해당 정답 확인 버튼 찾기
-                    const index = currentRecognitionTargetInput.id.split('-').pop();
-                    const checkButton = document.getElementById(`check-practice-btn-${index}`);
-                    if (checkButton) {
-                         // 짧은 딜레이 후 클릭
-                        setTimeout(() => checkButton.click(), 100);
-                    } else {
-                         console.error("Could not find the check button for practice input:", currentRecognitionTargetInput.id);
+                 // Use a short delay to allow input value to update reliably before click
+                setTimeout(() => {
+                    if (targetInput === chatInput) {
+                        console.log("Auto-submitting chat message...");
+                        if (sendChatBtn) sendChatBtn.click();
+                    } else if (targetInput.id.startsWith('practice-input-')) {
+                        console.log("Auto-submitting practice answer...");
+                        const index = targetInput.id.split('-').pop();
+                        const checkButton = document.getElementById(`check-practice-btn-${index}`);
+                        // Only click if the check button is currently visible
+                        if (checkButton && checkButton.style.display !== 'none') {
+                           checkButton.click();
+                        } else {
+                            console.warn("Auto-submit skipped: Check button not found or not visible for", targetInput.id);
+                        }
                     }
-                }
-                // 사용 후 타겟 초기화 (onend에서도 하지만 여기서도 해주는 것이 안전)
-                currentRecognitionTargetInput = null;
-                currentRecognitionMicButton = null;
-
+                }, 150); // Increased delay slightly
             } else {
                 console.warn("Recognition result received but no target input was set.");
-                chatInput.value = speechResult; // Fallback
+                if (chatInput) chatInput.value = speechResult; // Fallback
             }
+             // Do not nullify targets here, let onend handle it fully
         };
-        // --- [FEATURE 3 (Auto Submit) END] ---
 
         recognition.onspeechend = () => {
             console.log("Speech Recognition: Speech has stopped being detected.");
-            // stop() 은 onend에서 처리되도록 놔두는 것이 좋을 수 있음 (결과 처리 시간 확보)
-            // if(isRecognizing) recognition.stop(); // 일단 주석 처리
+            // Let the browser automatically stop recognition after speech ends
         };
 
         recognition.onnomatch = () => {
             console.log("Speech Recognition: No match found.");
             showAlert('음성을 인식하지 못했습니다. 다시 시도해주세요.');
+            // No need to manually stop here, error/end will handle cleanup
         };
 
         recognition.onerror = (event) => {
@@ -670,13 +698,7 @@ function initializeSpeechRecognition() {
             } else if (event.error === 'not-allowed') {
                  showAlert('마이크 사용 권한이 거부되었습니다. 브라우저 설정을 확인해주세요.');
             }
-
-             if (currentRecognitionMicButton) {
-                currentRecognitionMicButton.classList.remove('is-recording');
-             }
-             isRecognizing = false;
-             currentRecognitionTargetInput = null;
-             currentRecognitionMicButton = null;
+             // Cleanup happens in onend, which is always called after onerror
         };
 
          recognition.onend = () => {
@@ -684,8 +706,8 @@ function initializeSpeechRecognition() {
             if (currentRecognitionMicButton) {
                 currentRecognitionMicButton.classList.remove('is-recording');
             }
+            // Reset state reliably on end
             isRecognizing = false;
-            // Target은 onresult나 onerror에서 이미 초기화되었을 가능성이 높지만, 안전하게 여기서도 초기화
             currentRecognitionTargetInput = null;
             currentRecognitionMicButton = null;
         };
@@ -695,13 +717,13 @@ function initializeSpeechRecognition() {
     } else {
         console.warn('Web Speech API is not supported in this browser.');
         showAlert('현재 브라우저에서는 음성 인식을 지원하지 않습니다.');
-        // Disable all mic buttons if API not supported
         document.querySelectorAll('.mic-btn').forEach(btn => btn.disabled = true);
     }
 }
 
 // --- 퀴즈 관련 함수 ---
 function startQuiz() {
+    // ... (unchanged)
     const todayStr = getTodayString();
     const lastQuizDate = localStorage.getItem('lastQuizDate');
 
@@ -726,6 +748,7 @@ function startQuiz() {
 }
 
 function renderQuizQuestion() {
+    // ... (unchanged)
     if (currentQuizQuestionIndex >= quizQuestions.length) {
         showQuizResult();
         return;
@@ -752,6 +775,7 @@ function renderQuizQuestion() {
 }
 
 function handleQuizAnswer(targetButton) {
+    // ... (unchanged)
     const selectedPattern = targetButton.dataset.pattern;
     const correctPattern = quizQuestions[currentQuizQuestionIndex].pattern;
     const allButtons = quizContent.querySelectorAll('.quiz-option-btn');
@@ -776,6 +800,7 @@ function handleQuizAnswer(targetButton) {
 }
 
 function showQuizResult() {
+    // ... (unchanged)
     quizContent.innerHTML = `
         <div>
             <h2 class="text-2xl font-bold text-center mb-4">퀴즈 완료! 🎉</h2>
@@ -804,7 +829,11 @@ function setupEventListeners() {
             const pattern = target.dataset.pattern;
             learningCounts[pattern] = (learningCounts[pattern] || 0) + 1;
             saveCounts();
-            target.nextElementSibling.querySelector('.count-display').textContent = learningCounts[pattern];
+             // Find the specific count display related to this button and update it
+             const countDisplay = target.closest('div').querySelector('.count-display');
+             if (countDisplay) {
+                 countDisplay.textContent = learningCounts[pattern];
+             }
         } else if (target.closest('.start-chat-pattern-btn')) { // "이 패턴으로 대화"
             const button = target.closest('.start-chat-pattern-btn');
             const patternString = button.dataset.patternString;
@@ -812,25 +841,19 @@ function setupEventListeners() {
                 handleStartChatWithPattern(patternString);
             }
 
-        } else if (target.closest('.new-practice-btn')) { // "연습 시작" 버튼
-            const button = target.closest('.new-practice-btn');
-            const patternString = button.dataset.patternString;
-            const practiceIndex = button.dataset.practiceIndex;
-
-            const practiceContainer = document.getElementById(`practice-container-${practiceIndex}`);
-            practiceContainer.dataset.spreeCount = '0';
-            const counterEl = document.getElementById(`practice-counter-${practiceIndex}`);
-            counterEl.textContent = '';
-
-            handleNewPracticeRequest(patternString, practiceIndex);
+        // REMOVED: .new-practice-btn listener (now automatic)
 
         } else if (target.closest('.next-practice-btn')) { // "다음 문제" 버튼
             const button = target.closest('.next-practice-btn');
             const practiceIndex = button.dataset.practiceIndex;
-            const startButton = document.getElementById(`new-practice-btn-${practiceIndex}`);
-            const patternString = startButton.dataset.patternString;
-
-            handleNewPracticeRequest(patternString, practiceIndex);
+            // Find the container to get the pattern string
+            const practiceContainer = document.getElementById(`practice-container-${practiceIndex}`);
+            const patternString = practiceContainer.querySelector('.show-hint-btn')?.dataset.patternString; // Get pattern from hint btn data
+            if (patternString) {
+                handleNewPracticeRequest(patternString, practiceIndex);
+            } else {
+                console.error("Could not find pattern string for next practice button.");
+            }
 
         } else if (target.closest('.practice-mic-btn')) { // Practice Mic
             const button = target.closest('.practice-mic-btn');
@@ -842,16 +865,14 @@ function setupEventListeners() {
                  console.log("Recognition not available or not initialized.");
                 return;
             }
-            // 이미 다른 마이크가 녹음 중이면 중지
             if (isRecognizing && currentRecognitionMicButton !== button) {
                  console.log("Stopping ongoing recognition initiated by another mic...");
                  recognition.stop();
-                 // 잠시 후 시작 (stop()이 비동기적으로 onend를 호출할 수 있으므로)
                  setTimeout(() => startPracticeRecognition(button, targetInput), 300);
-            } else if (isRecognizing) { // 현재 버튼이 이미 녹음 중이면 중지
+            } else if (isRecognizing) {
                 console.log("Stopping recognition (from practice mic)...");
                 recognition.stop();
-            } else { // 녹음 시작
+            } else {
                  startPracticeRecognition(button, targetInput);
             }
         } else if (target.classList.contains('check-practice-btn')) { // 정답 확인
@@ -870,43 +891,53 @@ function setupEventListeners() {
             const spreeCount = parseInt(practiceContainer.dataset.spreeCount, 10);
             const spreeGoal = parseInt(practiceContainer.dataset.spreeGoal, 10);
 
-            // --- [FIX 1: "다시하기"/"다음문제" 버튼 로직 수정] ---
-            if (normalize(userInput) === normalize(correctAnswer)) {
+            // --- [FEATURE 2 (Button Logic) START] ---
+            let isCorrect = normalize(userInput) === normalize(correctAnswer);
+            let resultButtonsHtml = '';
+
+            if (isCorrect) {
                 resultMessageHtml = `<p class="text-green-600 font-bold text-lg">🎉 정답입니다!</p>` + answerHtml;
-
-                if (spreeCount > 0 && spreeCount < spreeGoal) { // spreeCount > 0 조건 추가 (연습 시작 후 정답)
-                    resultMessageHtml += `<button class="next-practice-btn mt-3 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">➡️ 다음 문제 (${spreeCount + 1}/${spreeGoal})</button>`;
-                } else if (spreeCount === spreeGoal) { // 5문제 완료
-                     resultMessageHtml += `<p class="text-green-600 font-bold text-lg mt-3">🎉 ${spreeGoal}문제 완료! 수고하셨습니다!</p>`;
-                     document.getElementById(`new-practice-btn-${index}`).style.display = '';
-                     document.getElementById(`practice-counter-${index}`).textContent = '';
-                } else { // 연습 시작 전 (spreeCount === 0) 이거나 spreeGoal을 초과한 비정상 상태
-                     // 이 경우는 "다시하기"만 표시 (또는 에러 처리)
-                     resultMessageHtml += `<button class="retry-practice-btn mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">다시하기</button>`;
-                }
-            } else { // 오답 시
+            } else {
                 resultMessageHtml = `<p class="text-red-500 font-bold text-lg">🤔 아쉽네요, 다시 시도해보세요.</p>${answerHtml}`;
-                resultMessageHtml += `<button class="retry-practice-btn mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">다시하기</button>`;
             }
-            // --- [FIX 1 END] ---
 
-            resultDiv.innerHTML = `${resultMessageHtml}`;
+            // Always add Retry button after any check
+            resultButtonsHtml += `<button class="retry-practice-btn mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">다시하기</button>`;
+
+            // Add Next Problem button if not the last question
+            if (spreeCount < spreeGoal) {
+                resultButtonsHtml += `<button class="next-practice-btn mt-3 ml-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">➡️ 다음 문제 (${spreeCount + 1}/${spreeGoal})</button>`;
+            } else if (isCorrect) { // Last question was correct
+                 resultMessageHtml += `<p class="text-green-600 font-bold text-lg mt-3">🎉 ${spreeGoal}문제 완료! 수고하셨습니다!</p>`;
+                 // Reset counter visually
+                 const counterEl = document.getElementById(`practice-counter-${index}`);
+                 if (counterEl) counterEl.textContent = '';
+                 // Reset internal count for potential restart (optional, depends on desired behavior)
+                 practiceContainer.dataset.spreeCount = '0';
+            }
+            // If last question was incorrect, only Retry button shows (already added).
+
+            resultDiv.innerHTML = resultMessageHtml + resultButtonsHtml;
+            // --- [FEATURE 2 (Button Logic) END] ---
+
             button.style.display = 'none';
             const hintButton = document.getElementById(`show-hint-btn-${index}`); if(hintButton) hintButton.style.display = 'none';
+            const micButtonPractice = document.getElementById(`practice-mic-btn-${index}`); if (micButtonPractice) micButtonPractice.style.display = 'none'; // Hide mic after check
 
         } else if (target.closest('.show-hint-btn')) {
-            // ... (힌트 보기 로직 - 변경 없음) ...
+            // ... (unchanged hint logic) ...
             const button = target.closest('.show-hint-btn');
             const newVocab = button.dataset.newVocab;
             const patternString = button.dataset.patternString;
             const hintTargetId = button.dataset.hintTarget;
             const hintDiv = document.getElementById(hintTargetId);
             let vocabSource = null;
-            if (newVocab) {
+            if (newVocab && newVocab !== '[]') { // Check if not empty array string
                 try {
                     vocabSource = JSON.parse(newVocab);
+                    if (!Array.isArray(vocabSource)) vocabSource = null; // Ensure it's an array
                 } catch(e) { console.error("Failed to parse newVocab JSON", e); vocabSource = null; }
-                console.log("Using new AI-generated vocab for hint.");
+                if(vocabSource) console.log("Using new AI-generated vocab for hint.");
             }
             if (!vocabSource) {
                 const patternData = allPatterns.find(p => p.pattern === patternString);
@@ -915,9 +946,9 @@ function setupEventListeners() {
                     console.log("Using original practiceVocab for hint.");
                 }
             }
-            if (vocabSource && vocabSource.length > 0) {
+             if (vocabSource && vocabSource.length > 0) {
                 const shuffledVocab = [...vocabSource].sort(() => 0.5 - Math.random());
-                const hintsHtml = shuffledVocab.map(hint => `<div class="flex items-baseline" style="line-height: 1.3;"><span class="inline-block w-[40%] font-medium chinese-text pr-2">${hint.word}</span><span class="inline-block w-[40%] text-sm text-gray-500 pr-2">${hint.pinyin}</span><span class="inline-block w-[20%] text-sm text-gray-600">${hint.meaning}</span></div>`).join('');
+                const hintsHtml = shuffledVocab.map(hint => `<div class="flex items-baseline" style="line-height: 1.3;"><span class="inline-block w-[40%] font-medium chinese-text pr-2">${hint?.word || '?'}</span><span class="inline-block w-[40%] text-sm text-gray-500 pr-2">${hint?.pinyin || '?'}</span><span class="inline-block w-[20%] text-sm text-gray-600">${hint?.meaning || '?'}</span></div>`).join('');
                 hintDiv.innerHTML = `<div class="bg-white/50 rounded-md p-2 text-left"><div class="flex items-center mb-1"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-0.5 text-yellow-500"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg><span class="font-semibold text-sm text-gray-700">힌트</span></div><div class="border-t border-gray-300/50 pt-1">${hintsHtml}</div></div>`;
             } else {
                 console.log("No vocab found for hint.");
@@ -927,11 +958,27 @@ function setupEventListeners() {
 
         } else if (target.classList.contains('retry-practice-btn')) { // 다시하기
             const index = target.dataset.practiceIndex;
-            document.getElementById(`practice-input-${index}`).value = '';
-            document.getElementById(`practice-result-${index}`).innerHTML = '';
-            document.getElementById(`practice-hint-${index}`).innerHTML = '';
-            document.getElementById(`check-practice-btn-${index}`).style.display = '';
-            const hintBtn = document.getElementById(`show-hint-btn-${index}`); hintBtn.style.display = ''; hintBtn.disabled = false; hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            const inputEl = document.getElementById(`practice-input-${index}`);
+            const resultEl = document.getElementById(`practice-result-${index}`);
+            const hintEl = document.getElementById(`practice-hint-${index}`);
+            const checkBtn = document.getElementById(`check-practice-btn-${index}`);
+            const hintBtn = document.getElementById(`show-hint-btn-${index}`);
+            const micBtnPractice = document.getElementById(`practice-mic-btn-${index}`);
+
+            if(inputEl) inputEl.value = '';
+            if(resultEl) resultEl.innerHTML = '';
+            if(hintEl) hintEl.innerHTML = '';
+            if(checkBtn) checkBtn.style.display = '';
+            if(hintBtn) {
+                hintBtn.style.display = '';
+                hintBtn.disabled = false;
+                hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+             if(micBtnPractice) micBtnPractice.style.display = ''; // Show mic button again
+             if(inputEl) inputEl.disabled = false; // Re-enable input
+             if(inputEl) inputEl.focus(); // Focus input
+
+
         } else if (target.closest('.tts-btn')) { // TTS
             const ttsButton = target.closest('.tts-btn');
             const textToSpeak = ttsButton.dataset.text; if (textToSpeak) playTTS(textToSpeak, ttsButton);
@@ -941,10 +988,9 @@ function setupEventListeners() {
     patternContainer.addEventListener('keydown', (e) => { // Enter 키
         if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') {
             e.preventDefault();
-            // Enter 키 입력 시, 바로 옆의 '정답 확인' 버튼 찾아서 클릭
             const checkButtonId = `check-practice-btn-${e.target.id.split('-').pop()}`;
             const checkButton = document.getElementById(checkButtonId);
-            if (checkButton && checkButton.style.display !== 'none') { // 버튼이 화면에 보일 때만
+            if (checkButton && checkButton.style.display !== 'none') {
                 checkButton.click();
             }
         }
@@ -991,7 +1037,7 @@ function setupEventListeners() {
     });
     closeChatBtn.addEventListener('click', () => {
         chatModal.classList.add('hidden');
-        if (recognition && isRecognizing) { // 모달 닫을 때 인식 중지
+        if (recognition && isRecognizing) {
             console.log("Stopping recognition due to modal close...");
             recognition.stop();
         }
@@ -1012,22 +1058,20 @@ function setupEventListeners() {
     });
 
     // 채팅방 마이크 버튼 리스너
-    micBtn.addEventListener('click', () => {
+    micBtn.addEventListener('click', () => { // Chat Mic Specific Listener
         if (!recognition) {
              showAlert('음성 인식이 지원되지 않거나 초기화되지 않았습니다.');
              console.log("Recognition not available or not initialized.");
             return;
         }
-         // 이미 다른 마이크가 녹음 중이면 중지
         if (isRecognizing && currentRecognitionMicButton !== micBtn) {
              console.log("Stopping ongoing recognition initiated by another mic...");
              recognition.stop();
-             // 잠시 후 시작
              setTimeout(() => startChatRecognition(), 300);
-        } else if (isRecognizing) { // 현재 버튼이 이미 녹음 중이면 중지
+        } else if (isRecognizing) {
             console.log("Stopping recognition (from chat mic)...");
             recognition.stop();
-        } else { // 녹음 시작
+        } else {
              startChatRecognition();
         }
     });
@@ -1054,8 +1098,7 @@ function setupEventListeners() {
     });
 }
 
-// --- [FEATURE 1 (Mic) START: 음성 인식 시작 헬퍼 함수] ---
-// 연습문제용 음성 인식 시작
+// --- 음성 인식 시작 헬퍼 함수 ---
 function startPracticeRecognition(button, targetInput) {
     try {
         console.log("Starting recognition (for practice input)...");
@@ -1069,7 +1112,6 @@ function startPracticeRecognition(button, targetInput) {
     }
 }
 
-// 채팅용 음성 인식 시작
 function startChatRecognition() {
     try {
         console.log("Starting recognition (for chat input)...");
@@ -1083,36 +1125,36 @@ function startChatRecognition() {
     }
 }
 
-// 음성 인식 시작 오류 공통 처리
 function handleRecognitionStartError(e, button) {
      console.error("Speech recognition start error:", e);
      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') { showAlert("마이크 권한이 필요합니다. 브라우저 설정에서 허용해주세요."); }
-     else if (e.name === 'InvalidStateError') { showAlert("음성 인식이 이미 진행 중일 수 있습니다."); }
+     else if (e.name === 'InvalidStateError') { /* showAlert("음성 인식이 이미 진행 중일 수 있습니다."); */ console.warn("Attempted to start recognition while already active. Ignoring."); } // InvalidStateError는 사용자에게 알리지 않을 수 있음
      else { showAlert("음성 인식을 시작할 수 없습니다. 잠시 후 다시 시도해주세요."); }
      if(button) button.classList.remove('is-recording');
-     currentRecognitionTargetInput = null;
-     currentRecognitionMicButton = null;
-     isRecognizing = false;
+     // Reset state only if it wasn't an InvalidStateError (which implies it's already running)
+     if (e.name !== 'InvalidStateError') {
+         isRecognizing = false;
+         currentRecognitionTargetInput = null;
+         currentRecognitionMicButton = null;
+     }
 }
-// --- [FEATURE 1 (Mic) END] ---
-
 
 // --- 앱 초기화 함수 ---
 export function initializeApp(patterns) {
-    allPatterns = patterns; // 복원된 데이터 사용
+    allPatterns = patterns;
     document.addEventListener('DOMContentLoaded', () => {
         initializeDOM();
         displayDate();
         initializeCounts();
-        loadDailyPatterns();
+        loadDailyPatterns(); // This now automatically starts practice problems
         renderAllPatternsList();
         setupScreenWakeLock();
-        initializeSpeechRecognition(); // 음성 인식 초기화
-        setupEventListeners(); // 모든 이벤트 리스너 설정
+        initializeSpeechRecognition();
+        setupEventListeners();
     });
 }
 
 // --- 앱 실행 ---
 initializeApp(patternsData);
 
-// v.2025.10.23_1410
+// v.2025.10.23_1445
