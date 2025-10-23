@@ -1,505 +1,625 @@
 import { allPatterns as patternsData } from '../data/patterns.js';
 
+let allPatterns = [];
+let learningCounts = {};
+const audioCache = {};
+let currentAudio = null;
+let currentPlayingButton = null;
+let wakeLock = null;
+let conversationHistory = []; // AI 채팅 기록
+
+// DOM Elements
+let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translatorModal,
+    closeTranslatorBtn, translateBtn, koreanInput, translationResult, customAlertModal,
+    customAlertMessage, customAlertCloseBtn, allPatternsBtn, allPatternsModal,
+    closeAllPatternsBtn, allPatternsList, chatBtn, chatModal, closeChatBtn,
+    chatHistory, chatInput, sendChatBtn, micBtn, suggestReplyBtn;
+
+// 음성 인식 관련
 let recognition = null;
 let isRecognizing = false;
-let chatHistory = [
-  // 시스템 프롬프트 (필요에 따라 수정)
-  {
-    role: "model",
-    parts: [{ text: "你是我的中文老师。请用中文和我对话。当我用韩语说话时, 请用中文回答我。 (당신은 나의 중국어 선생님입니다. 저와 중국어로 대화해 주세요. 제가 한국어로 말하면 중국어로 대답해 주세요.)" }]
-  }
-]; // AI 채팅 기록 저장
 
-function cleanupOldStorage() {
-  const now = Date.now();
-  const last = +localStorage.getItem('storageCleanTime') || 0;
-  if (!last || now - last > 1000 * 60 * 60 * 24 * 30) {
-    // 오래된 'dailyChinesePatterns' 외에 다른 것도 정리할 수 있습니다.
-    localStorage.removeItem('dailyChinesePatterns');
-    localStorage.removeItem('patternDate');
-    localStorage.setItem('storageCleanTime', String(now));
-    console.log('🧹 오래된 스토리지 데이터 정리 완료');
-  }
+function initializeDOM() {
+    patternContainer = document.getElementById('pattern-container');
+    currentDateEl = document.getElementById('current-date');
+    newPatternBtn = document.getElementById('new-pattern-btn');
+    openTranslatorBtn = document.getElementById('open-translator-btn');
+    translatorModal = document.getElementById('translator-modal');
+    closeTranslatorBtn = document.getElementById('close-translator-btn');
+    translateBtn = document.getElementById('translate-btn');
+    koreanInput = document.getElementById('korean-input');
+    translationResult = document.getElementById('translation-result');
+    customAlertModal = document.getElementById('custom-alert-modal');
+    customAlertMessage = document.getElementById('custom-alert-message');
+    customAlertCloseBtn = document.getElementById('custom-alert-close-btn');
+    allPatternsBtn = document.getElementById('all-patterns-btn');
+    allPatternsModal = document.getElementById('all-patterns-modal');
+    closeAllPatternsBtn = document.getElementById('close-all-patterns-btn');
+    allPatternsList = document.getElementById('all-patterns-list');
+    chatBtn = document.getElementById('open-chat-btn'); // <-- ID 변경 적용
+    chatModal = document.getElementById('chat-modal');
+    closeChatBtn = document.getElementById('close-chat-btn');
+    chatHistory = document.getElementById('chat-history');
+    chatInput = document.getElementById('chat-input');
+    sendChatBtn = document.getElementById('send-chat-btn');
+    micBtn = document.getElementById('mic-btn');
+    suggestReplyBtn = document.getElementById('suggest-reply-btn');
 }
-cleanupOldStorage();
 
+// --- 커스텀 알림 함수 ---
+function showAlert(message) {
+    customAlertMessage.textContent = message;
+    customAlertModal.classList.remove('hidden');
+}
+
+// --- API 호출 공통 함수 ---
 async function callGeminiAPI(action, body) {
-  const res = await fetch('/api/gemini', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, ...body })
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || 'API 오류');
-  }
-  return res.json();
-}
-
-function initSpeechRecognition() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return console.warn('SpeechRecognition not supported.');
-  recognition = new SR();
-  recognition.lang = 'zh-CN';
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-  recognition.onresult = (e) => {
-    const result = e.results[0][0].transcript;
-    document.getElementById('chat-input')?.value = result;
-  };
-  recognition.onerror = (e) => {
-    console.error('Speech recognition error:', e);
-    isRecognizing = false;
-    document.getElementById('mic-btn')?.classList.remove('is-recording');
-    alert('음성 인식 오류: ' + e.error);
-  };
-  recognition.onend = () => {
-    console.log('Speech recognition ended.');
-    isRecognizing = false;
-    document.getElementById('mic-btn')?.classList.remove('is-recording');
-  };
-}
-
-/**
- * (기존 함수 유지)
- * 중국어 문장 교정 함수 (현재 HTML에 연결된 버튼이 없음)
- */
-async function handleCorrection() {
-  // 이 함수는 'correction-input', 'correction-result' ID를 사용합니다.
-  // 현재 index.html에는 이 ID들이 없습니다.
-  const input = document.getElementById('correction-input')?.value.trim();
-  const resultDiv = document.getElementById('correction-result');
-  if (!input) return alert('교정할 문장을 입력하세요.');
-  if (!resultDiv) return;
-
-  resultDiv.innerHTML = 'AI 교정 중...';
-  try {
-    const data = await callGeminiAPI('correction', { text: input });
-    const txt = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    let parsed;
-    try {
-      parsed = JSON.parse(txt);
-    } catch {
-      parsed = { corrected: txt, pinyin: '(JSON 파싱 오류)', explanation: 'AI 응답을 이해하지 못했습니다.' };
+    const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...body })
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API ${action} failed`);
     }
-    resultDiv.innerHTML = `<p><b>교정:</b> ${parsed.corrected}</p><p>${parsed.pinyin}</p><p>${parsed.explanation}</p>`;
-  } catch (e) {
-    resultDiv.innerHTML = `<p class='text-red-500'>교정 오류: ${e.message}</p>`;
-  }
+    return response.json();
 }
 
-/**
- * [신규] 오늘의 패턴을 가져오는 함수 (LocalStorage 기반)
- * @param {number} count - 가져올 패턴 개수
- */
-function getDailyPatterns(count = 2) {
-  const today = new Date().toDateString();
-  const storedDate = localStorage.getItem('patternDate');
-  const storedPatterns = localStorage.getItem('dailyChinesePatterns');
-
-  if (storedDate === today && storedPatterns) {
-    console.log('🔄 캐시에서 오늘 자 패턴 로드');
-    try {
-      return JSON.parse(storedPatterns);
-    } catch (e) {
-      console.error("캐시 파싱 오류:", e);
-      // 오류 발생 시 캐시 삭제
-      localStorage.removeItem('dailyChinesePatterns');
-      localStorage.removeItem('patternDate');
+// --- TTS (Text-to-Speech) 함수 ---
+async function playTTS(text, buttonElement) {
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+        if (currentPlayingButton) currentPlayingButton.classList.remove('is-playing');
+        if (currentPlayingButton === buttonElement) {
+            currentPlayingButton = null;
+            return;
+        }
     }
-  }
-
-  console.log('✨ 새로운 패턴 생성 중...');
-  // 데이터 셔플 (Fisher-Yates shuffle)
-  const shuffled = [...patternsData];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-
-  const newPatterns = shuffled.slice(0, count);
-  localStorage.setItem('dailyChinesePatterns', JSON.stringify(newPatterns));
-  localStorage.setItem('patternDate', today);
-  
-  // cleanupOldStorage에서 사용하는 날짜도 갱신
-  localStorage.setItem('storageCleanTime', String(Date.now()));
-  return newPatterns;
-}
-
-/**
- * [수정] 오늘의 패턴을 렌더링하는 함수
- */
-function renderPatterns() {
-  const container = document.getElementById('pattern-container');
-  if (!container) return;
-  
-  const dailyPatterns = getDailyPatterns(2); // 2개 가져오기
-
-  if (!dailyPatterns || !dailyPatterns.length) {
-    container.innerHTML = '<p>패턴 데이터를 불러오지 못했습니다.</p>';
-    return;
-  }
-
-  container.innerHTML = dailyPatterns.map(p => `
-    <div class='bg-white p-6 rounded-lg shadow mb-4'>
-      <h2 class='text-2xl font-bold chinese-text mb-1'>${p.pattern}</h2>
-      <p class='text-blue-700 font-semibold mb-2'>${p.meaning}</p>
-      ${(p.examples||[]).map(ex => `
-        <div class='mb-2'>
-          <p class='chinese-text'>${ex.chinese}</p>
-          <p class='text-sm text-gray-500'>${ex.pinyin}</p>
-          <p class='text-sm text-gray-600'>${ex.korean}</p>
-        </div>`).join('')}
-    </div>`).join('');
-}
-
-/**
- * [신규] '전체 패턴' 모달에 모든 패턴 목록을 렌더링하는 함수
- */
-function renderAllPatterns() {
-  const listContainer = document.getElementById('all-patterns-list');
-  if (!listContainer) return;
-
-  listContainer.innerHTML = patternsData.map((p, index) => `
-    <div data-index="${index}" class='all-patterns-list-item py-3 px-2 hover:bg-gray-100 cursor-pointer rounded'>
-      <p class='text-lg font-semibold chinese-text'>${p.pattern}</p>
-      <p class='text-sm text-gray-600'>${p.meaning}</p>
-    </div>
-  `).join('');
-
-  // '전체 패턴 보기' 목록에서 특정 패턴 클릭 시 동작
-  listContainer.querySelectorAll('.all-patterns-list-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-      const index = e.currentTarget.dataset.index;
-      if (index === null) return;
-      
-      const selectedPattern = patternsData[+index];
-      if (!selectedPattern) return;
-
-      // 메인 컨테이너에 해당 패턴 1개만 렌더링
-      const container = document.getElementById('pattern-container');
-      if (!container) return;
-      
-      container.innerHTML = `
-        <div class='bg-white p-6 rounded-lg shadow mb-4'>
-          <h2 class='text-2xl font-bold chinese-text mb-1'>${selectedPattern.pattern}</h2>
-          <p class='text-blue-700 font-semibold mb-2'>${selectedPattern.meaning}</p>
-          ${(selectedPattern.examples||[]).map(ex => `
-            <div class='mb-2'>
-              <p class='chinese-text'>${ex.chinese}</p>
-              <p class='text-sm text-gray-500'>${ex.pinyin}</p>
-              <p class='text-sm text-gray-600'>${ex.korean}</p>
-            </div>`).join('')}
-        </div>`;
-
-      // 모달 닫기
-      toggleModal('all-patterns-modal', false);
-      // 페이지 상단으로 스크롤
-      window.scrollTo(0, 0);
-    });
-  });
-}
-
-/**
- * [신규] '번역하기' 모달 기능 처리
- */
-async function handleTranslation() {
-  const inputEl = document.getElementById('korean-input');
-  const resultDiv = document.getElementById('translation-result');
-  
-  if (!inputEl || !resultDiv) return;
-  
-  const input = inputEl.value.trim();
-  if (!input) return alert('번역할 한국어 문장을 입력하세요.');
-  
-  resultDiv.innerHTML = '<div class="loader mx-auto"></div><p class="text-center mt-2">AI 번역 중...</p>'; // 로더 표시
-  
-  try {
-    // gemini.js의 'translate' 액션 사용
-    const data = await callGeminiAPI('translate', { text: input });
-    const translatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '번역 결과를 받지 못했습니다.';
-    
-    // 번역 결과와 함께 교정 기능도 제안 (gemini.js의 'correction' 액션 사용)
-    const correctionData = await callGeminiAPI('correction', { text: translatedText });
-    const correctionText = correctionData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
-    let parsed;
+    currentPlayingButton = buttonElement;
+    buttonElement.classList.add('is-playing');
     try {
-      parsed = JSON.parse(correctionText);
-    } catch {
-      // 파싱 실패 시, 번역 결과만 표시
-      parsed = { corrected: translatedText, pinyin: '(병음 정보 없음)', explanation: '번역이 완료되었습니다.' };
+        let audioData = audioCache[text];
+        if (!audioData) {
+            const result = await callGeminiAPI('tts', { text });
+            audioData = result.audioContent;
+            audioCache[text] = audioData;
+        }
+        const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
+        currentAudio = audio;
+        audio.play();
+        audio.onended = () => {
+            buttonElement.classList.remove('is-playing');
+            currentAudio = null;
+            currentPlayingButton = null;
+        };
+        audio.onerror = (e) => {
+            console.error('Audio playback error:', e);
+            showAlert('오디오 재생 중 오류가 발생했습니다.');
+            buttonElement.classList.remove('is-playing');
+            currentAudio = null;
+            currentPlayingButton = null;
+        };
+    } catch (error) {
+        console.error('TTS error:', error);
+        showAlert(`음성(TTS)을 불러오는 데 실패했습니다: ${error.message}`);
+        buttonElement.classList.remove('is-playing');
+        currentPlayingButton = null;
     }
-    
-    resultDiv.innerHTML = `
-      <p class="text-lg font-semibold chinese-text">${parsed.corrected}</p>
-      <p class="text-blue-600 mb-2">${parsed.pinyin}</p>
-      <p class="text-gray-700">${parsed.explanation}</p>
-    `;
-    
-  } catch (e) {
-    resultDiv.innerHTML = `<p class='text-red-500'>번역 오류: ${e.message}</p>`;
-  }
 }
 
-/**
- * [신규] 채팅 기록을 화면에 추가하는 함수
- * @param {string} sender - 'user' 또는 'model'
- * @param {string} message - 표시할 메시지
- */
-function addMessageToChatHistory(sender, message) {
-  const chatHistoryDiv = document.getElementById('chat-history');
-  if (!chatHistoryDiv) return;
-
-  const msgDiv = document.createElement('div');
-  msgDiv.classList.add('p-3', 'rounded-lg', 'max-w-[80%]');
-  
-  if (sender === 'user') {
-    msgDiv.classList.add('bg-purple-600', 'text-white', 'self-end', 'ml-auto');
-    msgDiv.textContent = message;
-  } else if (sender === 'model') {
-    msgDiv.classList.add('bg-gray-200', 'text-gray-800', 'self-start', 'mr-auto');
-    // AI 응답은 중국어 폰트 적용
-    msgDiv.classList.add('chinese-text'); 
-    msgDiv.textContent = message;
-  } else {
-    // 시스템 메시지 (로딩 등)
-    msgDiv.classList.add('text-gray-500', 'text-sm', 'text-center', 'w-full');
-    msgDiv.innerHTML = message;
-  }
-  
-  chatHistoryDiv.appendChild(msgDiv);
-  // 새 메시지 추가 시 맨 아래로 스크롤
-  chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+// --- 학습 카운트 관련 함수 ---
+function initializeCounts() {
+    const storedCounts = localStorage.getItem('chineseLearningCounts');
+    learningCounts = storedCounts ? JSON.parse(storedCounts) : {};
+}
+function saveCounts() {
+    localStorage.setItem('chineseLearningCounts', JSON.stringify(learningCounts));
 }
 
-/**
- * [신규] AI 채팅 메시지 전송 처리
- */
-async function handleChatSend() {
-  const inputEl = document.getElementById('chat-input');
-  if (!inputEl) return;
-  
-  const text = inputEl.value.trim();
-  if (!text) return;
+// --- 날짜 및 패턴 렌더링 함수 ---
+function getTodayString() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+function displayDate() {
+    const today = new Date();
+    currentDateEl.textContent = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
+}
+function getRandomPatterns() {
+    const shuffled = [...allPatterns].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, 2);
+}
 
-  // 1. 사용자 메시지 화면에 표시
-  addMessageToChatHistory('user', text);
-  // 2. 채팅 기록에 사용자 메시지 추가
-  chatHistory.push({ role: "user", parts: [{ text }] });
-  
-  inputEl.value = ''; // 입력창 비우기
-  
-  // 3. AI 응답 대기 표시
-  addMessageToChatHistory('system', '<div class="loader mx-auto" style="width: 24px; height: 24px; border-width: 3px;"></div>');
+function renderPatterns(patterns, showIndex = false) {
+    patternContainer.innerHTML = '';
+    patterns.forEach((p, index) => {
+        const count = learningCounts[p.pattern] || 0;
+        const card = document.createElement('div');
+        card.className = 'bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300';
 
-  try {
-    // 4. gemini.js의 'chat' 액션 호출
-    const data = await callGeminiAPI('chat', { 
-      history: chatHistory.slice(0, -1), // 현재 사용자 입력을 제외한 기록
-      text: text 
+        const examplesHtml = p.examples.map(ex => `
+            <div class="mt-3">
+                <div class="flex items-center">
+                    <p class="text-lg chinese-text text-gray-800">${ex.chinese}</p>
+                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${ex.chinese}">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500">${ex.pinyin}</p>
+                <p class="text-md text-gray-600">${ex.korean}</p>
+            </div>`).join('');
+
+        const vocabHtml = p.vocab.map(v => `
+            <div class="flex items-baseline">
+                <p class="w-1/3 text-md chinese-text text-gray-700 font-medium">${v.word}</p>
+                <p class="w-1/3 text-sm text-gray-500">${v.pinyin}</p>
+                <p class="w-1/3 text-sm text-gray-600">${v.meaning}</p>
+            </div>`).join('');
+
+        const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
+
+        const practiceHtml = p.practice ? `
+            <div class="mt-6">
+                <h3 class="text-lg font-bold text-gray-700 border-b pb-1">✍️ 직접 말해보기</h3>
+                <div class="mt-3 bg-sky-50 p-4 rounded-lg relative">
+                    <button id="show-hint-btn-${index}" title="힌트 보기" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-3 right-3 bg-gray-300 hover:bg-gray-400 text-gray-700 p-1.5 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg>
+                    </button>
+                    <p class="text-md text-gray-700 mb-2">다음 문장을 중국어로 입력해보세요:</p>
+                    <p class="text-md font-semibold text-sky-800 mb-3">"${p.practice.korean}"</p>
+                    <div class="flex items-center space-x-2">
+                        <input type="text" id="practice-input-${index}" class="w-full p-2 border border-gray-300 rounded-md chinese-text" placeholder="중국어를 입력하세요...">
+                        <button id="check-practice-btn-${index}" data-answer="${p.practice.chinese}" data-pinyin="${p.practice.pinyin}" data-input-id="practice-input-${index}" class="check-practice-btn bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap">정답 확인</button>
+                    </div>
+                    <div id="practice-hint-${index}" class="mt-3"></div>
+                    <div id="practice-result-${index}" class="mt-3 text-center"></div>
+                </div>
+            </div>` : '';
+
+        card.innerHTML = `
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center">${indexHtml}<div><h2 class="text-2xl font-bold text-gray-800 chinese-text">${p.pattern}</h2><p class="text-md text-gray-500">${p.pinyin}</p></div></div>
+                <div class="text-right"><button data-pattern="${p.pattern}" class="learn-btn bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-bold py-1 px-3 rounded-full transition-colors">학습 완료!</button><p class="text-xs text-gray-500 mt-1">학습 <span class="font-bold text-red-500 count-display">${count}</span>회</p></div>
+            </div>
+            <div class="mt-4"><p class="text-lg text-blue-700 font-semibold mb-2">${p.meaning}</p><p class="text-sm text-gray-500 bg-gray-100 p-2 rounded-md"><b>🤔 어떻게 사용할까요?</b> ${p.structure || '구조 정보 없음'}</p></div>
+            <div class="mt-4"><h3 class="text-lg font-bold text-gray-700 border-b pb-1">💡 예문 살펴보기</h3>${examplesHtml}</div>
+            <div class="mt-6"><h3 class="text-lg font-bold text-gray-700 border-b pb-1">📌 주요 단어</h3><div class="mt-3 space-y-2">${vocabHtml}</div></div>
+            ${practiceHtml}`;
+        patternContainer.appendChild(card);
     });
-    
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '...';
-    
-    // 5. 채팅 기록에 AI 응답 추가
-    chatHistory.push({ role: "model", parts: [{ text: aiResponse }] });
-    
-    // 6. 로딩 메시지 삭제 (마지막 자식 노드)
-    document.getElementById('chat-history')?.lastChild.remove();
-    
-    // 7. AI 응답 화면에 표시
-    addMessageToChatHistory('model', aiResponse);
-
-  } catch (e) {
-    // 로딩 메시지 삭제
-    document.getElementById('chat-history')?.lastChild.remove();
-    addMessageToChatHistory('system', `<p class='text-red-500'>채팅 오류: ${e.message}</p>`);
-  }
 }
 
-/**
- * [신규] AI 채팅 답변 추천 받기
- */
-async function handleSuggestReply() {
-  const chatHistoryDiv = document.getElementById('chat-history');
-  if (!chatHistoryDiv) return;
-
-  addMessageToChatHistory('system', '💡 AI가 답변 추천 중...');
-
-  try {
-    // gemini.js의 'suggest_reply' 액션 호출
-    const data = await callGeminiAPI('suggest_reply', { 
-      history: chatHistory 
-    });
-    
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '추천 답변을 생성하지 못했습니다.';
-    
-    // 로딩 메시지 삭제
-    chatHistoryDiv.lastChild.remove();
-    
-    // 추천 답변 표시 (AI 응답과 다르게 스타일링)
-    const suggestions = aiResponse.split('\n').filter(s => s.trim().length > 0);
-    
-    const suggestionHtml = suggestions.map(s => {
-      // 예: "1. 你好 (nǐ hǎo) - 안녕하세요"
-      // 간단한 파싱으로 클릭 가능한 버튼 생성
-      const textOnly = s.replace(/^\d+\.\s*/, '').split('(')[0].trim();
-      return `<button class="suggested-reply-item text-left w-full p-2 bg-blue-100 hover:bg-blue-200 rounded-md mb-2 chinese-text" data-text="${textOnly}">
-                ${s}
-              </button>`;
-    }).join('');
-    
-    addMessageToChatHistory('system', `<div class="w-full">${suggestionHtml}</div>`);
-    
-    // 추천 답변 클릭 시 입력창에 채우기
-    document.querySelectorAll('.suggested-reply-item').forEach(item => {
-      item.addEventListener('click', (e) => {
-        const text = e.currentTarget.dataset.text;
-        document.getElementById('chat-input').value = text;
-        // 추천 답변 목록 삭제
-        chatHistoryDiv.lastChild.remove();
-      });
-    });
-
-  } catch (e) {
-    chatHistoryDiv.lastChild.remove();
-    addMessageToChatHistory('system', `<p class='text-red-500'>추천 오류: ${e.message}</p>`);
-  }
-}
-
-/**
- * [신규] 모달 표시/숨김 헬퍼 함수
- * @param {string} modalId - 모달의 ID
- * @param {boolean} show - true: 표시, false: 숨김
- */
-function toggleModal(modalId, show) {
-  const modal = document.getElementById(modalId);
-  if (modal) {
-    if (show) {
-      modal.classList.remove('hidden');
+function loadDailyPatterns() {
+    const todayStr = getTodayString();
+    const storedData = JSON.parse(localStorage.getItem('dailyChinesePatterns'));
+    if (storedData && storedData.date === todayStr) {
+        renderPatterns(storedData.patterns);
     } else {
-      modal.classList.add('hidden');
+        const newPatterns = getRandomPatterns();
+        localStorage.setItem('dailyChinesePatterns', JSON.stringify({ date: todayStr, patterns: newPatterns }));
+        renderPatterns(newPatterns);
     }
-  }
+}
+function renderAllPatternsList() {
+    allPatternsList.innerHTML = '';
+    allPatterns.forEach((p, index) => {
+        const patternItem = document.createElement('div');
+        patternItem.className = 'p-4 hover:bg-gray-100 cursor-pointer';
+        patternItem.dataset.patternIndex = index;
+        patternItem.innerHTML = `
+            <div class="flex items-start pointer-events-none">
+                <span class="mr-3 text-gray-500 font-medium w-8 text-right">${index + 1}.</span>
+                <div>
+                    <p class="text-lg font-semibold chinese-text text-gray-800">${p.pattern}</p>
+                    <p class="text-sm text-gray-600">${p.meaning}</p>
+                </div>
+            </div>`;
+        allPatternsList.appendChild(patternItem);
+    });
 }
 
+// --- 화면 꺼짐 방지 ---
+async function setupScreenWakeLock() {
+    if ('wakeLock' in navigator) {
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => console.log('Screen Wake Lock released'));
+            console.log('Screen Wake Lock active');
+        } catch (err) { console.error(`${err.name}, ${err.message}`); }
+    } else { console.log('Screen Wake Lock API not supported.'); }
+}
 
-/**
- * [수정] DOM 로드 완료 시 실행
- */
-document.addEventListener('DOMContentLoaded', () => {
-  // --- 1. 초기 렌더링 ---
-  renderPatterns(); // '오늘의 패턴' 렌더링
-  initSpeechRecognition(); // 음성 인식 초기화
-  renderAllPatterns(); // '전체 패턴' 모달 내용 미리 렌더링
-
-  // 헤더에 오늘 날짜 표시
-  const dateEl = document.getElementById('current-date');
-  if (dateEl) {
-     const today = new Date();
-     dateEl.textContent = today.toLocaleDateString('ko-KR', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        weekday: 'long'
-     });
-  }
-
-  // --- 2. 모달 열기/닫기 버튼 ---
-  // '번역하기' 모달
-  document.getElementById('open-translator-btn')?.addEventListener('click', () => {
-    toggleModal('translator-modal', true);
-  });
-  document.getElementById('close-translator-btn')?.addEventListener('click', () => {
-    toggleModal('translator-modal', false);
-  });
-
-  // 'AI와 대화하기' 모달
-  document.getElementById('open-chat-btn')?.addEventListener('click', () => {
-    toggleModal('chat-modal', true);
-  });
-  document.getElementById('close-chat-btn')?.addEventListener('click', () => {
-    toggleModal('chat-modal', false);
-  });
-
-  // '전체 패턴 보기' 모달
-  document.getElementById('all-patterns-btn')?.addEventListener('click', () => {
-    toggleModal('all-patterns-modal', true);
-  });
-  document.getElementById('close-all-patterns-btn')?.addEventListener('click', () => {
-    toggleModal('all-patterns-modal', false);
-  });
-  
-  // (커스텀 알림 모달 - 필요시 사용)
-  document.getElementById('custom-alert-close-btn')?.addEventListener('click', () => {
-    toggleModal('custom-alert-modal', false);
-  });
-  
-  // 모달 외부 배경 클릭 시 닫기
-  document.querySelectorAll('.fixed.inset-0.bg-black.bg-opacity-50').forEach(modalBackdrop => {
-    modalBackdrop.addEventListener('click', (e) => {
-      // 클릭된 대상이 정확히 배경(backdrop)일 때만 닫힘
-      if (e.target === modalBackdrop) {
-        modalBackdrop.classList.add('hidden');
-      }
+// --- AI 채팅 관련 함수 ---
+function addMessageToHistory(sender, messageData) {
+    const messageElement = document.createElement('div');
+    if (sender === 'user') {
+        messageElement.className = 'flex justify-end';
+        messageElement.innerHTML = `<div class="bg-purple-500 text-white p-3 rounded-lg max-w-xs">${messageData.text}</div>`;
+    } else { // AI
+        messageElement.className = 'flex justify-start';
+        messageElement.innerHTML = `
+            <div class="bg-white p-3 rounded-lg max-w-xs border">
+                <div class="flex items-center">
+                    <p class="text-lg chinese-text text-gray-800">${messageData.chinese}</p>
+                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${messageData.chinese}">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500">${messageData.pinyin || ''}</p>
+                <p class="text-sm text-gray-600 border-t mt-2 pt-2">${messageData.korean || ''}</p>
+            </div>`;
+    }
+    chatHistory.appendChild(messageElement);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+function addSuggestionToHistory(suggestions) {
+    const suggestionElement = document.createElement('div');
+    suggestionElement.className = 'flex justify-center my-2';
+    const buttonsHtml = suggestions.map(suggestion =>
+        `<button class="suggestion-chip bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-sm hover:bg-blue-200 mx-1 mb-1 flex flex-col items-center" data-text="${suggestion.chinese}">
+            <span class="chinese-text font-medium">${suggestion.chinese}</span>
+            <span class="text-xs text-gray-500 mt-0.5">${suggestion.pinyin}</span>
+            <span class="text-xs text-gray-600 mt-0.5">${suggestion.korean}</span>
+         </button>`
+    ).join('');
+    suggestionElement.innerHTML = `
+        <div class="bg-gray-100 p-2 rounded-lg text-center w-full">
+            <p class="text-xs text-gray-600 mb-1">이렇게 답해보세요:</p>
+            <div class="flex flex-wrap justify-center">${buttonsHtml}</div>
+        </div>`;
+    chatHistory.appendChild(suggestionElement);
+    suggestionElement.querySelectorAll('.suggestion-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chatInput.value = chip.dataset.text;
+            chatInput.focus();
+            suggestionElement.remove();
+        });
     });
-  });
-
-  // --- 3. 메인 기능 버튼 ---
-  // '새로운 패턴 보기'
-  document.getElementById('new-pattern-btn')?.addEventListener('click', () => {
-    console.log('🔄 새로운 패턴 버튼 클릭');
-    // 날짜와 캐시를 강제로 삭제
-    localStorage.removeItem('dailyChinesePatterns');
-    localStorage.removeItem('patternDate');
-    // 패턴 다시 렌더링
-    renderPatterns();
-    // 페이지 상단으로 스크롤
-    window.scrollTo(0, 0);
-  });
-  
-  // '번역하기' 모달 내부의 '번역' 버튼
-  document.getElementById('translate-btn')?.addEventListener('click', handleTranslation);
-
-  // --- 4. 채팅 모달 내부 기능 ---
-  // '전송' 버튼
-  document.getElementById('send-chat-btn')?.addEventListener('click', handleChatSend);
-  // 'Enter' 키로 전송
-  document.getElementById('chat-input')?.addEventListener('keypress', (e) => {
-     if(e.key === 'Enter' && !e.shiftKey) { // Shift+Enter는 줄바꿈
-       e.preventDefault(); // 기본 Enter 동작(줄바꿈) 방지
-       handleChatSend();
-     }
-  });
-  
-  // '답변 추천받기' 버튼
-  document.getElementById('suggest-reply-btn')?.addEventListener('click', handleSuggestReply);
-
-  // '음성 입력' (마이크) 버튼
-  const micBtn = document.getElementById('mic-btn');
-  micBtn?.addEventListener('click', () => {
-    if (!recognition) {
-      initSpeechRecognition(); // 혹시 초기화 안됐으면 다시 시도
-      if (!recognition) return alert('음성 인식이 지원되지 않습니다.');
-    }
-    if (isRecognizing) { 
-      recognition.stop(); 
-      return; 
-    }
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+async function handleSendMessage() {
+    const userInput = chatInput.value.trim();
+    if (!userInput) return;
+    chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
+    addMessageToHistory('user', { text: userInput });
+    chatInput.value = '';
+    const loadingElement = document.createElement('div');
+    loadingElement.className = 'flex justify-start';
+    loadingElement.id = 'chat-loading';
+    loadingElement.innerHTML = `<div class="bg-white p-3 rounded-lg border"><div class="loader"></div></div>`;
+    chatHistory.appendChild(loadingElement);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
     try {
-      recognition.start();
-      isRecognizing = true;
-      micBtn.classList.add('is-recording');
-    } catch (e) {
-      console.error('Speech start error:', e);
-      isRecognizing = false;
-      micBtn.classList.remove('is-recording');
-      alert('음성 인식 시작 실패: ' + e.message);
+        conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
+        const result = await callGeminiAPI('chat', { text: userInput, history: conversationHistory });
+        let aiResponseData;
+        if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
+            const aiResponseText = result.candidates[0].content.parts[0].text;
+            try {
+                aiResponseData = JSON.parse(aiResponseText);
+                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+            } catch (e) {
+                console.error("AI response is not valid JSON:", aiResponseText);
+                aiResponseData = { chinese: aiResponseText, pinyin: "(JSON 파싱 오류)", korean: "(번역 오류)" };
+                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+            }
+        } else {
+             console.error("Invalid response structure from chat API:", result);
+             aiResponseData = { chinese: "(유효하지 않은 응답)", pinyin: "", korean: "" };
+        }
+        addMessageToHistory('ai', aiResponseData);
+    } catch (error) {
+        console.error('Chat error:', error);
+        showAlert(`대화 중 오류가 발생했습니다: ${error.message}`);
+    } finally {
+        document.getElementById('chat-loading')?.remove();
     }
-  });
+}
+async function handleSuggestReply() {
+    chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
+    if (conversationHistory.length === 0) {
+        showAlert('추천할 답변을 생성하기 위한 대화 내용이 없습니다.');
+        return;
+    }
+    suggestReplyBtn.disabled = true;
+    suggestReplyBtn.textContent = '추천 생성 중...';
+    try {
+        const result = await callGeminiAPI('suggest_reply', { history: conversationHistory });
+        const suggestions = result.suggestions || [];
+        if (suggestions.length > 0 && suggestions.every(s => s.chinese && s.pinyin && s.korean)) {
+            addSuggestionToHistory(suggestions);
+        } else {
+             console.warn("Received suggestions are empty or have invalid format:", suggestions);
+            showAlert('추천할 만한 답변을 찾지 못했거나 형식이 잘못되었습니다.');
+        }
+    } catch (error) {
+        console.error('Suggest reply error:', error);
+        showAlert(`답변 추천 중 오류 발생: ${error.message}`);
+    } finally {
+        suggestReplyBtn.disabled = false;
+        suggestReplyBtn.textContent = '💡 답변 추천받기';
+    }
+}
 
-  // (참고) 기존 handleCorrection 함수는 HTML에 'correction-btn' ID가 없으므로
-  // 현재 연결되지 않은 상태입니다.
-  // document.getElementById('correction-btn')?.addEventListener('click', handleCorrection);
-});
+// --- 번역기 함수 ---
+async function handleTranslation() {
+    const text = koreanInput.value.trim();
+    if (!text) {
+        showAlert('번역할 한국어 문장을 입력하세요.');
+        return;
+    }
+    translateBtn.disabled = true;
+    translationResult.innerHTML = '<div class="loader mx-auto"></div>';
+    try {
+        const systemPrompt = `You are a professional Korean-to-Chinese translator and language teacher. Translate the following Korean sentence into natural, native-sounding Chinese. Provide: 1. The main Chinese translation. 2. The pinyin for the main translation. 3. (Optional) 1-2 alternative natural expressions if applicable. 4. A concise explanation (in Korean) of why this expression is natural, what the key vocabulary or grammar point is. Format your response as a single, valid JSON object with keys "chinese", "pinyin", "alternatives" (string array), and "explanation" (string, in Korean). Do not include markdown backticks.`;
+        const result = await callGeminiAPI('translate', { text, systemPrompt });
+        let translationData;
+        if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
+            const translationText = result.candidates[0].content.parts[0].text;
+            try {
+                translationData = JSON.parse(translationText);
+            } catch (e) {
+                console.error("AI translation response is not valid JSON:", translationText);
+                translationData = { chinese: translationText, pinyin: "(JSON 파싱 오류)", alternatives: [], explanation: "(설명 파싱 오류)" };
+            }
+        } else {
+             console.error("Invalid response structure from translate API:", result);
+             translationData = { chinese: "(유효하지 않은 응답)", pinyin: "", alternatives: [], explanation: "" };
+        }
+        let alternativesHtml = '';
+        if (translationData.alternatives && Array.isArray(translationData.alternatives) && translationData.alternatives.length > 0) {
+            alternativesHtml = `<p class="text-sm text-gray-500 mt-3">다른 표현:</p><ul class="list-disc list-inside text-sm text-gray-600 chinese-text">${translationData.alternatives.map(alt => `<li>${alt}</li>`).join('')}</ul>`;
+        }
+        let explanationHtml = '';
+        if (translationData.explanation) {
+            explanationHtml = `<div class="mt-4 pt-3 border-t"><h4 class="text-sm font-semibold text-gray-700">💡 표현 꿀팁:</h4><p class="text-sm text-gray-600 mt-1">${translationData.explanation.replace(/\n/g, '<br>')}</p></div>`;
+        }
+        translationResult.innerHTML = `
+            <div class="flex items-center">
+                <p class="text-xl chinese-text font-bold text-gray-800">${translationData.chinese}</p>
+                <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${translationData.chinese}">
+                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                </button>
+            </div>
+            <p class="text-md text-gray-500">${translationData.pinyin || '(병음 정보 없음)'}</p>
+            ${alternativesHtml}
+            ${explanationHtml}`;
+    } catch (error) {
+        console.error('Translation error:', error);
+        translationResult.innerHTML = `<p class="text-red-500 text-center">번역 중 오류가 발생했습니다: ${error.message}</p>`;
+    } finally {
+        translateBtn.disabled = false;
+    }
+}
+
+// --- 음성 인식 초기화 ---
+function initializeSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'zh-CN'; // 중국어 설정
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onresult = (event) => {
+            console.log("Speech Recognition Result:", event.results); // 결과 로그
+            const speechResult = event.results[0][0].transcript;
+            console.log("Recognized Text:", speechResult); // 인식된 텍스트 로그
+            chatInput.value = speechResult;
+        };
+
+        recognition.onspeechend = () => {
+            console.log("Speech Recognition: Speech has stopped being detected."); // 음성 종료 로그
+            if(isRecognizing) recognition.stop();
+        };
+
+        recognition.onnomatch = () => {
+            console.log("Speech Recognition: No match found."); // 불일치 로그
+            showAlert('음성을 인식하지 못했습니다. 다시 시도해주세요.');
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Speech Recognition Error:", event.error, event.message); // 오류 상세 로그
+            if (event.error !== 'no-speech' && event.error !== 'aborted' && event.error !== 'not-allowed') {
+                 showAlert(`음성 인식 오류: ${event.error}. 마이크 권한을 확인하세요.`);
+            } else if (event.error === 'not-allowed') {
+                 showAlert('마이크 사용 권한이 거부되었습니다. 브라우저 설정을 확인해주세요.');
+            }
+             micBtn.classList.remove('is-recording');
+             isRecognizing = false;
+        };
+
+         recognition.onend = () => {
+            console.log("Speech Recognition: Service ended."); // 서비스 종료 로그
+            micBtn.classList.remove('is-recording');
+            isRecognizing = false;
+        };
+
+        console.log("Speech Recognition initialized for zh-CN."); // 초기화 로그
+
+    } else {
+        console.warn('Web Speech API is not supported in this browser.');
+        showAlert('현재 브라우저에서는 음성 인식을 지원하지 않습니다.');
+        if(micBtn) micBtn.disabled = true;
+    }
+}
+
+// --- 메인 이벤트 리스너 설정 ---
+function setupEventListeners() {
+    newPatternBtn.addEventListener('click', () => {
+         const newPatterns = getRandomPatterns();
+         localStorage.setItem('dailyChinesePatterns', JSON.stringify({ date: getTodayString(), patterns: newPatterns }));
+         renderPatterns(newPatterns);
+         window.scrollTo(0, 0);
+    });
+
+    patternContainer.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target.classList.contains('learn-btn')) { // 학습 완료
+            const pattern = target.dataset.pattern;
+            learningCounts[pattern] = (learningCounts[pattern] || 0) + 1;
+            saveCounts();
+            target.nextElementSibling.querySelector('.count-display').textContent = learningCounts[pattern];
+        } else if (target.classList.contains('check-practice-btn')) { // 정답 확인
+            const button = target;
+            const inputId = button.dataset.inputId;
+            const index = inputId.split('-').pop();
+            const correctAnswer = button.dataset.answer;
+            const correctPinyin = button.dataset.pinyin;
+            const userInput = document.getElementById(inputId).value.trim();
+            const resultDiv = document.getElementById(`practice-result-${index}`);
+            const normalize = (str) => str.replace(/[.,。，？！？!]/g, '').replace(/\s+/g, '');
+            let resultMessageHtml = '';
+            const answerHtml = `<div class="mt-2 p-2 bg-gray-100 rounded text-left"><p class="text-sm">정답:</p><div class="flex items-center"><p class="text-md chinese-text font-semibold text-gray-800">${correctAnswer}</p><button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${correctAnswer}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg></button></div><p class="text-sm text-gray-500">${correctPinyin}</p></div>`;
+            if (normalize(userInput) === normalize(correctAnswer)) { resultMessageHtml = `<p class="text-green-600 font-bold text-lg">🎉 정답입니다!</p>` + answerHtml; }
+            else { resultMessageHtml = `<p class="text-red-500 font-bold text-lg">🤔 아쉽네요, 다시 시도해보세요.</p>${answerHtml}`; }
+            resultDiv.innerHTML = `${resultMessageHtml}<button class="retry-practice-btn mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" data-practice-index="${index}">다시하기</button>`;
+            button.style.display = 'none';
+            const hintButton = document.getElementById(`show-hint-btn-${index}`); if(hintButton) hintButton.style.display = 'none';
+        } else if (target.closest('.show-hint-btn')) { // 힌트 보기 (이전 데이터 구조 기준)
+            const button = target.closest('.show-hint-btn');
+            const patternString = button.dataset.patternString;
+            const hintTargetId = button.dataset.hintTarget;
+            const hintDiv = document.getElementById(hintTargetId);
+            const patternData = allPatterns.find(p => p.pattern === patternString);
+            if (patternData && patternData.practiceVocab && patternData.practiceVocab.length > 0) { // practiceVocab 우선 확인
+                const vocabSource = patternData.practiceVocab;
+                console.log("Using practiceVocab for hint.");
+                const shuffledVocab = [...vocabSource].sort(() => 0.5 - Math.random());
+                const hintsHtml = shuffledVocab.map(hint => `<div class="flex items-baseline" style="line-height: 1.3;"><span class="inline-block w-[40%] font-medium chinese-text pr-2">${hint.word}</span><span class="inline-block w-[40%] text-sm text-gray-500 pr-2">${hint.pinyin}</span><span class="inline-block w-[20%] text-sm text-gray-600">${hint.meaning}</span></div>`).join('');
+                hintDiv.innerHTML = `<div class="bg-white/50 rounded-md p-2 text-left"><div class="flex items-center mb-1"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-0.5 text-yellow-500"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg><span class="font-semibold text-sm text-gray-700">힌트</span></div><div class="border-t border-gray-300/50 pt-1">${hintsHtml}</div></div>`;
+            } else { // practiceVocab 없으면 정보 없음
+                console.log("No practiceVocab found for hint.");
+                hintDiv.innerHTML = `<p class="text-sm text-gray-500">이 문장에 대한 핵심 단어 정보가 없습니다.</p>`;
+            }
+            button.disabled = true; button.classList.add('opacity-50', 'cursor-not-allowed');
+        } else if (target.classList.contains('retry-practice-btn')) { // 다시하기
+            const index = target.dataset.practiceIndex;
+            document.getElementById(`practice-input-${index}`).value = '';
+            document.getElementById(`practice-result-${index}`).innerHTML = '';
+            document.getElementById(`practice-hint-${index}`).innerHTML = '';
+            document.getElementById(`check-practice-btn-${index}`).style.display = '';
+            const hintBtn = document.getElementById(`show-hint-btn-${index}`); hintBtn.style.display = ''; hintBtn.disabled = false; hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        } else if (target.closest('.tts-btn')) { // TTS
+            const ttsButton = target.closest('.tts-btn');
+            const textToSpeak = ttsButton.dataset.text; if (textToSpeak) playTTS(textToSpeak, ttsButton);
+        }
+    });
+
+    patternContainer.addEventListener('keydown', (e) => { // Enter 키
+        if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') {
+            e.preventDefault();
+            const checkButton = e.target.nextElementSibling;
+            if (checkButton?.classList.contains('check-practice-btn')) checkButton.click();
+        }
+    });
+
+    // 번역기 모달 이벤트
+    openTranslatorBtn.addEventListener('click', () => translatorModal.classList.remove('hidden'));
+    closeTranslatorBtn.addEventListener('click', () => { translatorModal.classList.add('hidden'); if (currentAudio) currentAudio.pause(); });
+    translateBtn.addEventListener('click', handleTranslation);
+    koreanInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTranslation(); } });
+    translationResult.addEventListener('click', (e) => { const ttsButton = e.target.closest('.tts-btn'); if (ttsButton) { const textToSpeak = ttsButton.dataset.text; if (textToSpeak) playTTS(textToSpeak, ttsButton); } });
+
+    // 커스텀 알림
+    customAlertCloseBtn.addEventListener('click', () => customAlertModal.classList.add('hidden'));
+
+    // 전체 패턴 모달 이벤트
+    allPatternsBtn.addEventListener('click', () => allPatternsModal.classList.remove('hidden'));
+    closeAllPatternsBtn.addEventListener('click', () => allPatternsModal.classList.add('hidden'));
+    allPatternsList.addEventListener('click', (e) => {
+        const selectedPatternDiv = e.target.closest('[data-pattern-index]');
+        if (selectedPatternDiv) {
+            const patternIndex = parseInt(selectedPatternDiv.dataset.patternIndex, 10);
+            const selectedPattern = allPatterns[patternIndex];
+            if (selectedPattern) {
+                renderPatterns([selectedPattern]);
+                allPatternsModal.classList.add('hidden');
+                window.scrollTo(0, 0);
+            }
+        }
+    });
+
+    // AI 채팅 모달 이벤트 (chatBtn은 이제 플로팅 버튼 ID 참조)
+    chatBtn.addEventListener('click', () => {
+        chatModal.classList.remove('hidden');
+        if (conversationHistory.length === 0) {
+            const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };
+            addMessageToHistory('ai', firstMsg);
+            conversationHistory.push({ role: 'model', parts: [{ text: JSON.stringify(firstMsg) }] });
+        }
+    });
+    closeChatBtn.addEventListener('click', () => {
+        chatModal.classList.add('hidden');
+        if (recognition && isRecognizing) recognition.stop(); // 모달 닫을 때 인식 중지
+    });
+    sendChatBtn.addEventListener('click', handleSendMessage);
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    });
+    chatHistory.addEventListener('click', (e) => { // 채팅창 내 TTS
+        const ttsButton = e.target.closest('.tts-btn');
+        if (ttsButton) {
+            const textToSpeak = ttsButton.dataset.text;
+            if (textToSpeak) playTTS(textToSpeak, ttsButton);
+        }
+    });
+
+    // 마이크 버튼 이벤트
+    micBtn.addEventListener('click', () => {
+        if (!recognition) {
+             showAlert('음성 인식이 지원되지 않거나 초기화되지 않았습니다.');
+             console.log("Recognition not available or not initialized.");
+            return;
+        }
+        if (isRecognizing) {
+            console.log("Stopping recognition...");
+            recognition.stop();
+        } else {
+             try {
+                console.log("Starting recognition...");
+                recognition.start();
+                micBtn.classList.add('is-recording'); // 녹음 중 스타일 적용
+                isRecognizing = true;
+            } catch(e) {
+                 console.error("Speech recognition start error:", e);
+                 if (e.name === 'NotAllowedError' || e.name === 'SecurityError') { showAlert("마이크 권한이 필요합니다. 브라우저 설정에서 허용해주세요."); }
+                 else if (e.name === 'InvalidStateError') { showAlert("음성 인식이 이미 진행 중일 수 있습니다."); }
+                 else { showAlert("음성 인식을 시작할 수 없습니다. 잠시 후 다시 시도해주세요."); }
+                 micBtn.classList.remove('is-recording'); // 에러 시 스타일 제거
+                 isRecognizing = false;
+            }
+        }
+    });
+
+    // 답변 추천 버튼 이벤트
+    suggestReplyBtn.addEventListener('click', handleSuggestReply);
+}
+
+// --- 앱 초기화 함수 ---
+export function initializeApp(patterns) {
+    allPatterns = patterns; // 복원된 데이터 사용
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeDOM();
+        displayDate();
+        initializeCounts();
+        loadDailyPatterns();
+        renderAllPatternsList();
+        setupScreenWakeLock();
+        initializeSpeechRecognition(); // 음성 인식 초기화
+        setupEventListeners(); // 모든 이벤트 리스너 설정
+    });
+}
+
+// --- 앱 실행 ---
+initializeApp(patternsData);
+
+// v.2025.10.21_0851-15
