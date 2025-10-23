@@ -176,38 +176,33 @@ function renderPatterns(patterns, showIndex = false) {
 
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
 
-        // --- [FEATURE 3 (Auto Start) START: Remove Start button, ensure no comments] ---
+        // --- [FIX: Removed JS comments from HTML string] ---
         const practiceHtml = p.practice ? `
             <div class="mt-6">
                 <h3 class="text-lg font-bold text-gray-700 border-b pb-1">✍️ AI 연습 문제 (5개)</h3>
-                {/* Ensure data-spree-count is initialized to 0 */}
                 <div id="practice-container-${index}" class="mt-3 bg-sky-50 p-4 rounded-lg relative" data-spree-count="0" data-spree-goal="5">
-                    <button id="show-hint-btn-${index}" title="힌트 보기" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-3 right-3 bg-gray-300 hover:bg-gray-400 text-gray-700 p-1.5 rounded-full" style="display: none;"> {/* Initially hidden */}
+                    <button id="show-hint-btn-${index}" title="힌트 보기" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-3 right-3 bg-gray-300 hover:bg-gray-400 text-gray-700 p-1.5 rounded-full" style="display: none;">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.355a11.95 11.95 0 0 1-8.25 0m11.25 0a11.95 11.95 0 0 0-8.25 0M9 7.5a9 9 0 1 1 6 0a9 9 0 0 1-6 0Z" /></svg>
                     </button>
                     <p class="text-md text-gray-700 mb-2">다음 문장을 중국어로 입력해보세요:</p>
-                    {/* Korean text will be loaded by AI */}
                     <p id="practice-korean-${index}" class="text-md font-semibold text-sky-800 mb-3">""</p>
                     <div class="flex items-center space-x-2">
-                        <button id="practice-mic-btn-${index}" title="음성 입력" data-practice-index="${index}" class="practice-mic-btn mic-btn p-2 rounded-full text-gray-500 hover:bg-gray-200 flex-shrink-0" style="display: none;"> {/* Initially hidden */}
+                        <button id="practice-mic-btn-${index}" title="음성 입력" data-practice-index="${index}" class="practice-mic-btn mic-btn p-2 rounded-full text-gray-500 hover:bg-gray-200 flex-shrink-0" style="display: none;">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6V7.5a6 6 0 0 0-12 0v5.25a6 6 0 0 0 6 6Z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5v2.25a7.5 7.5 0 0 1-15 0v-2.25" />
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 18.75a8.25 8.25 0 0 0 10.5 0" />
                             </svg>
                         </button>
-                        <input type="text" id="practice-input-${index}" class="flex-grow p-2 border border-gray-300 rounded-md chinese-text" placeholder="중국어를 입력하세요..." disabled> {/* Initially disabled */}
-                        {/* Check button data updated by AI */}
-                        <button id="check-practice-btn-${index}" data-answer="" data-pinyin="" data-input-id="practice-input-${index}" class="check-practice-btn bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap flex-shrink-0" style="display: none;">정답 확인</button> {/* Initially hidden */}
+                        <input type="text" id="practice-input-${index}" class="flex-grow p-2 border border-gray-300 rounded-md chinese-text" placeholder="중국어를 입력하세요..." disabled>
+                        <button id="check-practice-btn-${index}" data-answer="" data-pinyin="" data-input-id="practice-input-${index}" class="check-practice-btn bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap flex-shrink-0" style="display: none;">정답 확인</button>
                     </div>
                     <div id="practice-hint-${index}" class="mt-3"></div>
                     <div id="practice-result-${index}" class="mt-3 text-center"></div>
-                    {/* Counter is updated dynamically */}
                     <div id="practice-counter-${index}" class="text-sm text-gray-500 mt-2 text-center">AI 연습문제 로딩 중...</div>
-                     {/* Removed the 'new-practice-btn' start button */}
                 </div>
             </div>` : '';
-        // --- [FEATURE 3 (Auto Start) END] ---
+        // --- [FIX END] ---
 
         card.innerHTML = `
             <div class="flex items-center justify-between mb-3">
@@ -223,15 +218,22 @@ function renderPatterns(patterns, showIndex = false) {
             <div class="mt-4"><p class="text-lg text-blue-700 font-semibold mb-2">${p.meaning}</p><p class="text-sm text-gray-500 bg-gray-100 p-2 rounded-md"><b>🤔 어떻게 사용할까요?</b> ${p.structure || '구조 정보 없음'}</p></div>
             <div class="mt-4"><h3 class="text-lg font-bold text-gray-700 border-b pb-1">💡 예문 살펴보기</h3>${examplesHtml}</div>
             <div class="mt-6"><h3 class="text-lg font-bold text-gray-700 border-b pb-1">📌 주요 단어</h3><div class="mt-3 space-y-2">${vocabHtml}</div></div>
-            ${practiceHtml}`; // This now includes the modified practice section
+            ${practiceHtml}`;
         patternContainer.appendChild(card);
 
-        // --- [FEATURE 3 (Auto Start) START: Call request after render] ---
         if (p.practice) {
             // Use setTimeout to ensure the element is fully in the DOM before access
-            setTimeout(() => handleNewPracticeRequest(p.pattern, index), 0);
+            setTimeout(() => {
+                // Initialize the practice session automatically
+                const practiceContainerDiv = document.getElementById(`practice-container-${index}`);
+                 if (practiceContainerDiv) {
+                     practiceContainerDiv.dataset.spreeCount = '0'; // Ensure count starts at 0 before first call
+                     handleNewPracticeRequest(p.pattern, index);
+                 } else {
+                     console.error(`Practice container practice-container-${index} not found immediately after render.`);
+                 }
+            }, 0);
         }
-        // --- [FEATURE 3 (Auto Start) END] ---
     });
 }
 
