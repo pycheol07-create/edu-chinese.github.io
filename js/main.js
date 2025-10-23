@@ -181,15 +181,23 @@ function renderPatterns(patterns, showIndex = false) {
                 </div>
             </div>` : '';
 
+        // --- [FEATURE 1 START: "AI와 대화" 버튼 추가] ---
         card.innerHTML = `
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center">${indexHtml}<div><h2 class="text-2xl font-bold text-gray-800 chinese-text">${p.pattern}</h2><p class="text-md text-gray-500">${p.pinyin}</p></div></div>
-                <div class="text-right"><button data-pattern="${p.pattern}" class="learn-btn bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-bold py-1 px-3 rounded-full transition-colors">학습 완료!</button><p class="text-xs text-gray-500 mt-1">학습 <span class="font-bold text-red-500 count-display">${count}</span>회</p></div>
+                <div class="text-right">
+                    <button data-pattern="${p.pattern}" class="learn-btn bg-yellow-400 hover:bg-yellow-500 text-white text-sm font-bold py-1 px-3 rounded-full transition-colors">학습 완료!</button>
+                    <p class="text-xs text-gray-500 mt-1">학습 <span class="font-bold text-red-500 count-display">${count}</span>회</p>
+                    <button data-pattern-string="${p.pattern}" class="start-chat-pattern-btn mt-2 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-bold py-1 px-3 rounded-full transition-colors w-full text-center">
+                        💬 이 패턴으로 대화
+                    </button>
+                </div>
             </div>
             <div class="mt-4"><p class="text-lg text-blue-700 font-semibold mb-2">${p.meaning}</p><p class="text-sm text-gray-500 bg-gray-100 p-2 rounded-md"><b>🤔 어떻게 사용할까요?</b> ${p.structure || '구조 정보 없음'}</p></div>
             <div class="mt-4"><h3 class="text-lg font-bold text-gray-700 border-b pb-1">💡 예문 살펴보기</h3>${examplesHtml}</div>
             <div class="mt-6"><h3 class="text-lg font-bold text-gray-700 border-b pb-1">📌 주요 단어</h3><div class="mt-3 space-y-2">${vocabHtml}</div></div>
             ${practiceHtml}`;
+        // --- [FEATURE 1 END] ---
         patternContainer.appendChild(card);
     });
 }
@@ -341,6 +349,55 @@ async function handleSendMessage() {
         document.getElementById('chat-loading')?.remove();
     }
 }
+
+// --- [FEATURE 1 START: 패턴으로 대화 시작하는 함수] ---
+async function handleStartChatWithPattern(patternString) {
+    chatModal.classList.remove('hidden'); // 모달 열기
+    chatHistory.innerHTML = ''; // 채팅 기록 UI 비우기
+    conversationHistory = []; // 채팅 기록 배열 비우기
+    chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove()); // 제안 제거
+    chatInput.value = ''; // 입력창 비우기
+
+    // 로딩 인디케이터 표시
+    const loadingElement = document.createElement('div');
+    loadingElement.className = 'flex justify-start';
+    loadingElement.id = 'chat-loading';
+    loadingElement.innerHTML = `<div class="bg-white p-3 rounded-lg border"><div class="loader"></div></div>`;
+    chatHistory.appendChild(loadingElement);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+
+    try {
+        // 새 액션 'start_chat_with_pattern' 호출
+        const result = await callGeminiAPI('start_chat_with_pattern', { pattern: patternString });
+
+        let aiResponseData;
+        if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
+            const aiResponseText = result.candidates[0].content.parts[0].text;
+            try {
+                aiResponseData = JSON.parse(aiResponseText);
+                // 이 첫 번째 메시지를 대화 기록에 추가
+                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+            } catch (e) {
+                console.error("AI response is not valid JSON:", aiResponseText);
+                aiResponseData = { chinese: aiResponseText, pinyin: "(JSON 파싱 오류)", korean: "(번역 오류)" };
+                conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+            }
+        } else {
+             console.error("Invalid response structure from start_chat_with_pattern API:", result);
+             aiResponseData = { chinese: "(유효하지 않은 응답)", pinyin: "", korean: "" };
+        }
+        // 첫 번째 AI 메시지 표시
+        addMessageToHistory('ai', aiResponseData);
+    } catch (error) {
+        console.error('Start chat with pattern error:', error);
+        showAlert(`대화 시작 중 오류가 발생했습니다: ${error.message}`);
+    } finally {
+        // 로딩 인디케이터 제거
+        document.getElementById('chat-loading')?.remove();
+    }
+}
+// --- [FEATURE 1 END] ---
+
 async function handleSuggestReply() {
     chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
     if (conversationHistory.length === 0) {
@@ -377,7 +434,14 @@ async function handleTranslation() {
     translateBtn.disabled = true;
     translationResult.innerHTML = '<div class="loader mx-auto"></div>';
     try {
-        const systemPrompt = `You are a professional Korean-to-Chinese translator and language teacher. Translate the following Korean sentence into natural, native-sounding Chinese. Provide: 1. The main Chinese translation. 2. The pinyin for the main translation. 3. (Optional) 1-2 alternative natural expressions if applicable. 4. A concise explanation (in Korean) of why this expression is natural, what the key vocabulary or grammar point is. Format your response as a single, valid JSON object with keys "chinese", "pinyin", "alternatives" (string array), and "explanation" (string, in Korean). Do not include markdown backticks.`;
+        // --- [FEATURE 2 START: 번역기 프롬프트 수정] ---
+        const patternList = allPatterns.map(p => p.pattern).join(", "); // 전체 패턴 목록 가져오기
+        const systemPrompt = `You are a professional Korean-to-Chinese translator and language teacher. Translate the following Korean sentence into natural, native-sounding Chinese. Provide: 1. The main Chinese translation. 2. The pinyin for the main translation. 3. (Optional) 1-2 alternative natural expressions if applicable. 4. A concise explanation (in Korean) of why this expression is natural, what the key vocabulary or grammar point is.
+Format your response as a single, valid JSON object with keys "chinese", "pinyin", "alternatives" (string array), "explanation" (string, in Korean), and "usedPattern" (string or null).
+Do not include markdown backticks.
+IMPORTANT: After translating, analyze your Chinese translation. If it uses one of the following patterns: [${patternList}], set the "usedPattern" key to the matching pattern string. If no pattern matches, set "usedPattern" to null.`;
+        // --- [FEATURE 2 END] ---
+
         const result = await callGeminiAPI('translate', { text, systemPrompt });
         let translationData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
@@ -386,16 +450,24 @@ async function handleTranslation() {
                 translationData = JSON.parse(translationText);
             } catch (e) {
                 console.error("AI translation response is not valid JSON:", translationText);
-                translationData = { chinese: translationText, pinyin: "(JSON 파싱 오류)", alternatives: [], explanation: "(설명 파싱 오류)" };
+                translationData = { chinese: translationText, pinyin: "(JSON 파싱 오류)", alternatives: [], explanation: "(설명 파싱 오류)", usedPattern: null }; // usedPattern 기본값 추가
             }
         } else {
              console.error("Invalid response structure from translate API:", result);
-             translationData = { chinese: "(유효하지 않은 응답)", pinyin: "", alternatives: [], explanation: "" };
+             translationData = { chinese: "(유효하지 않은 응답)", pinyin: "", alternatives: [], explanation: "", usedPattern: null }; // usedPattern 기본값 추가
         }
         let alternativesHtml = '';
         if (translationData.alternatives && Array.isArray(translationData.alternatives) && translationData.alternatives.length > 0) {
             alternativesHtml = `<p class="text-sm text-gray-500 mt-3">다른 표현:</p><ul class="list-disc list-inside text-sm text-gray-600 chinese-text">${translationData.alternatives.map(alt => `<li>${alt}</li>`).join('')}</ul>`;
         }
+
+        // --- [FEATURE 2 START: 사용된 패턴 표시 로직] ---
+        let patternHtml = '';
+        if (translationData.usedPattern) {
+            patternHtml = `<div class="mt-4 pt-3 border-t"><h4 class="text-sm font-semibold text-green-700">💡 학습 패턴 발견!</h4><p class="text-sm text-gray-600 mt-1">이 문장은 <strong>'${translationData.usedPattern}'</strong> 패턴을 사용했어요!</p></div>`;
+        }
+        // --- [FEATURE 2 END] ---
+
         let explanationHtml = '';
         if (translationData.explanation) {
             explanationHtml = `<div class="mt-4 pt-3 border-t"><h4 class="text-sm font-semibold text-gray-700">💡 표현 꿀팁:</h4><p class="text-sm text-gray-600 mt-1">${translationData.explanation.replace(/\n/g, '<br>')}</p></div>`;
@@ -409,6 +481,7 @@ async function handleTranslation() {
             </div>
             <p class="text-md text-gray-500">${translationData.pinyin || '(병음 정보 없음)'}</p>
             ${alternativesHtml}
+            ${patternHtml} 
             ${explanationHtml}`;
     } catch (error) {
         console.error('Translation error:', error);
@@ -486,6 +559,16 @@ function setupEventListeners() {
             learningCounts[pattern] = (learningCounts[pattern] || 0) + 1;
             saveCounts();
             target.nextElementSibling.querySelector('.count-display').textContent = learningCounts[pattern];
+        
+        // --- [FEATURE 1 START: 새 버튼 이벤트 핸들러 추가] ---
+        } else if (target.closest('.start-chat-pattern-btn')) { // "이 패턴으로 대화"
+            const button = target.closest('.start-chat-pattern-btn');
+            const patternString = button.dataset.patternString;
+            if (patternString) {
+                handleStartChatWithPattern(patternString);
+            }
+        // --- [FEATURE 1 END] ---
+
         } else if (target.classList.contains('check-practice-btn')) { // 정답 확인
             const button = target;
             const inputId = button.dataset.inputId;

@@ -9,14 +9,16 @@ export default async function handler(request, response) {
   }
 
   // 2. 프런트엔드에서 보낸 요청 데이터를 받습니다.
-  const { action, text, systemPrompt, history } = request.body;
+  // --- [FEATURE 1 START: 'pattern' 변수 추가] ---
+  const { action, text, systemPrompt, history, pattern } = request.body;
+  // --- [FEATURE 1 END] ---
 
   try {
     let apiUrl;
     let apiRequestBody;
     let modelShortName = 'gemini-1.0-pro'; // 기본 모델 설정
 
-    // TTS가 아닌 경우 (번역, 채팅, 답변 추천) 모델 동적 선택 필요
+    // TTS가 아닌 경우 (번역, 채팅, 답변 추천, 패턴 채팅 시작) 모델 동적 선택 필요
     if (action !== 'tts') {
         const listModelsRes = await fetch(
             `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`
@@ -81,9 +83,26 @@ export default async function handler(request, response) {
             { role: "user", parts: [{ text: text }] }
         ];
         apiRequestBody = { contents };
-    }
+    
+    // --- [FEATURE 1 START: 'start_chat_with_pattern' 액션 추가] ---
+    } else if (action === 'start_chat_with_pattern') {
+        const startChatSystemPrompt = `You are "Ling" (灵), a friendly native Chinese speaker and language tutor. Your goal is to help a user learning Chinese.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\` for this first message.
+- Your *very first message* must be a natural, conversational question that cleverly uses or relates to the Chinese pattern: "${pattern}".
+- Ask a question to encourage the user to reply, perhaps using the same pattern.
+- Example for pattern "A是A, 但是B": {"chinese": "今天天气好是好, 但是有点儿热。你觉得呢？", "pinyin": "Jīntiān tiānqì hǎo shì hǎo, dànshì yǒudiǎnr rè. Nǐ juéde ne?", "korean": "오늘 날씨가 좋긴 좋은데, 조금 덥네요. 당신은 어때요?", "correction": null}`;
+
+        const contents = [
+            { role: "user", parts: [{ text: startChatSystemPrompt }] },
+            { role: "model", parts: [{ text: `Okay, I will start the conversation by asking a natural question using the pattern "${pattern}" and respond in the required JSON format with "correction" set to null.` }] }
+        ];
+        apiRequestBody = { contents };
+    // --- [FEATURE 1 END] ---
+    
     // --- [FEATURE UPDATE START: Suggest Reply with Pinyin & Korean] ---
-    else if (action === 'suggest_reply') {
+    } else if (action === 'suggest_reply') {
         // [수정] 시스템 프롬프트: korean 필드 추가 요청
         const suggestSystemPrompt = `Based on the previous conversation history, suggest 1 or 2 simple and natural next replies in Chinese for the user who is learning Chinese. The user just received the last message from the AI model.
 - Provide only the suggested replies with their pinyin and Korean meaning.
@@ -131,7 +150,7 @@ export default async function handler(request, response) {
         return response.status(200).json(data);
     }
 
-    // 번역, 채팅, 답변 추천 응답 처리 (v1 응답 구조 확인)
+    // 번역, 채팅, 답변 추천, 패턴 채팅 시작 응답 처리 (v1 응답 구조 확인)
     if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
         console.error("Invalid response structure from Google API:", data);
         // ... (이전 오류 처리 로직 동일) ...
@@ -191,7 +210,7 @@ export default async function handler(request, response) {
     }
     // --- [BUG FIX & FEATURE UPDATE END] ---
 
-    // 번역 및 채팅은 data 전체를 반환 (프론트엔드에서 파싱)
+    // 번역, 채팅, 패턴 채팅 시작은 data 전체를 반환 (프론트엔드에서 파싱)
     return response.status(200).json(data);
 
   } catch (error) {
