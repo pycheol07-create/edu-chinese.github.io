@@ -63,15 +63,7 @@ export default async function handler(request, response) {
 - "pinyin": The pinyin for your Chinese response.
 - "korean": A natural Korean translation of your Chinese response.`;
 
-    else if (action === 'correction') {
-        const prompt = `Please correct the following Chinese sentence and explain why it is incorrect. 
-    Respond ONLY in JSON with keys: "corrected", "pinyin", "explanation" (Korean).
-    Example: {"corrected":"我昨天去了公园玩。","pinyin":"Wǒ zuótiān qùle gōngyuán wán.","explanation":"‘了’의 위치가 잘못되었음"}`;
-        apiRequestBody = {
-            contents: [{ parts: [{ text: `${prompt}\n\nSentence: "${text}"` }] }]
-        };
-    }
-
+        // [오류 수정] 'correction' 블록을 'chat' 블록 밖으로 이동시켰습니다.
         const contents = [
             { role: "user", parts: [{ text: "Please follow these instructions for all future responses: " + chatSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I understand. I will act as Ling and respond in the required JSON format." }] },
@@ -79,6 +71,15 @@ export default async function handler(request, response) {
             { role: "user", parts: [{ text: text }] }
         ];
         apiRequestBody = { contents };
+    }
+    // [오류 수정] 'correction' 블록이 'chat' 블록 밖의 올바른 위치로 이동했습니다.
+    else if (action === 'correction') {
+        const prompt = `Please correct the following Chinese sentence and explain why it is incorrect. 
+    Respond ONLY in JSON with keys: "corrected", "pinyin", "explanation" (Korean).
+    Example: {"corrected":"我昨天去了公园玩。","pinyin":"Wǒ zuótiān qùle gōngyuán wán.","explanation":"‘了’의 위치가 잘못되었음"}`;
+        apiRequestBody = {
+            contents: [{ parts: [{ text: `${prompt}\n\nSentence: "${text}"` }] }]
+        };
     }
     // --- [FEATURE UPDATE START: Suggest Reply with Pinyin & Korean] ---
     else if (action === 'suggest_reply') {

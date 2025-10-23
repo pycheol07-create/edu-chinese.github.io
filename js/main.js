@@ -1,4 +1,4 @@
-import { allPatterns as patternsData } from '../data/patterns.js';
+import { allPatterns as patternsData } from './patterns.js';
 
 let allPatterns = [];
 let learningCounts = {};
@@ -565,7 +565,7 @@ function setupEventListeners() {
     chatBtn.addEventListener('click', () => {
         chatModal.classList.remove('hidden');
         if (conversationHistory.length === 0) {
-            const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };
+            const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };
             addMessageToHistory('ai', firstMsg);
             conversationHistory.push({ role: 'model', parts: [{ text: JSON.stringify(firstMsg) }] });
         }
