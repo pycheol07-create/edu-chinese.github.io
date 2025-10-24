@@ -69,7 +69,11 @@
         /* FAB가 열렸을 때 서브 버튼별 애니메이션 지연 (아래서부터 순서대로) */
         #fab-container.is-open #open-translator-btn { transition-delay: 0.0s; }
         #fab-container.is-open #open-correction-btn { transition-delay: 0.1s; }
-        #fab-container.is-open #open-chat-btn { transition-delay: 0.2s; }
+        /* [수정] 새 버튼 딜레이 추가 */
+        #fab-container.is-open #open-word-btn { transition-delay: 0.2s; }
+        #fab-container.is-open #open-char-btn { transition-delay: 0.3s; }
+        #fab-container.is-open #open-chat-btn { transition-delay: 0.4s; }
+
 
         /* FAB가 열렸을 때 메인 버튼 아이콘 회전 */
         #fab-main-btn svg {
@@ -83,6 +87,37 @@
         .min-w-0 {
             min-width: 0;
         }
+
+        /* [추가] 플래시카드 스타일 */
+        .flashcard {
+            perspective: 1000px;
+            cursor: pointer;
+        }
+        .flashcard-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .flashcard.is-flipped .flashcard-inner {
+            transform: rotateY(180deg);
+        }
+        .flashcard-front, .flashcard-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+        .flashcard-back {
+            transform: rotateY(180deg);
+        }
+
     </style>
 </head>
 <body class="bg-gray-100">
@@ -119,6 +154,18 @@
             <button id="open-chat-btn" title="AI와 대화하기" class="fab-sub-button bg-purple-600 hover:bg-purple-700 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-3.04 8.3-7.146 9.574a18.79 18.79 0 0 1-8.708 0C3.04 20.3 0 16.556 0 12c0-4.556 3.04-8.3 7.146-9.574a18.79 18.79 0 0 1 8.708 0C17.96 3.7 21 7.444 21 12Z" />
+                </svg>
+            </button>
+            
+            <button id="open-char-btn" title="간체자 학습" class="fab-sub-button bg-red-500 hover:bg-red-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 0 1-3.827-5.802" />
+                </svg>
+            </button>
+            
+            <button id="open-word-btn" title="단어장" class="fab-sub-button bg-cyan-500 hover:bg-cyan-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
                 </svg>
             </button>
 
@@ -292,6 +339,77 @@
             </div>
         </div>
     </div>
+    
+    <div id="word-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 relative flex flex-col" style="min-height: 350px;">
+            <div class="flex-shrink-0 flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">단어 학습 📖</h2>
+                <button id="close-word-btn" class="p-1 rounded-full hover:bg-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="flex-grow flex flex-col justify-center items-center">
+                <div id="word-flashcard" class="flashcard w-full bg-cyan-50 border border-cyan-200 rounded-lg" style="height: 150px;">
+                    <div class="flashcard-inner">
+                        <div id="word-flashcard-front" class="flashcard-front">
+                            <p class="text-4xl font-bold chinese-text text-cyan-800">단어</p>
+                        </div>
+                        <div id="word-flashcard-back" class="flashcard-back bg-cyan-50">
+                            <p id="word-pinyin" class="text-xl text-gray-600">pinyin</p>
+                            <p id="word-meaning" class="text-2xl font-semibold text-cyan-700 mt-2">뜻</p>
+                        </div>
+                    </div>
+                </div>
+                <button id="word-tts-btn" class="tts-btn mt-4 p-2 rounded-full hover:bg-gray-200 transition-colors" data-text="">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                </button>
+            </div>
+
+            <div class="flex-shrink-0 mt-6 flex space-x-2">
+                <button id="show-word-answer-btn" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg">정답 보기</button>
+                <button id="next-word-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg">다음 단어 →</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="char-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 relative flex flex-col" style="min-height: 400px;">
+            <div class="flex-shrink-0 flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">간체자 학습 字</h2>
+                <button id="close-char-btn" class="p-1 rounded-full hover:bg-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div id="character-info" class="flex-grow flex flex-col justify-center items-center p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div class="text-center">
+                    <p class="text-6xl font-bold chinese-text text-red-700">字</p>
+                    <p class="text-2xl text-gray-600 mt-2">pinyin</p>
+                    <p class="text-2xl font-semibold text-red-600 mt-2">뜻</p>
+                </div>
+                <div class="mt-6 w-full">
+                    <h4 class="text-sm font-semibold text-gray-700 border-b pb-1">예시 단어:</h4>
+                    <div class="space-y-2 mt-2">
+                        <p class="text-gray-500">예시 단어 로딩 중...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="char-tts-btn" class="tts-btn mt-4 p-2 rounded-full hover:bg-gray-200 transition-colors self-center" data-text="">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+            </button>
+
+            <div class="flex-shrink-0 mt-6">
+                <button id="next-char-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg">다음 글자 →</button>
+            </div>
+        </div>
+    </div>
+
 
     <script type="module" src="./js/main.js"></script> 
 </body>

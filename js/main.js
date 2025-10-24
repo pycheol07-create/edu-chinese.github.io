@@ -1,6 +1,9 @@
 import { allPatterns as patternsData } from '../data/patterns.js';
 
 let allPatterns = [];
+let allWords = []; // [추가] 통합 단어장 배열
+let allCharacters = []; // [추가] 통합 글자 배열
+
 let learningCounts = {};
 const audioCache = {};
 let currentAudio = null;
@@ -20,7 +23,15 @@ let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translato
     correctWritingBtn, correctionResult, getTopicBtn, writingTopicDisplay,
     correctionHistoryModal, openCorrectionHistoryBtn, closeCorrectionHistoryBtn,
     correctionHistoryList, clearCorrectionHistoryBtn,
-    fabContainer, fabMainBtn;
+    fabContainer, fabMainBtn,
+    // [추가] 단어 학습 모달 DOM
+    openWordBtn, wordModal, closeWordBtn, wordFlashcard,
+    wordFlashcardFront, wordFlashcardBack, wordPinyin, wordMeaning,
+    wordTtsBtn, showWordAnswerBtn, nextWordBtn,
+    // [추가] 간체자 학습 모달 DOM
+    openCharBtn, charModal, closeCharBtn, characterInfo,
+    charTtsBtn, nextCharBtn;
+
 
 // 음성 인식 관련
 let recognition = null;
@@ -82,6 +93,27 @@ function initializeDOM() {
 
     fabContainer = document.getElementById('fab-container');
     fabMainBtn = document.getElementById('fab-main-btn');
+
+    // [추가] 단어 학습 모달 DOM 초기화
+    openWordBtn = document.getElementById('open-word-btn');
+    wordModal = document.getElementById('word-modal');
+    closeWordBtn = document.getElementById('close-word-btn');
+    wordFlashcard = document.getElementById('word-flashcard');
+    wordFlashcardFront = document.getElementById('word-flashcard-front');
+    wordFlashcardBack = document.getElementById('word-flashcard-back');
+    wordPinyin = document.getElementById('word-pinyin');
+    wordMeaning = document.getElementById('word-meaning');
+    wordTtsBtn = document.getElementById('word-tts-btn');
+    showWordAnswerBtn = document.getElementById('show-word-answer-btn');
+    nextWordBtn = document.getElementById('next-word-btn');
+
+    // [추가] 간체자 학습 모달 DOM 초기화
+    openCharBtn = document.getElementById('open-char-btn');
+    charModal = document.getElementById('char-modal');
+    closeCharBtn = document.getElementById('close-char-btn');
+    characterInfo = document.getElementById('character-info');
+    charTtsBtn = document.getElementById('char-tts-btn');
+    nextCharBtn = document.getElementById('next-char-btn');
 }
 
 // --- 커스텀 알림 함수 ---
@@ -199,6 +231,45 @@ function renderCorrectionHistory() {
         `;
         correctionHistoryList.appendChild(itemEl);
     });
+}
+
+// --- [추가] 단어장 및 글자 목록 초기화 ---
+function initializeWordList() {
+    const wordSet = new Map();
+    allPatterns.forEach(pattern => {
+        // '주요 단어' 추가
+        if (pattern.vocab && Array.isArray(pattern.vocab)) {
+            pattern.vocab.forEach(v => {
+                if (v.word && v.pinyin && v.meaning && !wordSet.has(v.word)) {
+                    wordSet.set(v.word, { word: v.word, pinyin: v.pinyin, meaning: v.meaning });
+                }
+            });
+        }
+        // '연습 문제 힌트 단어' 추가
+        if (pattern.practiceVocab && Array.isArray(pattern.practiceVocab)) {
+            pattern.practiceVocab.forEach(v => {
+                if (v.word && v.pinyin && v.meaning && !wordSet.has(v.word)) {
+                    wordSet.set(v.word, { word: v.word, pinyin: v.pinyin, meaning: v.meaning });
+                }
+            });
+        }
+    });
+    allWords = Array.from(wordSet.values());
+    console.log(`Initialized ${allWords.length} unique words.`);
+}
+
+function initializeCharacterList() {
+    const charSet = new Set();
+    const chineseCharRegex = /[\u4e00-\u9fa5]/g; // 중국어 한자 범위
+    
+    allWords.forEach(wordObj => {
+        const chars = wordObj.word.match(chineseCharRegex);
+        if (chars) {
+            chars.forEach(char => charSet.add(char));
+        }
+    });
+    allCharacters = Array.from(charSet);
+    console.log(`Initialized ${allCharacters.length} unique characters.`);
 }
 
 
@@ -827,6 +898,104 @@ async function handleGetWritingTopic() {
     }
 }
 
+// --- [추가] 단어 학습 기능 ---
+function showNextWord() {
+    if (allWords.length === 0) {
+        showAlert('학습할 단어가 없습니다. 패턴을 먼저 확인해주세요.');
+        return;
+    }
+
+    // 카드 뒷면으로 뒤집기 (초기화)
+    wordFlashcard.classList.remove('is-flipped');
+    
+    // 랜덤 단어 선택
+    const randomIndex = Math.floor(Math.random() * allWords.length);
+    const word = allWords[randomIndex];
+
+    // 카드 앞면에 단어 표시
+    wordFlashcardFront.innerHTML = `<p class="text-4xl font-bold chinese-text text-cyan-800">${word.word}</p>`;
+    
+    // 카드 뒷면에 병음/뜻 표시
+    wordPinyin.textContent = word.pinyin;
+    wordMeaning.textContent = word.meaning;
+
+    // TTS 버튼에 텍스트 설정
+    wordTtsBtn.dataset.text = word.word;
+}
+
+// --- [추가] 간체자 학습 기능 ---
+async function showNextCharacter() {
+    if (allCharacters.length === 0) {
+        showAlert('학습할 글자가 없습니다. 패턴을 먼저 확인해주세요.');
+        return;
+    }
+
+    // 로딩 상태 표시
+    characterInfo.innerHTML = '<div class="loader mx-auto"></div>';
+    charTtsBtn.dataset.text = '';
+
+    // 랜덤 글자 선택
+    const randomIndex = Math.floor(Math.random() * allCharacters.length);
+    const char = allCharacters[randomIndex];
+
+    try {
+        const result = await callGeminiAPI('get_character_info', { text: char });
+        
+        let charData;
+        if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
+            const charText = result.candidates[0].content.parts[0].text.trim().replace(/^```json\s*|\s*```$/g, '');
+            if (!charText || !charText.startsWith('{')) {
+                throw new Error("AI가 유효한 JSON 형식으로 응답하지 않았습니다.");
+            }
+            try {
+                charData = JSON.parse(charText);
+            } catch (e) {
+                console.error("AI char response is not valid JSON:", charText, e);
+                throw new Error("AI 응답을 처리하는 중 오류가 발생했습니다.");
+            }
+        } else {
+            console.error("Invalid response structure from get_character_info API:", result);
+            throw new Error("AI로부터 유효한 응답을 받지 못했습니다.");
+        }
+
+        // 결과 표시
+        const examplesHtml = charData.examples.map(ex => `
+            <div class="p-2 bg-white rounded-md shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-lg chinese-text font-semibold text-gray-800">${ex.word}</p>
+                        <p class="text-sm text-gray-500">${ex.pinyin}</p>
+                    </div>
+                    <button class="tts-btn p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${ex.word}">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-600 mt-1 pt-1 border-t">${ex.meaning}</p>
+            </div>
+        `).join('');
+
+        characterInfo.innerHTML = `
+            <div class="text-center">
+                <p class="text-6xl font-bold chinese-text text-red-700">${charData.char}</p>
+                <p class="text-2xl text-gray-600 mt-2">${charData.pinyin}</p>
+                <p class="text-2xl font-semibold text-red-600 mt-2">${charData.meaning}</p>
+            </div>
+            <div class="mt-6 w-full">
+                <h4 class="text-sm font-semibold text-gray-700 border-b pb-1">예시 단어:</h4>
+                <div class="space-y-2 mt-2">
+                    ${examplesHtml}
+                </div>
+            </div>`;
+        
+        // 메인 TTS 버튼에 글자 설정
+        charTtsBtn.dataset.text = charData.char;
+
+    } catch (error) {
+        console.error('Get character info error:', error);
+        characterInfo.innerHTML = `<p class="text-red-500 text-center">글자 정보를 불러오는 중 오류가 발생했습니다: ${error.message}</p>`;
+    }
+}
+
 
 // --- 음성 인식 초기화 ---
 function initializeSpeechRecognition() {
@@ -1328,6 +1497,58 @@ function setupEventListeners() {
             }
         }
     });
+
+    // --- [추가] 단어 학습 모달 이벤트 ---
+    openWordBtn.addEventListener('click', () => {
+        wordModal.classList.remove('hidden');
+        if (fabContainer) fabContainer.classList.remove('is-open');
+        showNextWord(); // 모달 열 때 첫 단어 표시
+    });
+    closeWordBtn.addEventListener('click', () => {
+        wordModal.classList.add('hidden');
+        if (currentAudio) currentAudio.pause();
+    });
+    // 플래시카드 클릭 시 뒤집기
+    wordFlashcard.addEventListener('click', () => {
+        wordFlashcard.classList.toggle('is-flipped');
+    });
+    // '정답 보기' 버튼 클릭 시 뒤집기
+    showWordAnswerBtn.addEventListener('click', () => {
+        wordFlashcard.classList.add('is-flipped');
+    });
+    // '다음 단어' 버튼 클릭
+    nextWordBtn.addEventListener('click', showNextWord);
+    // 단어 TTS 버튼
+    wordTtsBtn.addEventListener('click', (e) => {
+        const textToSpeak = e.currentTarget.dataset.text;
+        if (textToSpeak) playTTS(textToSpeak, e.currentTarget);
+    });
+
+    // --- [추가] 간체자 학습 모달 이벤트 ---
+    openCharBtn.addEventListener('click', () => {
+        charModal.classList.remove('hidden');
+        if (fabContainer) fabContainer.classList.remove('is-open');
+        showNextCharacter(); // 모달 열 때 첫 글자 표시
+    });
+    closeCharBtn.addEventListener('click', () => {
+        charModal.classList.add('hidden');
+        if (currentAudio) currentAudio.pause();
+    });
+    // '다음 글자' 버튼 클릭
+    nextCharBtn.addEventListener('click', showNextCharacter);
+    // 글자 메인 TTS 버튼
+    charTtsBtn.addEventListener('click', (e) => {
+        const textToSpeak = e.currentTarget.dataset.text;
+        if (textToSpeak) playTTS(textToSpeak, e.currentTarget);
+    });
+    // 글자 모달 내 예시 단어 TTS 버튼 (이벤트 위임)
+    characterInfo.addEventListener('click', (e) => {
+        const ttsButton = e.target.closest('.tts-btn');
+        if (ttsButton) {
+            const textToSpeak = ttsButton.dataset.text;
+            if (textToSpeak) playTTS(textToSpeak, ttsButton);
+        }
+    });
 }
 
 // --- 음성 인식 시작 헬퍼 함수 ---
@@ -1378,6 +1599,8 @@ export function initializeApp(patterns) {
         displayDate();
         initializeCounts();
         initializeCorrectionHistory();
+        initializeWordList(); // [추가] 단어 리스트 생성
+        initializeCharacterList(); // [추가] 글자 리스트 생성
         loadDailyPatterns();
         renderAllPatternsList();
         setupScreenWakeLock();
@@ -1389,4 +1612,4 @@ export function initializeApp(patterns) {
 // --- 앱 실행 ---
 initializeApp(patternsData);
 
-// v.2025.10.24_0915
+// v.2025.10.24_1055

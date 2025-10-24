@@ -16,7 +16,7 @@ export default async function handler(request, response) {
     let apiRequestBody;
     let modelShortName = 'gemini-1.0-pro'; // 기본 모델 설정
 
-    // TTS가 아닌 경우 (번역, 채팅, 답변 추천, 패턴 채팅 시작, 문제 생성) 모델 동적 선택 필요
+    // TTS가 아닌 경우 (번역, 채팅, 답변 추천, 패턴 채팅 시작, 문제 생성 등) 모델 동적 선택 필요
     if (action !== 'tts') {
         const listModelsRes = await fetch(
             `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}` // 오타 수정: language
@@ -142,6 +142,40 @@ export default async function handler(request, response) {
         apiRequestBody = { contents };
     // --- [추가 완료] ---
         
+    // --- [새 기능 추가]: `get_writing_topic` 액션 (main.js에서 호출됨) ---
+    } else if (action === 'get_writing_topic') {
+        const topicSystemPrompt = `You are a helpful assistant for a Chinese language learner.
+- Generate one simple and interesting writing topic in Korean for a user to practice Chinese writing.
+- The topic should be a short question or a simple situation (e.g., "어제 저녁에 무엇을 먹었나요?", "가장 좋아하는 계절은 무엇인가요?").
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have this exact key: "topic" (string, the Korean topic).
+- Example: {"topic": "주말에 보통 무엇을 하나요?"}`;
+        
+        const contents = [
+            { role: "user", parts: [{ text: topicSystemPrompt }] },
+            { role: "model", parts: [{ text: "Okay, I understand. I will provide a simple writing topic in Korean, formatted as the requested JSON." }] },
+            { role: "user", parts: [{ text: "Please generate a topic now." }] }
+        ];
+        apiRequestBody = { contents };
+    // --- [추가 완료] ---
+
+    // --- [새 기능 추가]: `get_character_info` 액션 ---
+    } else if (action === 'get_character_info') {
+        const characterSystemPrompt = `You are a Chinese lexicographer. Your task is to provide detailed information for a single Chinese character.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "char" (string, the character itself), "pinyin" (string, the pinyin with tone marks), "meaning" (string, the primary Korean meaning), and "examples" (array of objects).
+- The "examples" array should contain 1-2 objects, each with keys: "word" (Chinese word), "pinyin" (word pinyin), "meaning" (Korean meaning).
+- Example response for "好": {"char": "好", "pinyin": "hǎo", "meaning": "좋다, 안녕하다", "examples": [{"word": "你好", "pinyin": "nǐ hǎo", "meaning": "안녕하세요"}, {"word": "好看", "pinyin": "hǎokàn", "meaning": "예쁘다"}]}
+- Example response for "学": {"char": "学", "pinyin": "xué", "meaning": "배우다, 공부하다", "examples": [{"word": "学生", "pinyin": "xuéshēng", "meaning": "학생"}, {"word": "学习", "pinyin": "xuéxí", "meaning": "공부하다"}]}`;
+        
+        const contents = [
+            { role: "user", parts: [{ text: characterSystemPrompt }] },
+            { role: "model", parts: [{ text: "Okay, I understand. I will provide information for the requested character in the specified JSON format." }] },
+            { role: "user", parts: [{ text: `Please provide information for the character: "${text}"` }] }
+        ];
+        apiRequestBody = { contents };
+    // --- [추가 완료] ---
+
     } else if (action === 'suggest_reply') {
         const suggestSystemPrompt = `Based on the previous conversation history, suggest 1 or 2 simple and natural next replies in Chinese for the user who is learning Chinese. The user just received the last message from the AI model.
 - Provide only the suggested replies with their pinyin and Korean meaning.
@@ -240,7 +274,7 @@ export default async function handler(request, response) {
         }
     }
 
-    // 번역, 채팅, 패턴 채팅 시작, 문제 생성, 작문 교정은 data 전체를 반환 (프론트엔드에서 파싱)
+    // 번역, 채팅, 패턴 채팅 시작, 문제 생성, 작문 교정 등은 data 전체를 반환 (프론트엔드에서 파싱)
     return response.status(200).json(data);
 
   } catch (error) {
