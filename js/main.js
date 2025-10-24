@@ -260,7 +260,6 @@ function renderPatterns(patterns, showIndex = false) {
                     </button>
                     <p class="text-md text-gray-700 mb-2">다음 문장을 중국어로 입력해보세요:</p>
                     <p id="practice-korean-${index}" class="text-md font-semibold text-sky-800 mb-3">""</p>
-                    {/* 입력창과 마이크 버튼 */}
                     <div class="flex items-center space-x-2 min-w-0">
                         <button id="practice-mic-btn-${index}" title="음성 입력" data-practice-index="${index}" class="practice-mic-btn mic-btn p-2 rounded-full text-gray-500 hover:bg-gray-200 flex-shrink-0" style="display: none;">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
@@ -271,12 +270,11 @@ function renderPatterns(patterns, showIndex = false) {
                         </button>
                         <input type="text" id="practice-input-${index}" class="flex-1 p-2 border border-gray-300 rounded-md chinese-text min-w-0" placeholder="중국어를 입력하세요..." disabled>
                     </div>
-                    {/* [수정] 정답 버튼(가운데 정렬)과 카운터(오른쪽 정렬)를 담는 div */}
                     <div class="mt-3 flex justify-between items-center">
-                        <div class="flex-1 text-center"> {/* 버튼을 감싸서 가운데 정렬 */}
+                        <div class="flex-1 text-center">
                             <button id="check-practice-btn-${index}" data-answer="" data-pinyin="" data-input-id="practice-input-${index}" class="check-practice-btn bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap inline-block" style="display: none;">정답 확인</button>
                         </div>
-                        <div id="practice-counter-${index}" class="text-sm text-gray-500 flex-shrink-0 ml-2">AI 연습문제 로딩 중...</div> {/* 카운터는 오른쪽에 */}
+                        <div id="practice-counter-${index}" class="text-sm text-gray-500 flex-shrink-0 ml-2">AI 연습문제 로딩 중...</div>
                     </div>
                     <div id="practice-hint-${index}" class="mt-3"></div>
                     <div id="practice-result-${index}" class="mt-3 text-center"></div>
