@@ -32,7 +32,7 @@ export function displayDate() {
  * @param {Array} patterns - 표시할 패턴 객체 배열
  * @param {boolean} [showIndex=false] - 전체 목록 보기에서처럼 인덱스를 표시할지 여부
  */
-export function renderPatterns(patterns) {
+export function renderPatterns(patterns, showIndex = false) { // <--- 여기를 수정했습니다!
     if (!dom.patternContainer) return;
 
     dom.patternContainer.innerHTML = '';
@@ -60,6 +60,7 @@ export function renderPatterns(patterns) {
                 <p class="w-1/3 text-sm text-gray-600">${v.meaning}</p>
             </div>`).join('');
 
+        // 이제 'showIndex'가 정의되었으므로 이 줄은 오류가 발생하지 않습니다.
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
 
         const practiceHtml = p.practice ? `
@@ -110,19 +111,7 @@ export function renderPatterns(patterns) {
             ${practiceHtml}`;
         
         dom.patternContainer.appendChild(card);
-
-        // 비동기적으로 연습문제 핸들러를 호출 (이 부분은 handlers.js로 이동)
-        if (p.practice) {
-            // main.js의 setupEventListeners에서 이 카드가 렌더링 된 후,
-            // 'practice' 핸들러를 호출하도록 이벤트를 위임하거나
-            // 여기서 직접 handlers.js의 함수를 호출해야 합니다.
-            // 지금은 렌더링만 담당하므로, main.js가 이 함수 호출 후
-            // 후속 조치를 하도록 합니다. (예: handleNewPracticeRequest 호출)
-        }
     });
-    
-    // 렌더링 후 TTS 버튼에 이벤트 리스너를 다시 연결해야 함
-    // 이 작업은 main.js의 setupEventListeners에서 이벤트 위임으로 처리
 }
 
 /**
