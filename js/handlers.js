@@ -26,17 +26,27 @@ export async function handleTranslation() {
         let translationData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const translationText = result.candidates[0].content.parts[0].text;
+            
+            // [★ 오류 1 수정] AI가 JSON이 아닌 일반 텍스트로 응답할 경우를 대비한 try...catch
             try {
                 const cleanedText = translationText.trim().replace(/^```json\s*|\s*```$/g, '');
                 translationData = JSON.parse(cleanedText);
             } catch (e) {
                 console.error("AI translation response is not valid JSON:", translationText, e);
-                translationData = { chinese: translationText, pinyin: "(JSON 파싱 오류)", alternatives: [], explanation: "(설명 파싱 오류)", usedPattern: null };
+                // JSON 파싱에 실패하면, 받은 텍스트를 'chinese' 키에 넣고 나머지는 기본값으로 처리
+                translationData = { 
+                    chinese: translationText, 
+                    pinyin: "(AI가 JSON 형식으로 응답하지 않았습니다)", 
+                    alternatives: [], 
+                    explanation: "AI가 요청한 JSON 형식이 아닌 일반 텍스트로 응답했습니다. 아마도 중국어 이외의 언어를 요청하셨을 수 있습니다.", 
+                    usedPattern: null 
+                };
             }
         } else {
              console.error("Invalid response structure from translate API:", result);
              translationData = { chinese: "(유효하지 않은 응답)", pinyin: "", alternatives: [], explanation: "", usedPattern: null };
         }
+        // [★ 수정 끝]
 
         let alternativesHtml = '';
         if (translationData.alternatives && Array.isArray(translationData.alternatives) && translationData.alternatives.length > 0) {
@@ -94,8 +104,14 @@ export async function handleSendMessage() {
         const roleContext = state.conversationHistory.find(m => m.role === 'system')?.context || null;
         
         state.conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
+
+        // [★ 오류 2 수정] 'system' role을 API로 보내면 오류가 발생하므로, user/model 메시지만 필터링합니다.
+        const filteredHistory = state.conversationHistory.filter(
+            m => m.role === 'user' || m.role === 'model'
+        );
         
-        const result = await api.getChatResponse(userInput, state.conversationHistory, roleContext);
+        // [★ 수정] 필터링된 기록과 roleContext를 전달
+        const result = await api.getChatResponse(userInput, filteredHistory, roleContext);
 
         let aiResponseData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
@@ -237,10 +253,9 @@ export async function handleStartRoleplay(context) {
         let aiResponseData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const aiResponseText = result.candidates[0].content.parts[0].text;
-            // [★ 오류 2 수정] AI가 JSON이 아닌 일반 텍스트로 응답할 경우를 대비
             if (!aiResponseText || !aiResponseText.trim().startsWith('{')) {
                 console.error("AI response is not valid JSON:", aiResponseText);
-                throw new Error("AI response is not valid JSON."); // 이 오류가 잡힙니다.
+                throw new Error("AI response is not valid JSON.");
             }
             
             try {
@@ -361,9 +376,6 @@ export async function handleSuggestReply() {
                  console.error("Failed to parse suggestion JSON:", suggestionText, e);
              }
         } else {
-            // 이 지점으로 오면 서버 500 오류가 발생했거나,
-            // 200 OK를 받았지만 'suggestions' 키가 없는 경우입니다.
-            // (사용자가 보고한 오류는 500 오류였으므로, 이 'else'는 아니었을 것입니다.)
             console.error("Invalid response structure for suggestions:", result);
         }
 
@@ -376,7 +388,6 @@ export async function handleSuggestReply() {
         
     } catch (error) {
         console.error('Suggest reply error:', error);
-        // [★] 사용자가 본 오류가 여기서 표시됩니다.
         ui.showAlert(`답변 추천 중 오류 발생: ${error.message}`);
     } finally {
         dom.suggestReplyBtn.disabled = false;
@@ -437,7 +448,7 @@ export async function handleNewPracticeRequest(patternString, practiceIndex) {
                     throw new Error("AI가 연습문제 형식을 올바르게 반환하지 못했습니다.");
                 }
 
-                koreanEl.textContent = `"${practiceData.korean}"`;
+                koreanEl.textContent = `"${practiceData.korean}"`; // "undefined" 오류 수정
                 checkBtn.dataset.answer = practiceData.chinese;
                 checkBtn.dataset.pinyin = practiceData.pinyin;
                 hintBtn.dataset.newVocab = JSON.stringify(practiceData.practiceVocab || []);
@@ -454,15 +465,14 @@ export async function handleNewPracticeRequest(patternString, practiceIndex) {
 
             } catch (e) {
                 console.error("Failed to parse practice data:", practiceText, e);
-                // [★ 오류 1 수정] 사용자에게 오류 표시
-                koreanEl.textContent = `오류: ${e.message}`;
+                koreanEl.textContent = `오류: ${e.message}`; // [★] 오류 메시지 표시
                 counterEl.textContent = '오류';
                 practiceContainer.dataset.spreeCount = currentCount;
                 inputEl.disabled = true;
             }
         } else {
-            console.error("Invalid response structure from generate_practice API:", result);
-            throw new Error("AI로부터 유효한 응답을 받지 못했습니다.");
+             console.error("Invalid response structure from generate_practice API:", result);
+             throw new Error("AI로부터 유효한 응답을 받지 못했습니다.");
         }
     } catch (error) {
         console.error('New practice request error:', error);

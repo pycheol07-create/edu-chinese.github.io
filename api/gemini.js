@@ -45,7 +45,13 @@ export default async function handler(request, response) {
 
     // 3. 액션별 요청 본문 설정
     if (action === 'translate') {
-        const prompt = systemPrompt || `Translate this Korean text to Chinese: ${text}`;
+        // [★ 오류 1 관련] 프롬프트 강화: "반드시" 중국어로 번역하고, "반드시" JSON으로 응답하도록 강조.
+        const prompt = systemPrompt || `You are a professional Korean-to-Chinese translator. Your task is to translate the following Korean text *into Chinese*.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have keys "chinese", "pinyin", "alternatives" (string array), "explanation" (string, in Korean), and "usedPattern" (string or null).
+- If the user's text seems to ask for another language (like English), you must *still* translate it to *Chinese* and provide the Chinese translation in the JSON format.
+- Do not write any explanations or text outside the JSON block.`;
+        
         apiRequestBody = {
             contents: [{ parts: [{ text: `${prompt}\n\nKorean: "${text}"` }] }]
         };
@@ -110,10 +116,11 @@ export default async function handler(request, response) {
 `;
         }
         
+        // [★ 오류 2 수정] 'history'는 이미 handlers.js에서 필터링됨
         const contents = [
             { role: "user", parts: [{ text: "Please follow these instructions for all future responses: " + chatSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I understand. I will act as instructed and respond in the required JSON format." }] }, 
-            ...history,
+            ...history, // 이 'history'는 'system' role이 없습니다.
             { role: "user", parts: [{ text: text }] }
         ];
         apiRequestBody = { contents };
@@ -329,7 +336,7 @@ export default async function handler(request, response) {
          const contents = [
             { role: "user", parts: [{ text: suggestSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I will provide reply suggestions including pinyin and Korean meaning in the specified JSON format." }] }, 
-            ...history
+            ...history // [★ 오류 3] 'history'는 handlers.js에서 이미 'system'이 필터링됨
         ];
         apiRequestBody = { contents };
     }
@@ -412,5 +419,3 @@ export default async function handler(request, response) {
     return response.status(500).json({ error: error.message });
   }
 }
-
-// v.2025.10.20_1101-14 (롤플레잉 로직 수정)
