@@ -46,7 +46,7 @@
             animation: pulse 1.5s ease-in-out infinite;
         }
         /* 마이크 녹음 중 애니메이션 */
-        .mic-btn.is-recording svg, .follow-speak-btn.is-recording svg { /* [수정] follow-speak-btn에도 적용 */
+        .mic-btn.is-recording svg, .follow-speak-btn.is-recording svg {
             color: #ef4444; /* Tailwind red-500 */
             animation: pulse 1.2s ease-in-out infinite;
         }
@@ -66,13 +66,14 @@
             pointer-events: auto;
         }
 
-        /* [★ 수정] FAB가 열렸을 때 서브 버튼별 애니메이션 지연 (롤플레잉 포함) */
+        /* [★ 수정] FAB가 열렸을 때 서브 버튼별 애니메이션 지연 (듣기 버튼 포함) */
         #fab-container.is-open #open-translator-btn { transition-delay: 0.0s; }
         #fab-container.is-open #open-correction-btn { transition-delay: 0.1s; }
         #fab-container.is-open #open-word-btn { transition-delay: 0.2s; }
         #fab-container.is-open #open-char-btn { transition-delay: 0.3s; }
-        #fab-container.is-open #open-roleplay-btn { transition-delay: 0.4s; } /* ★ 새 버튼 */
-        #fab-container.is-open #open-chat-btn { transition-delay: 0.5s; } /* ★ 딜레이 수정 */
+        #fab-container.is-open #open-roleplay-btn { transition-delay: 0.4s; }
+        #fab-container.is-open #open-listening-btn { transition-delay: 0.5s; } /* ★ 새 버튼 */
+        #fab-container.is-open #open-chat-btn { transition-delay: 0.6s; } /* ★ 딜레이 수정 */
 
 
         /* FAB가 열렸을 때 메인 버튼 아이콘 회전 */
@@ -154,6 +155,12 @@
             <button id="open-chat-btn" title="AI와 자유 대화" class="fab-sub-button bg-purple-600 hover:bg-purple-700 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-3.04 8.3-7.146 9.574a18.79 18.79 0 0 1-8.708 0C3.04 20.3 0 16.556 0 12c0-4.556 3.04-8.3 7.146-9.574a18.79 18.79 0 0 1 8.708 0C17.96 3.7 21 7.444 21 12Z" />
+                </svg>
+            </button>
+
+            <button id="open-listening-btn" title="듣기 훈련" class="fab-sub-button bg-teal-500 hover:bg-teal-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
                 </svg>
             </button>
             
@@ -443,6 +450,62 @@
                     <p class="text-sm text-gray-500">택시 기사님께 목적지를 설명합니다.</p>
                 </button>
             </div>
+        </div>
+    </div>
+
+    <div id="listening-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 relative">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">듣기 훈련 🎧</h2>
+                <button id="close-listening-btn" class="p-1 rounded-full hover:bg-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <p class="text-gray-600 mb-6">듣고 싶은 대화 상황을 선택하세요.</p>
+            <div id="listening-scenario-list" class="space-y-3">
+                <button data-scenario="restaurant" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    <p class="text-lg font-semibold">🍽️ 식당 대화</p>
+                    <p class="text-sm text-gray-500">손님과 종업원의 주문 대화를 들어봅니다.</p>
+                </button>
+                <button data-scenario="airport" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    <p class="text-lg font-semibold">✈️ 공항 대화</p>
+                    <p class="text-sm text-gray-500">승객과 직원의 체크인 대화를 들어봅니다.</p>
+                </button>
+                <button data-scenario="campus" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    <p class="text-lg font-semibold">🧑‍🎓 캠퍼스 대화</p>
+                    <p class="text-sm text-gray-500">친구와 수업에 대해 이야기하는 대화를 들어봅니다.</p>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="script-player-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+       <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6 relative flex flex-col max-h-[90vh]">
+            <div class="flex-shrink-0">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="script-title" class="text-2xl font-bold text-gray-800">대본 제목</h2>
+                    <button id="close-script-player-btn" class="p-1 rounded-full hover:bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="flex items-center space-x-2 border-b pb-4 mb-4">
+                    <button id="play-all-script-btn" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L8.029 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" />
+                        </svg>
+                        <span>전체 대본 듣기 (반복)</span>
+                    </button>
+                    <button id="toggle-script-btn" class="flex-shrink-0 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">
+                        대본 숨기기
+                    </button>
+                </div>
+            </div>
+            <div id="script-content" class="mt-2 overflow-y-auto divide-y flex-grow">
+                </div>
         </div>
     </div>
 

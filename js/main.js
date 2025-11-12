@@ -16,7 +16,7 @@ function setupEventListeners() {
     
     // '새로운 패턴 보기' 버튼
     dom.newPatternBtn.addEventListener('click', () => {
-         const newPatterns = state.loadDailyPatterns(); // loadDailyPatterns가 새로 생성/저장
+         const newPatterns = state.loadDailyPatterns(); 
          ui.renderPatterns(newPatterns);
          newPatterns.forEach((p, index) => {
              if (p.practice) {
@@ -261,15 +261,12 @@ function setupEventListeners() {
     });
 
     // --- AI 채팅 모달 ---
-    // [★ 수정] '자유 대화' 버튼 리스너
     dom.chatBtn.addEventListener('click', () => {
         dom.chatModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
-
         dom.chatHistory.innerHTML = '';
-        state.conversationHistory.length = 0; // [★] 롤플레잉 문맥 제거
+        state.conversationHistory.length = 0; 
         dom.chatInput.value = '';
-        
         const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };
         ui.addMessageToHistory('ai', firstMsg);
         state.conversationHistory.push({ role: 'model', parts: [{ text: JSON.stringify(firstMsg) }] });
@@ -286,7 +283,6 @@ function setupEventListeners() {
             handlers.handleSendMessage();
         }
     });
-    
     dom.chatHistory.addEventListener('click', (e) => {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
@@ -294,7 +290,6 @@ function setupEventListeners() {
             if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
             return;
         }
-        
         const followSpeakButton = e.target.closest('.follow-speak-btn');
         if (followSpeakButton) {
             const originalText = followSpeakButton.dataset.text;
@@ -303,7 +298,6 @@ function setupEventListeners() {
             }
             return;
         }
-        
         const suggestionChip = e.target.closest('.suggestion-chip');
         if (suggestionChip) {
             dom.chatInput.value = suggestionChip.dataset.text;
@@ -312,7 +306,6 @@ function setupEventListeners() {
             return;
         }
     });
-    
     dom.micBtn.addEventListener('click', () => {
         speech.toggleRecognition(dom.micBtn, { targetInput: dom.chatInput });
     });
@@ -393,7 +386,7 @@ function setupEventListeners() {
         }
     });
     
-    // --- [★ 새 기능] 롤플레잉 모달 리스너 ---
+    // --- 롤플레잉 모달 리스너 ---
     dom.openRoleplayBtn.addEventListener('click', () => {
         dom.roleplayModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
@@ -407,6 +400,73 @@ function setupEventListeners() {
             const context = scenarioButton.dataset.scenario;
             dom.roleplayModal.classList.add('hidden');
             handlers.handleStartRoleplay(context);
+        }
+    });
+    
+    // --- [★ 새 기능] 듣기 훈련 모달 리스너 ---
+    dom.openListeningBtn.addEventListener('click', () => {
+        dom.listeningModal.classList.remove('hidden');
+        if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
+    });
+    dom.closeListeningBtn.addEventListener('click', () => {
+        dom.listeningModal.classList.add('hidden');
+    });
+    dom.listeningScenarioList.addEventListener('click', (e) => {
+        const scenarioButton = e.target.closest('[data-scenario]');
+        if (scenarioButton) {
+            const context = scenarioButton.dataset.scenario;
+            dom.listeningModal.classList.add('hidden');
+            handlers.handleStartListeningScript(context);
+        }
+    });
+    dom.closeScriptPlayerBtn.addEventListener('click', () => {
+        dom.scriptPlayerModal.classList.add('hidden');
+        state.stopCurrentAudio(); // 모달 닫을 때 재생 중인 오디오 중지
+    });
+    
+    // "전체 대본 듣기" 버튼 (반복 듣기)
+    dom.playAllScriptBtn.addEventListener('click', (e) => {
+        const textsToPlay = [];
+        // [★] 'script-turn-visible' 클래스를 가진 요소만 수집 (대본 숨기기/보이기 연동)
+        dom.scriptContent.querySelectorAll('.script-turn-visible').forEach(turnEl => {
+            if (turnEl.dataset.text) {
+                textsToPlay.push(turnEl.dataset.text);
+            }
+        });
+        
+        if (textsToPlay.length > 0) {
+            api.playTTSequentially(textsToPlay, e.currentTarget);
+        }
+    });
+
+    // "대본 숨기기/보이기" 버튼
+    dom.toggleScriptBtn.addEventListener('click', (e) => {
+        const isVisible = e.currentTarget.dataset.visible === 'true';
+        if (isVisible) {
+            dom.scriptContent.classList.add('hidden');
+            e.currentTarget.textContent = '대본 보기';
+            e.currentTarget.dataset.visible = 'false';
+            // [★] '전체 듣기'가 대본을 수집하지 못하도록 클래스 제거
+            dom.scriptContent.querySelectorAll('.script-turn-visible').forEach(el => {
+                el.classList.remove('script-turn-visible');
+            });
+        } else {
+            dom.scriptContent.classList.remove('hidden');
+            e.currentTarget.textContent = '대본 숨기기';
+            e.currentTarget.dataset.visible = 'true';
+            // [★] '전체 듣기'가 대본을 수집할 수 있도록 클래스 추가
+            dom.scriptContent.querySelectorAll('[data-text]').forEach(el => {
+                el.classList.add('script-turn-visible');
+            });
+        }
+    });
+    
+    // '대본 플레이어' 모달 내의 개별 TTS 버튼 (이벤트 위임)
+    dom.scriptContent.addEventListener('click', (e) => {
+        const ttsButton = e.target.closest('.tts-btn');
+        if (ttsButton) {
+            const textToSpeak = ttsButton.dataset.text;
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
         }
     });
 }
