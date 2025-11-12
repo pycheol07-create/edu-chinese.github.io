@@ -1,13 +1,10 @@
 // js/ui.js
 import * as dom from './dom.js';
 import * as state from './state.js';
-import { playTTS } from './api.js';
+import { playTTS } from './api.js'; // 예문 TTS를 위해 import
 
-/**
- * 커스텀 알림(모달)을 표시합니다.
- */
+// ... (showAlert, displayDate 함수는 동일) ...
 export function showAlert(message) {
-    // ... (기존 코드와 동일) ...
     if (dom.customAlertMessage && dom.customAlertModal) {
         dom.customAlertMessage.textContent = message;
         dom.customAlertModal.classList.remove('hidden');
@@ -15,20 +12,18 @@ export function showAlert(message) {
         alert(message);
     }
 }
-
-/**
- * 현재 날짜를 상단에 표시합니다.
- */
 export function displayDate() {
-    // ... (기존 코드와 동일) ...
     const today = new Date();
     if (dom.currentDateEl) {
         dom.currentDateEl.textContent = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
     }
 }
 
+
 /**
  * 메인 컨테이너에 패턴 카드들을 렌더링합니다.
+ * @param {Array} patterns - 표시할 패턴 객체 배열
+ * @param {boolean} [showIndex=false] - 전체 목록 보기에서처럼 인덱스를 표시할지 여부
  */
 export function renderPatterns(patterns, showIndex = false) { 
     if (!dom.patternContainer) return;
@@ -39,6 +34,7 @@ export function renderPatterns(patterns, showIndex = false) {
         const card = document.createElement('div');
         card.className = 'bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300';
 
+        // [★ 수정] "따라 말하기" 버튼 추가
         const examplesHtml = p.examples.map(ex => `
             <div class="mt-3">
                 <div class="flex items-center">
@@ -69,7 +65,34 @@ export function renderPatterns(patterns, showIndex = false) {
 
         const practiceHtml = p.practice ? `
             <div class="mt-6">
-                </div>` : '';
+                <h3 class="text-lg font-bold text-gray-700 border-b pb-1">🗣️ 직접 말해보기</h3>
+                <div id="practice-container-${index}" class="mt-3 bg-sky-50 p-4 rounded-lg relative" data-spree-count="0" data-spree-goal="5">
+                    <button id="show-hint-btn-${index}" title="힌트 보기" data-pattern-string="${p.pattern}" data-hint-target="practice-hint-${index}" class="show-hint-btn absolute top-3 right-3 bg-gray-300 hover:bg-gray-400 text-yellow-500 p-1.5 rounded-full" style="display: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 pointer-events-none">
+                          <path d="M12 2.25a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75ZM7.5 12a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM18.894 6.166a.75.75 0 0 0-1.06-1.06l-1.591 1.59a.75.75 0 1 0 1.06 1.061l1.591-1.59ZM21.75 12a.75.75 0 0 1-.75.75h-2.25a.75.75 0 0 1 0-1.5h2.25a.75.75 0 0 1 .75.75ZM17.834 18.894a.75.75 0 0 0 1.06-1.06l-1.59-1.591a.75.75 0 1 0-1.061 1.06l1.59 1.591ZM12 18a.75.75 0 0 1 .75.75V21a.75.75 0 0 1-1.5 0v-2.25A.75.75 0 0 1 12 18ZM7.758 17.303a.75.75 0 0 0-1.061-1.06l-1.591 1.59a.75.75 0 0 0 1.06 1.061l1.591-1.59ZM6 12a.75.75 0 0 1-.75.75H3a.75.75 0 0 1 0-1.5h2.25A.75.75 0 0 1 6 12ZM6.166 7.758a.75.75 0 0 0 1.06-1.06l-1.59-1.591a.75.75 0 0 0-1.061 1.06l1.59 1.591Z" />
+                        </svg>
+                    </button>
+                    <p class="text-md text-gray-700 mb-2">다음 문장을 중국어로 입력해보세요:</p>
+                    <p id="practice-korean-${index}" class="text-md font-semibold text-sky-800 mb-3">""</p>
+                    <div class="flex items-center space-x-1 min-w-0">
+                        <button id="practice-mic-btn-${index}" title="음성 입력" data-practice-index="${index}" class="practice-mic-btn mic-btn p-1 rounded-full text-gray-500 hover:bg-gray-200 flex-shrink-0" style="display: none;"> <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6V7.5a6 6 0 0 0-12 0v5.25a6 6 0 0 0 6 6Z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5v2.25a7.5 7.5 0 0 1-15 0v-2.25" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 18.75a8.25 8.25 0 0 0 10.5 0" />
+                            </svg>
+                        </button>
+                        <input type="text" id="practice-input-${index}" class="flex-1 p-2 border border-gray-300 rounded-md chinese-text min-w-0" placeholder="중국어를 입력하세요..." disabled>
+                    </div>
+                    <div class="mt-3 flex justify-between items-center">
+                        <div class="flex-1 text-center">
+                            <button id="check-practice-btn-${index}" data-answer="" data-pinyin="" data-input-id="practice-input-${index}" class="check-practice-btn bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap inline-block" style="display: none;">정답 확인</button>
+                        </div>
+                        <div id="practice-counter-${index}" class="text-sm text-gray-500 flex-shrink-0 ml-2">AI 연습문제 로딩 중...</div>
+                    </div>
+                    <div id="practice-hint-${index}" class="mt-3"></div>
+                    <div id="practice-result-${index}" class="mt-3 text-center"></div>
+                </div>
+            </div>` : '';
 
         card.innerHTML = `
             <div class="flex items-center justify-between mb-3">
@@ -91,11 +114,8 @@ export function renderPatterns(patterns, showIndex = false) {
     });
 }
 
-/**
- * '전체 패턴 보기' 모달에 패턴 목록을 렌더링합니다.
- */
+// ... (renderAllPatternsList 함수는 동일) ...
 export function renderAllPatternsList() {
-    // ... (기존 코드와 동일) ...
     if (!dom.allPatternsList) return;
     
     dom.allPatternsList.innerHTML = '';
@@ -118,6 +138,8 @@ export function renderAllPatternsList() {
 
 /**
  * 채팅 기록창에 메시지를 추가합니다.
+ * @param {string} sender - 'user' 또는 'ai'
+ * @param {object} messageData - 메시지 데이터
  */
 export function addMessageToHistory(sender, messageData) {
     if (!dom.chatHistory) return;
@@ -140,6 +162,7 @@ export function addMessageToHistory(sender, messageData) {
                 </div>`;
             dom.chatHistory.appendChild(correctionElement);
         }
+        // [★ 수정] "따라 말하기" 버튼 추가
         const messageElement = document.createElement('div');
         messageElement.className = 'flex justify-start';
         messageElement.innerHTML = `
@@ -165,12 +188,10 @@ export function addMessageToHistory(sender, messageData) {
     if (dom.chatHistory) dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
 }
 
-/**
- * 채팅창에 추천 답변 칩을 렌더링합니다.
- */
+// ... (addSuggestionToHistory, renderCorrectionHistory 함수는 동일) ...
 export function addSuggestionToHistory(suggestions) {
-    // ... (기존 코드와 동일) ...
     if (!dom.chatHistory) return;
+
     const suggestionElement = document.createElement('div');
     suggestionElement.className = 'flex justify-center my-2';
     const buttonsHtml = suggestions.map(suggestion =>
@@ -180,6 +201,7 @@ export function addSuggestionToHistory(suggestions) {
             <span class="text-xs text-gray-600 mt-0.5">${suggestion.korean}</span>
          </button>`
     ).join('');
+    
     suggestionElement.innerHTML = `
         <div class="bg-gray-100 p-2 rounded-lg text-center w-full">
             <p class="text-xs text-gray-600 mb-1">이렇게 답해보세요:</p>
@@ -188,23 +210,22 @@ export function addSuggestionToHistory(suggestions) {
     dom.chatHistory.appendChild(suggestionElement);    
     dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
 }
-
-/**
- * '교정 노트' 모달에 교정 내역을 렌더링합니다.
- */
 export function renderCorrectionHistory() {
-    // ... (기존 코드와 동일) ...
     if (!dom.correctionHistoryList) return;
+    
     if (state.correctionHistory.length === 0) {
         dom.correctionHistoryList.innerHTML = `<p class="text-gray-500 text-center p-4">아직 교정 내역이 없습니다.</p>`;
         return;
     }
+
     dom.correctionHistoryList.innerHTML = '';
     state.correctionHistory.forEach(item => {
         const itemEl = document.createElement('div');
         itemEl.className = 'p-4 hover:bg-gray-50';
+
         const itemDate = new Date(item.date);
         const dateString = `${itemDate.getFullYear()}-${String(itemDate.getMonth() + 1).padStart(2, '0')}-${String(itemDate.getDate()).padStart(2, '0')}`;
+
         itemEl.innerHTML = `
             <p class="text-sm text-gray-400 mb-1">${dateString}</p>
             <p class="text-gray-600 chinese-text"><strong>원본:</strong> ${item.original}</p>
@@ -217,47 +238,5 @@ export function renderCorrectionHistory() {
             <p class="text-sm text-gray-700 mt-2 pt-2 border-t border-gray-200"><strong>AI 코멘트:</strong> ${item.explanation}</p>
         `;
         dom.correctionHistoryList.appendChild(itemEl);
-    });
-}
-
-/**
- * [★ 새 기능] '듣기 대본 플레이어' 모달에 대본을 렌더링합니다.
- * @param {string} title - 대본 제목
- * @param {Array} dialogue - 대화 턴 배열
- */
-export function renderScriptPlayer(title, dialogue) {
-    if (!dom.scriptPlayerModal) return;
-
-    dom.scriptTitle.textContent = title;
-    dom.scriptContent.innerHTML = ''; // 기존 내용 초기화
-    
-    // [★] 대본 숨기기/보이기 버튼 초기화
-    dom.scriptContent.classList.remove('hidden');
-    dom.toggleScriptBtn.textContent = '대본 숨기기';
-    dom.toggleScriptBtn.dataset.visible = "true";
-
-    dialogue.forEach(turn => {
-        const turnEl = document.createElement('div');
-        turnEl.className = 'p-4 script-turn-visible'; // [★] data-text를 가진 상위 div
-        turnEl.dataset.text = turn.chinese; // [★] '전체 듣기'가 수집할 텍스트
-        
-        const speakerClass = turn.speaker === 'A' ? 'text-blue-600' : 'text-green-600';
-
-        turnEl.innerHTML = `
-            <div class="flex items-start space-x-3">
-                <span class="flex-shrink-0 w-10 h-10 rounded-full ${speakerClass} bg-gray-100 flex items-center justify-center font-bold text-lg">${turn.speaker}</span>
-                <div class="flex-1">
-                    <div class="flex items-center">
-                        <p class="text-lg chinese-text text-gray-800">${turn.chinese}</p>
-                        <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${turn.chinese}" title="이 줄만 듣기">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
-                        </button>
-                    </div>
-                    <p class="text-sm text-gray-500">${turn.pinyin}</p>
-                    <p class="text-md text-gray-600">${turn.korean}</p>
-                </div>
-            </div>
-        `;
-        dom.scriptContent.appendChild(turnEl);
     });
 }
