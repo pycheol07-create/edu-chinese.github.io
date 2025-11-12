@@ -237,18 +237,22 @@ export async function handleStartRoleplay(context) {
         let aiResponseData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const aiResponseText = result.candidates[0].content.parts[0].text;
+            // [★ 오류 2 수정] AI가 JSON이 아닌 일반 텍스트로 응답할 경우를 대비
             if (!aiResponseText || !aiResponseText.trim().startsWith('{')) {
-                throw new Error("AI response is not valid JSON.");
-            } else {
-                try {
-                    const cleanedText = aiResponseText.trim().replace(/^```json\s*|\s*```$/g, '');
-                    aiResponseData = JSON.parse(cleanedText);
-                    // 3. AI의 첫 메시지를 대화 기록에 추가
-                    state.conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
-                } catch (e) {
-                    throw new Error("AI response parsing failed.");
-                }
+                console.error("AI response is not valid JSON:", aiResponseText);
+                throw new Error("AI response is not valid JSON."); // 이 오류가 잡힙니다.
             }
+            
+            try {
+                const cleanedText = aiResponseText.trim().replace(/^```json\s*|\s*```$/g, '');
+                aiResponseData = JSON.parse(cleanedText);
+                // 3. AI의 첫 메시지를 대화 기록에 추가
+                state.conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+            } catch (e) {
+                console.error("AI response parsing failed:", e);
+                throw new Error("AI response parsing failed.");
+            }
+            
         } else {
              throw new Error("Invalid response structure from start_roleplay_chat API.");
         }
@@ -266,7 +270,7 @@ export async function handleStartRoleplay(context) {
 }
 
 /**
- * [★ 새 기능] '듣기 훈련' 시나리오 시작 핸들러
+ * '듣기 훈련' 시나리오 시작 핸들러
  * @param {string} context - 듣기 상황 (e.g., 'restaurant')
  */
 export async function handleStartListeningScript(context) {
@@ -335,10 +339,12 @@ export async function handleSuggestReply() {
     dom.suggestReplyBtn.textContent = '추천 생성 중...';
     
     try {
+        // [★ 오류 3 수정] 'system' role을 API로 보내면 오류가 발생하므로, user/model 메시지만 필터링합니다.
         const filteredHistory = state.conversationHistory.filter(
             m => m.role === 'user' || m.role === 'model'
         );
         
+        // 필터링된 기록으로 API 호출
         const result = await api.getSuggestedReplies(filteredHistory);
         
         let suggestions = [];
@@ -355,6 +361,9 @@ export async function handleSuggestReply() {
                  console.error("Failed to parse suggestion JSON:", suggestionText, e);
              }
         } else {
+            // 이 지점으로 오면 서버 500 오류가 발생했거나,
+            // 200 OK를 받았지만 'suggestions' 키가 없는 경우입니다.
+            // (사용자가 보고한 오류는 500 오류였으므로, 이 'else'는 아니었을 것입니다.)
             console.error("Invalid response structure for suggestions:", result);
         }
 
@@ -367,6 +376,7 @@ export async function handleSuggestReply() {
         
     } catch (error) {
         console.error('Suggest reply error:', error);
+        // [★] 사용자가 본 오류가 여기서 표시됩니다.
         ui.showAlert(`답변 추천 중 오류 발생: ${error.message}`);
     } finally {
         dom.suggestReplyBtn.disabled = false;
@@ -421,6 +431,12 @@ export async function handleNewPracticeRequest(patternString, practiceIndex) {
                 }
                 practiceData = JSON.parse(practiceText);
 
+                // [★ 오류 1 수정] AI가 키를 빠뜨렸는지 확인
+                if (!practiceData.korean || !practiceData.chinese || !practiceData.pinyin) {
+                    console.error("AI practice response missing required keys:", practiceData);
+                    throw new Error("AI가 연습문제 형식을 올바르게 반환하지 못했습니다.");
+                }
+
                 koreanEl.textContent = `"${practiceData.korean}"`;
                 checkBtn.dataset.answer = practiceData.chinese;
                 checkBtn.dataset.pinyin = practiceData.pinyin;
@@ -438,17 +454,15 @@ export async function handleNewPracticeRequest(patternString, practiceIndex) {
 
             } catch (e) {
                 console.error("Failed to parse practice data:", practiceText, e);
-                koreanEl.textContent = "오류: 새 문제를 불러오지 못했습니다.";
+                // [★ 오류 1 수정] 사용자에게 오류 표시
+                koreanEl.textContent = `오류: ${e.message}`;
                 counterEl.textContent = '오류';
                 practiceContainer.dataset.spreeCount = currentCount;
                 inputEl.disabled = true;
             }
         } else {
             console.error("Invalid response structure from generate_practice API:", result);
-            koreanEl.textContent = "오류: AI 응답이 없습니다.";
-            counterEl.textContent = '오류';
-            practiceContainer.dataset.spreeCount = currentCount;
-            inputEl.disabled = true;
+            throw new Error("AI로부터 유효한 응답을 받지 못했습니다.");
         }
     } catch (error) {
         console.error('New practice request error:', error);
