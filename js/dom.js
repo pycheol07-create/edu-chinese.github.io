@@ -1,7 +1,6 @@
 // js/dom.js
 
 // 이 파일은 모든 DOM 요소 변수를 초기화하고 내보냅니다.
-// main.js의 initializeDOM() 함수와 전역 변수 부분을 여기로 옮깁니다.
 
 export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translatorModal,
     closeTranslatorBtn, translateBtn, koreanInput, translationResult, customAlertModal,
@@ -19,8 +18,11 @@ export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, tr
     wordTtsBtn, showWordAnswerBtn, nextWordBtn,
     openCharBtn, charModal, closeCharBtn, characterInfo,
     charTtsBtn, nextCharBtn,
+    openRoleplayBtn, roleplayModal, closeRoleplayBtn, roleplayScenarioList,
     // [★ 새 변수 추가]
-    openRoleplayBtn, roleplayModal, closeRoleplayBtn, roleplayScenarioList;
+    openListeningBtn, listeningModal, closeListeningBtn, listeningScenarioList,
+    scriptPlayerModal, closeScriptPlayerBtn, scriptTitle,
+    playAllScriptBtn, toggleScriptBtn, scriptContent;
 
 
 /**
@@ -95,11 +97,22 @@ export function initializeDOM() {
     charTtsBtn = document.getElementById('char-tts-btn');
     nextCharBtn = document.getElementById('next-char-btn');
     
-    // [★ 새 DOM 요소 매핑]
     openRoleplayBtn = document.getElementById('open-roleplay-btn');
     roleplayModal = document.getElementById('roleplay-modal');
     closeRoleplayBtn = document.getElementById('close-roleplay-btn');
     roleplayScenarioList = document.getElementById('roleplay-scenario-list');
+
+    // [★ 새 DOM 요소 매핑]
+    openListeningBtn = document.getElementById('open-listening-btn');
+    listeningModal = document.getElementById('listening-modal');
+    closeListeningBtn = document.getElementById('close-listening-btn');
+    listeningScenarioList = document.getElementById('listening-scenario-list');
+    scriptPlayerModal = document.getElementById('script-player-modal');
+    closeScriptPlayerBtn = document.getElementById('close-script-player-btn');
+    scriptTitle = document.getElementById('script-title');
+    playAllScriptBtn = document.getElementById('play-all-script-btn');
+    toggleScriptBtn = document.getElementById('toggle-script-btn');
+    scriptContent = document.getElementById('script-content');
 
     console.log("DOM elements initialized.");
 }

@@ -3,22 +3,29 @@ import * as dom from './dom.js';
 import * as state from './state.js';
 import { playTTS } from './api.js'; // 예문 TTS를 위해 import
 
-// ... (showAlert, displayDate 함수는 동일) ...
+/**
+ * 커스텀 알림(모달)을 표시합니다.
+ * @param {string} message - 알림창에 표시할 메시지
+ */
 export function showAlert(message) {
     if (dom.customAlertMessage && dom.customAlertModal) {
         dom.customAlertMessage.textContent = message;
         dom.customAlertModal.classList.remove('hidden');
     } else {
+        // 모달이 아직 로드되지 않았을 경우를 대비한 fallback
         alert(message);
     }
 }
+
+/**
+ * 현재 날짜를 상단에 표시합니다.
+ */
 export function displayDate() {
     const today = new Date();
     if (dom.currentDateEl) {
         dom.currentDateEl.textContent = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
     }
 }
-
 
 /**
  * 메인 컨테이너에 패턴 카드들을 렌더링합니다.
@@ -34,7 +41,6 @@ export function renderPatterns(patterns, showIndex = false) {
         const card = document.createElement('div');
         card.className = 'bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300';
 
-        // [★ 수정] "따라 말하기" 버튼 추가
         const examplesHtml = p.examples.map(ex => `
             <div class="mt-3">
                 <div class="flex items-center">
@@ -63,6 +69,7 @@ export function renderPatterns(patterns, showIndex = false) {
 
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
 
+        // [★ 수정] 생략되었던 "직접 말해보기" (practiceHtml) 코드를 복구합니다.
         const practiceHtml = p.practice ? `
             <div class="mt-6">
                 <h3 class="text-lg font-bold text-gray-700 border-b pb-1">🗣️ 직접 말해보기</h3>
@@ -114,7 +121,9 @@ export function renderPatterns(patterns, showIndex = false) {
     });
 }
 
-// ... (renderAllPatternsList 함수는 동일) ...
+/**
+ * '전체 패턴 보기' 모달에 패턴 목록을 렌더링합니다.
+ */
 export function renderAllPatternsList() {
     if (!dom.allPatternsList) return;
     
@@ -134,7 +143,6 @@ export function renderAllPatternsList() {
         dom.allPatternsList.appendChild(patternItem);
     });
 }
-
 
 /**
  * 채팅 기록창에 메시지를 추가합니다.
@@ -162,7 +170,6 @@ export function addMessageToHistory(sender, messageData) {
                 </div>`;
             dom.chatHistory.appendChild(correctionElement);
         }
-        // [★ 수정] "따라 말하기" 버튼 추가
         const messageElement = document.createElement('div');
         messageElement.className = 'flex justify-start';
         messageElement.innerHTML = `
@@ -188,7 +195,10 @@ export function addMessageToHistory(sender, messageData) {
     if (dom.chatHistory) dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
 }
 
-// ... (addSuggestionToHistory, renderCorrectionHistory 함수는 동일) ...
+/**
+ * 채팅창에 추천 답변 칩을 렌더링합니다.
+ * @param {Array} suggestions - 추천 답변 객체 배열
+ */
 export function addSuggestionToHistory(suggestions) {
     if (!dom.chatHistory) return;
 
@@ -207,9 +217,14 @@ export function addSuggestionToHistory(suggestions) {
             <p class="text-xs text-gray-600 mb-1">이렇게 답해보세요:</p>
             <div class="flex flex-wrap justify-center">${buttonsHtml}</div>
         </div>`;
-    dom.chatHistory.appendChild(suggestionElement);    
+    dom.chatHistory.appendChild(suggestionElement);
+    
     dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
 }
+
+/**
+ * '교정 노트' 모달에 교정 내역을 렌더링합니다.
+ */
 export function renderCorrectionHistory() {
     if (!dom.correctionHistoryList) return;
     
@@ -238,5 +253,47 @@ export function renderCorrectionHistory() {
             <p class="text-sm text-gray-700 mt-2 pt-2 border-t border-gray-200"><strong>AI 코멘트:</strong> ${item.explanation}</p>
         `;
         dom.correctionHistoryList.appendChild(itemEl);
+    });
+}
+
+/**
+ * [★ 새 기능] '듣기 대본 플레이어' 모달에 대본을 렌더링합니다.
+ * @param {string} title - 대본 제목
+ * @param {Array} dialogue - 대화 턴 배열
+ */
+export function renderScriptPlayer(title, dialogue) {
+    if (!dom.scriptPlayerModal) return;
+
+    dom.scriptTitle.textContent = title;
+    dom.scriptContent.innerHTML = ''; // 기존 내용 초기화
+    
+    // [★] 대본 숨기기/보이기 버튼 초기화
+    dom.scriptContent.classList.remove('hidden');
+    dom.toggleScriptBtn.textContent = '대본 숨기기';
+    dom.toggleScriptBtn.dataset.visible = "true";
+
+    dialogue.forEach(turn => {
+        const turnEl = document.createElement('div');
+        turnEl.className = 'p-4 script-turn-visible'; // [★] data-text를 가진 상위 div
+        turnEl.dataset.text = turn.chinese; // [★] '전체 듣기'가 수집할 텍스트
+        
+        const speakerClass = turn.speaker === 'A' ? 'text-blue-600' : 'text-green-600';
+
+        turnEl.innerHTML = `
+            <div class="flex items-start space-x-3">
+                <span class="flex-shrink-0 w-10 h-10 rounded-full ${speakerClass} bg-gray-100 flex items-center justify-center font-bold text-lg">${turn.speaker}</span>
+                <div class="flex-1">
+                    <div class="flex items-center">
+                        <p class="text-lg chinese-text text-gray-800">${turn.chinese}</p>
+                        <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${turn.chinese}" title="이 줄만 듣기">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                        </button>
+                    </div>
+                    <p class="text-sm text-gray-500">${turn.pinyin}</p>
+                    <p class="text-md text-gray-600">${turn.korean}</p>
+                </div>
+            </div>
+        `;
+        dom.scriptContent.appendChild(turnEl);
     });
 }
