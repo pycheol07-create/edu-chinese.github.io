@@ -56,7 +56,7 @@ export async function handleTranslation() {
             <div class="flex items-center">
                 <p class="text-xl chinese-text font-bold text-gray-800">${translationData.chinese}</p>
                 <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${translationData.chinese}">
-                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.Sina.com'da 0.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
                 </button>
             </div>
             <p class="text-md text-gray-500">${translationData.pinyin || '(병음 정보 없음)'}</p>
@@ -73,7 +73,7 @@ export async function handleTranslation() {
 }
 
 /**
- * [★ 수정] AI 채팅 '전송' 버튼 핸들러 (롤플레잉 문맥 인식)
+ * AI 채팅 '전송' 버튼 핸들러 (롤플레잉 문맥 인식)
  */
 export async function handleSendMessage() {
     const userInput = dom.chatInput.value.trim();
@@ -92,12 +92,10 @@ export async function handleSendMessage() {
     dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
     
     try {
-        // [★ 수정] 롤플레잉 문맥(context)이 있는지 확인
         const roleContext = state.conversationHistory.find(m => m.role === 'system')?.context || null;
         
         state.conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
         
-        // [★ 수정] api.getChatResponse에 roleContext 전달
         const result = await api.getChatResponse(userInput, state.conversationHistory, roleContext);
 
         let aiResponseData;
@@ -212,7 +210,7 @@ export async function handleStartChatWithPattern(patternString) {
 }
 
 /**
- * [★ 새 기능] '상황별 대화' 시나리오 시작 핸들러
+ * '상황별 대화' 시나리오 시작 핸들러
  * @param {string} context - 롤플레잉 상황 (e.g., 'restaurant')
  */
 export async function handleStartRoleplay(context) {
@@ -231,10 +229,10 @@ export async function handleStartRoleplay(context) {
     dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
 
     try {
-        // [★] 1. 롤플레잉 문맥(context)을 대화 기록에 시스템 메시지로 추가
+        // 1. 롤플레잉 문맥(context)을 대화 기록에 시스템 메시지로 추가
         state.conversationHistory.push({ role: 'system', context: context });
 
-        // [★] 2. 롤플레잉 시작 API 호출
+        // 2. 롤플레잉 시작 API 호출
         const result = await api.startRoleplayChat(context);
 
         let aiResponseData;
@@ -246,7 +244,7 @@ export async function handleStartRoleplay(context) {
                 try {
                     const cleanedText = aiResponseText.trim().replace(/^```json\s*|\s*```$/g, '');
                     aiResponseData = JSON.parse(cleanedText);
-                    // [★] 3. AI의 첫 메시지를 대화 기록에 추가
+                    // 3. AI의 첫 메시지를 대화 기록에 추가
                     state.conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
                 } catch (e) {
                     throw new Error("AI response parsing failed.");
@@ -260,7 +258,6 @@ export async function handleStartRoleplay(context) {
     } catch (error) {
         console.error('Start role-play error:', error);
         ui.showAlert(`대화 시작 중 오류가 발생했습니다: ${error.message}`);
-        // 오류 발생 시 채팅방을 닫거나, 시스템 마커를 제거
         state.conversationHistory.length = 0;
         dom.chatModal.classList.add('hidden');
     } finally {
@@ -274,16 +271,25 @@ export async function handleStartRoleplay(context) {
  * '답변 추천받기' 버튼 핸들러
  */
 export async function handleSuggestReply() {
-    // ... (기존 코드와 동일) ...
     dom.chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
+    
     if (state.conversationHistory.length === 0) {
         ui.showAlert('추천할 답변을 생성하기 위한 대화 내용이 없습니다.');
         return;
     }
+    
     dom.suggestReplyBtn.disabled = true;
     dom.suggestReplyBtn.textContent = '추천 생성 중...';
+    
     try {
-        const result = await api.getSuggestedReplies(state.conversationHistory);
+        // [★ 수정] 'system' role을 API로 보내면 오류가 발생하므로, user/model 메시지만 필터링합니다.
+        const filteredHistory = state.conversationHistory.filter(
+            m => m.role === 'user' || m.role === 'model'
+        );
+        
+        // 필터링된 기록으로 API 호출
+        const result = await api.getSuggestedReplies(filteredHistory);
+        
         let suggestions = [];
         if (result.suggestions && Array.isArray(result.suggestions)) {
             suggestions = result.suggestions;
@@ -300,12 +306,14 @@ export async function handleSuggestReply() {
         } else {
             console.error("Invalid response structure for suggestions:", result);
         }
+
         if (suggestions.length > 0 && suggestions.every(s => s.chinese && s.pinyin && s.korean)) {
             ui.addSuggestionToHistory(suggestions);
         } else {
              console.warn("Received suggestions are empty or have invalid format:", suggestions);
             ui.showAlert('추천할 만한 답변을 찾지 못했거나 형식이 잘못되었습니다.');
         }
+        
     } catch (error) {
         console.error('Suggest reply error:', error);
         ui.showAlert(`답변 추천 중 오류 발생: ${error.message}`);
@@ -438,7 +446,7 @@ export async function handleCorrectWriting() {
                 <div class="flex items-center mt-1 p-3 bg-green-50 rounded-lg">
                     <p class="text-lg chinese-text font-bold text-green-800">${correctionData.corrected_sentence}</p>
                     <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${correctionData.corrected_sentence}">
-                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.Sina.com'da 0.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
                     </button>
                 </div>
                 ${explanationHtml}
