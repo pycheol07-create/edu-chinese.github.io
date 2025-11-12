@@ -66,14 +66,14 @@
             pointer-events: auto;
         }
 
-        /* [★ 수정] FAB가 열렸을 때 서브 버튼별 애니메이션 지연 (듣기 버튼 포함) */
+        /* FAB가 열렸을 때 서브 버튼별 애니메이션 지연 */
         #fab-container.is-open #open-translator-btn { transition-delay: 0.0s; }
         #fab-container.is-open #open-correction-btn { transition-delay: 0.1s; }
         #fab-container.is-open #open-word-btn { transition-delay: 0.2s; }
         #fab-container.is-open #open-char-btn { transition-delay: 0.3s; }
         #fab-container.is-open #open-roleplay-btn { transition-delay: 0.4s; }
-        #fab-container.is-open #open-listening-btn { transition-delay: 0.5s; } /* ★ 새 버튼 */
-        #fab-container.is-open #open-chat-btn { transition-delay: 0.6s; } /* ★ 딜레이 수정 */
+        #fab-container.is-open #open-listening-btn { transition-delay: 0.5s; }
+        #fab-container.is-open #open-chat-btn { transition-delay: 0.6s; }
 
 
         /* FAB가 열렸을 때 메인 버튼 아이콘 회전 */
@@ -118,6 +118,16 @@
         .flashcard-back {
             transform: rotateY(180deg);
         }
+        
+        /* 듣기 대본 화자 구분 */
+        .speaker-a {
+            background-color: #DBEAFE; /* Tailwind blue-100 */
+            color: #1D4ED8; /* Tailwind blue-700 */
+        }
+        .speaker-b {
+            background-color: #DCFCE7; /* Tailwind green-100 */
+            color: #15803D; /* Tailwind green-700 */
+        }
 
     </style>
 </head>
@@ -157,7 +167,7 @@
                   <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-3.04 8.3-7.146 9.574a18.79 18.79 0 0 1-8.708 0C3.04 20.3 0 16.556 0 12c0-4.556 3.04-8.3 7.146-9.574a18.79 18.79 0 0 1 8.708 0C17.96 3.7 21 7.444 21 12Z" />
                 </svg>
             </button>
-
+            
             <button id="open-listening-btn" title="듣기 훈련" class="fab-sub-button bg-teal-500 hover:bg-teal-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
@@ -449,6 +459,14 @@
                     <p class="text-lg font-semibold">🚕 택시에서 목적지 말하기</p>
                     <p class="text-sm text-gray-500">택시 기사님께 목적지를 설명합니다.</p>
                 </button>
+                <button data-scenario="cafe" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    <p class="text-lg font-semibold">☕ 카페에서 주문하기</p>
+                    <p class="text-sm text-gray-500">바리스타에게 커피를 주문합니다.</p>
+                </button>
+                <button data-scenario="finding_way" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    <p class="text-lg font-semibold">🗺️ 길 묻기</p>
+                    <p class="text-sm text-gray-500">지나가는 사람에게 길을 묻습니다.</p>
+                </button>
             </div>
         </div>
     </div>
@@ -476,6 +494,14 @@
                 <button data-scenario="campus" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                     <p class="text-lg font-semibold">🧑‍🎓 캠퍼스 대화</p>
                     <p class="text-sm text-gray-500">친구와 수업에 대해 이야기하는 대화를 들어봅니다.</p>
+                </button>
+                <button data-scenario="appointment" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    <p class="text-lg font-semibold">📞 전화로 약속 잡기</p>
+                    <p class="text-sm text-gray-500">친구와 전화로 만날 약속을 잡습니다.</p>
+                </button>
+                <button data-scenario="refund" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    <p class="text-lg font-semibold">👕 물건 환불하기</p>
+                    <p class="text-sm text-gray-500">가게에서 구매한 물건을 환불합니다.</p>
                 </button>
             </div>
         </div>

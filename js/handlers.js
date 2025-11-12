@@ -363,6 +363,7 @@ export async function handleSuggestReply() {
         const result = await api.getSuggestedReplies(filteredHistory);
         
         let suggestions = [];
+        // [★ 수정] API 응답 구조가 candidates가 아닌 suggestions를 바로 반환할 수 있음
         if (result.suggestions && Array.isArray(result.suggestions)) {
             suggestions = result.suggestions;
         } else if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
