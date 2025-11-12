@@ -156,3 +156,13 @@ export function getWritingTopic() {
 export function getCharacterInfo(char) {
     return callGeminiAPI('get_character_info', { text: char });
 }
+
+/**
+ * [★ 새 기능] 발음 평가 요청 (API 호출)
+ * @param {string} original - 원본 텍스트
+ * @param {string} user - 사용자가 말한 텍스트
+ * @returns {Promise<object>} - Gemini API 응답
+ */
+export function evaluatePronunciation(original, user) {
+    return callGeminiAPI('evaluate_pronunciation', { originalText: original, userText: user });
+}

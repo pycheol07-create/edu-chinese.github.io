@@ -9,7 +9,8 @@ export default async function handler(request, response) {
   }
 
   // 2. 프런트엔드에서 보낸 요청 데이터를 받습니다.
-  const { action, text, systemPrompt, history, pattern } = request.body;
+  // [수정] originalText와 userText 추가
+  const { action, text, systemPrompt, history, pattern, originalText, userText } = request.body;
 
   try {
     let apiUrl;
@@ -94,7 +95,7 @@ export default async function handler(request, response) {
         ];
         apiRequestBody = { contents };
     
-    // --- [확인 및 수정]: `generate_practice` 액션 ---
+    // --- `generate_practice` 액션 ---
     } else if (action === 'generate_practice') {
         const practiceSystemPrompt = `You are a Chinese language teacher. Your task is to generate one new, simple practice problem for the given Chinese pattern.
 - The problem must be different from the examples provided in the pattern data.
@@ -109,17 +110,14 @@ export default async function handler(request, response) {
 - Example Response (for pattern "越来越..."):
   {"korean": "그는 점점 더 잘생겨져.", "chinese": "他越来越帅了。", "pinyin": "tā yuèláiyuè shuài le.", "practiceVocab": [{"word": "越来越", "pinyin": "yuèláiyuè", "meaning": "점점 더"}, {"word": "帅", "pinyin": "shuài", "meaning": "잘생기다"}]}`;
         
-        // [수정 확인] contents 배열 마지막이 'user' 역할로 끝나야 함
         const contents = [
             { role: "user", parts: [{ text: practiceSystemPrompt }] },
             { role: "model", parts: [{ text: `Okay, I understand. I will generate a new practice problem for the pattern "${pattern}" in the specified JSON format, including "practiceVocab".` }] },
-            // 마지막 메시지가 AI에게 생성을 '명령'하는 user 역할이어야 합니다.
-            { role: "user", parts: [{ text: `Great. Now, please generate the practice problem for the pattern "${pattern}".` }] } // 이 부분이 이전 코드에서 정확했는지 다시 확인 (이번 코드는 확실히 맞습니다)
+            { role: "user", parts: [{ text: `Great. Now, please generate the practice problem for the pattern "${pattern}".` }] } 
         ];
         apiRequestBody = { contents };
-    // --- [수정 완료] ---
         
-    // --- [새 기능 추가]: `correct_writing` 액션 ---
+    // --- `correct_writing` 액션 ---
     } else if (action === 'correct_writing') {
         const correctionSystemPrompt = `You are a Chinese language teacher. Your task is to correct a single Chinese sentence or short paragraph written by a learner.
 - Analyze the user's text for grammatical errors, unnatural expressions, or typos.
@@ -140,9 +138,8 @@ export default async function handler(request, response) {
             { role: "user", parts: [{ text: `Please correct the following text: "${text}"` }] }
         ];
         apiRequestBody = { contents };
-    // --- [추가 완료] ---
         
-    // --- [새 기능 추가]: `get_writing_topic` 액션 (main.js에서 호출됨) ---
+    // --- `get_writing_topic` 액션 ---
     } else if (action === 'get_writing_topic') {
         const topicSystemPrompt = `You are a helpful assistant for a Chinese language learner.
 - Generate one simple and interesting writing topic in Korean for a user to practice Chinese writing.
@@ -157,9 +154,8 @@ export default async function handler(request, response) {
             { role: "user", parts: [{ text: "Please generate a topic now." }] }
         ];
         apiRequestBody = { contents };
-    // --- [추가 완료] ---
 
-    // --- [새 기능 추가]: `get_character_info` 액션 ---
+    // --- `get_character_info` 액션 ---
     } else if (action === 'get_character_info') {
         const characterSystemPrompt = `You are a Chinese lexicographer. Your task is to provide detailed information for a single Chinese character.
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
@@ -174,7 +170,30 @@ export default async function handler(request, response) {
             { role: "user", parts: [{ text: `Please provide information for the character: "${text}"` }] }
         ];
         apiRequestBody = { contents };
-    // --- [추가 완료] ---
+
+    // --- [★ 발음 평가 기능 추가] ---
+    } else if (action === 'evaluate_pronunciation') {
+        const pronunciationSystemPrompt = `You are a Chinese pronunciation coach. Compare the original Chinese text with the user's recognized text.
+- Determine if the user's text is a correct match (ignoring simple punctuation).
+- If it's correct, congratulate them.
+- If it's incorrect, identify the likely mispronounced part (e.g., a specific word, tone, or missing word).
+- Provide a very short, simple, and encouraging feedback tip *in Korean*.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "is_correct" (boolean) and "feedback" (string, in Korean).
+
+- Example (Correct): Original "你好", User said "你好" -> {"is_correct": true, "feedback": "👍 완벽해요! 발음이 정확합니다."}
+- Example (Wrong Tone): Original "你好 (nǐ hǎo)", User said "你号 (nǐ hào)" -> {"is_correct": false, "feedback": "🤔 'hǎo'의 3성 성조가 조금 약했어요. '하오'↘︎↗︎ 느낌으로 다시 시도해보세요!"}
+- Example (Missing Word): Original "我很高兴", User said "很高兴" -> {"is_correct": false, "feedback": "🤔 '我 (wǒ)' 발음이 빠졌네요. 다시 시도해보세요!"}
+- Example (Similar): Original "今天天气很好", User said "今天天气很好" -> {"is_correct": true, "feedback": "👍 훌륭해요! 정확합니다."}
+`;
+        
+        const contents = [
+            { role: "user", parts: [{ text: pronunciationSystemPrompt }] },
+            { role: "model", parts: [{ text: "Okay, I understand. I will act as a pronunciation coach and respond in the required JSON format (is_correct, feedback)." }] },
+            { role: "user", parts: [{ text: `Please evaluate this: Original: "${originalText}", User said: "${userText}"` }] }
+        ];
+        apiRequestBody = { contents };
+    // --- [★ 추가 완료] ---
 
     } else if (action === 'suggest_reply') {
         const suggestSystemPrompt = `Based on the previous conversation history, suggest 1 or 2 simple and natural next replies in Chinese for the user who is learning Chinese. The user just received the last message from the AI model.
@@ -274,7 +293,7 @@ export default async function handler(request, response) {
         }
     }
 
-    // 번역, 채팅, 패턴 채팅 시작, 문제 생성, 작문 교정 등은 data 전체를 반환 (프론트엔드에서 파싱)
+    // 번역, 채팅, 패턴 채팅 시작, 문제 생성, 작문 교정, 발음 평가 등은 data 전체를 반환 (프론트엔드에서 파싱)
     return response.status(200).json(data);
 
   } catch (error) {
@@ -283,4 +302,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1101-10
+// v.2025.10.20_1101-11 (발음 평가 추가)

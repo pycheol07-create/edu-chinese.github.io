@@ -3,23 +3,15 @@ import * as dom from './dom.js';
 import * as state from './state.js';
 import { playTTS } from './api.js'; // 예문 TTS를 위해 import
 
-/**
- * 커스텀 알림(모달)을 표시합니다.
- * @param {string} message - 알림창에 표시할 메시지
- */
+// ... (showAlert, displayDate 함수는 동일) ...
 export function showAlert(message) {
     if (dom.customAlertMessage && dom.customAlertModal) {
         dom.customAlertMessage.textContent = message;
         dom.customAlertModal.classList.remove('hidden');
     } else {
-        // 모달이 아직 로드되지 않았을 경우를 대비한 fallback
         alert(message);
     }
 }
-
-/**
- * 현재 날짜를 상단에 표시합니다.
- */
 export function displayDate() {
     const today = new Date();
     if (dom.currentDateEl) {
@@ -27,12 +19,13 @@ export function displayDate() {
     }
 }
 
+
 /**
  * 메인 컨테이너에 패턴 카드들을 렌더링합니다.
  * @param {Array} patterns - 표시할 패턴 객체 배열
  * @param {boolean} [showIndex=false] - 전체 목록 보기에서처럼 인덱스를 표시할지 여부
  */
-export function renderPatterns(patterns, showIndex = false) { // <--- 여기를 수정했습니다!
+export function renderPatterns(patterns, showIndex = false) { 
     if (!dom.patternContainer) return;
 
     dom.patternContainer.innerHTML = '';
@@ -41,12 +34,20 @@ export function renderPatterns(patterns, showIndex = false) { // <--- 여기를 
         const card = document.createElement('div');
         card.className = 'bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300';
 
+        // [★ 수정] "따라 말하기" 버튼 추가
         const examplesHtml = p.examples.map(ex => `
             <div class="mt-3">
                 <div class="flex items-center">
                     <p class="text-lg chinese-text text-gray-800">${ex.chinese}</p>
-                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${ex.chinese}">
+                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${ex.chinese}" title="듣기">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                    </button>
+                    <button class="follow-speak-btn ml-1 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${ex.chinese}" title="따라 말하기">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6V7.5a6 6 0 0 0-12 0v5.25a6 6 0 0 0 6 6Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5v2.25a7.5 7.5 0 0 1-15 0v-2.25" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 18.75a8.25 8.25 0 0 0 10.5 0" />
+                        </svg>
                     </button>
                 </div>
                 <p class="text-sm text-gray-500">${ex.pinyin}</p>
@@ -60,7 +61,6 @@ export function renderPatterns(patterns, showIndex = false) { // <--- 여기를 
                 <p class="w-1/3 text-sm text-gray-600">${v.meaning}</p>
             </div>`).join('');
 
-        // 이제 'showIndex'가 정의되었으므로 이 줄은 오류가 발생하지 않습니다.
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
 
         const practiceHtml = p.practice ? `
@@ -114,9 +114,7 @@ export function renderPatterns(patterns, showIndex = false) { // <--- 여기를 
     });
 }
 
-/**
- * '전체 패턴 보기' 모달에 패턴 목록을 렌더링합니다.
- */
+// ... (renderAllPatternsList 함수는 동일) ...
 export function renderAllPatternsList() {
     if (!dom.allPatternsList) return;
     
@@ -136,6 +134,7 @@ export function renderAllPatternsList() {
         dom.allPatternsList.appendChild(patternItem);
     });
 }
+
 
 /**
  * 채팅 기록창에 메시지를 추가합니다.
@@ -163,14 +162,22 @@ export function addMessageToHistory(sender, messageData) {
                 </div>`;
             dom.chatHistory.appendChild(correctionElement);
         }
+        // [★ 수정] "따라 말하기" 버튼 추가
         const messageElement = document.createElement('div');
         messageElement.className = 'flex justify-start';
         messageElement.innerHTML = `
             <div class="bg-white p-3 rounded-lg max-w-xs border">
                 <div class="flex items-center">
                     <p class="text-lg chinese-text text-gray-800">${messageData.chinese}</p>
-                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${messageData.chinese}">
+                    <button class="tts-btn ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${messageData.chinese}" title="듣기">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
+                    </button>
+                    <button class="follow-speak-btn ml-1 p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${messageData.chinese}" title="따라 말하기">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6V7.5a6 6 0 0 0-12 0v5.25a6 6 0 0 0 6 6Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5v2.25a7.5 7.5 0 0 1-15 0v-2.25" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 18.75a8.25 8.25 0 0 0 10.5 0" />
+                        </svg>
                     </button>
                 </div>
                 <p class="text-sm text-gray-500">${messageData.pinyin || ''}</p>
@@ -181,10 +188,7 @@ export function addMessageToHistory(sender, messageData) {
     if (dom.chatHistory) dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
 }
 
-/**
- * 채팅창에 추천 답변 칩을 렌더링합니다.
- * @param {Array} suggestions - 추천 답변 객체 배열
- */
+// ... (addSuggestionToHistory, renderCorrectionHistory 함수는 동일) ...
 export function addSuggestionToHistory(suggestions) {
     if (!dom.chatHistory) return;
 
@@ -203,16 +207,9 @@ export function addSuggestionToHistory(suggestions) {
             <p class="text-xs text-gray-600 mb-1">이렇게 답해보세요:</p>
             <div class="flex flex-wrap justify-center">${buttonsHtml}</div>
         </div>`;
-    dom.chatHistory.appendChild(suggestionElement);
-    
-    // 추천 답변 칩 클릭 이벤트는 main.js의 setupEventListeners에서 위임 처리
-    
+    dom.chatHistory.appendChild(suggestionElement);    
     dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
 }
-
-/**
- * '교정 노트' 모달에 교정 내역을 렌더링합니다.
- */
 export function renderCorrectionHistory() {
     if (!dom.correctionHistoryList) return;
     
