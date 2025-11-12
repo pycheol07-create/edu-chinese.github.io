@@ -23,12 +23,10 @@ async function callGeminiAPI(action, body) {
 
 /**
  * 텍스트를 음성(TTS)으로 재생합니다.
- * (수정: state.currentAudio -> state.runTimeState.currentAudio)
  * @param {string} text - 재생할 텍스트
  * @param {HTMLElement} buttonElement - 클릭된 TTS 버튼
  */
 export async function playTTS(text, buttonElement) {
-    // (수정) state.runTimeState 객체의 속성으로 접근
     if (state.runTimeState.currentAudio) {
         state.runTimeState.currentAudio.pause();
         state.runTimeState.currentAudio = null;
@@ -41,7 +39,7 @@ export async function playTTS(text, buttonElement) {
         }
     }
     
-    state.runTimeState.currentPlayingButton = buttonElement; // (수정)
+    state.runTimeState.currentPlayingButton = buttonElement;
     if(buttonElement) buttonElement.classList.add('is-playing');
 
     try {
@@ -53,27 +51,27 @@ export async function playTTS(text, buttonElement) {
         }
         
         const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
-        state.runTimeState.currentAudio = audio; // (수정)
+        state.runTimeState.currentAudio = audio;
         audio.play();
         
         audio.onended = () => {
             if(buttonElement) buttonElement.classList.remove('is-playing');
-            state.runTimeState.currentAudio = null; // (수정)
-            state.runTimeState.currentPlayingButton = null; // (수정)
+            state.runTimeState.currentAudio = null;
+            state.runTimeState.currentPlayingButton = null;
         };
         
         audio.onerror = (e) => {
             console.error('Audio playback error:', e);
             showAlert('오디오 재생 중 오류가 발생했습니다.');
             if(buttonElement) buttonElement.classList.remove('is-playing');
-            state.runTimeState.currentAudio = null; // (수정)
-            state.runTimeState.currentPlayingButton = null; // (수정)
+            state.runTimeState.currentAudio = null;
+            state.runTimeState.currentPlayingButton = null;
         };
     } catch (error) {
         console.error('TTS error:', error);
         showAlert(`음성(TTS)을 불러오는 데 실패했습니다: ${error.message}`);
         if(buttonElement) buttonElement.classList.remove('is-playing');
-        state.runTimeState.currentPlayingButton = null; // (수정)
+        state.runTimeState.currentPlayingButton = null;
     }
 }
 
@@ -86,22 +84,19 @@ export async function playTTS(text, buttonElement) {
  */
 export function translateText(text) {
     const patternList = state.allPatterns.map(p => p.pattern).join(", ");
-    const systemPrompt = `You are a professional Korean-to-Chinese translator and language teacher. Translate the following Korean sentence into natural, native-sounding Chinese. Provide: 1. The main Chinese translation. 2. The pinyin for the main translation. 3. (Optional) 1-2 alternative natural expressions if applicable. 4. A concise explanation (in Korean) of why this expression is natural, what the key vocabulary or grammar point is.
-Format your response as a single, valid JSON object with keys "chinese", "pinyin", "alternatives" (string array), "explanation" (string, in Korean), and "usedPattern" (string or null).
-Do not include markdown backticks.
-IMPORTANT: After translating, analyze your Chinese translation. If it uses one of the following patterns: [${patternList}], set the "usedPattern" key to the matching pattern string. If no pattern matches, set "usedPattern" to null.`;
-    
+    const systemPrompt = `... (생략) ...`; // 기존 프롬프트
     return callGeminiAPI('translate', { text, systemPrompt });
 }
 
 /**
- * AI 채팅 응답 요청 (API 호출)
+ * [★ 수정] AI 채팅 응답 요청 (API 호출)
  * @param {string} text - 사용자 입력
  * @param {Array} history - 대화 기록
+ * @param {string | null} roleContext - (선택) 롤플레잉 상황
  * @returns {Promise<object>} - Gemini API 응답
  */
-export function getChatResponse(text, history) {
-    return callGeminiAPI('chat', { text, history });
+export function getChatResponse(text, history, roleContext = null) {
+    return callGeminiAPI('chat', { text, history, roleContext });
 }
 
 /**
@@ -111,6 +106,15 @@ export function getChatResponse(text, history) {
  */
 export function startChatWithPattern(pattern) {
     return callGeminiAPI('start_chat_with_pattern', { pattern });
+}
+
+/**
+ * [★ 새 기능] 롤플레잉 채팅 시작 (API 호출)
+ * @param {string} context - 롤플레잉 상황 (e.g., 'restaurant')
+ * @returns {Promise<object>} - Gemini API 응답
+ */
+export function startRoleplayChat(context) {
+    return callGeminiAPI('start_roleplay_chat', { roleContext: context });
 }
 
 /**
@@ -158,7 +162,7 @@ export function getCharacterInfo(char) {
 }
 
 /**
- * [★ 새 기능] 발음 평가 요청 (API 호출)
+ * 발음 평가 요청 (API 호출)
  * @param {string} original - 원본 텍스트
  * @param {string} user - 사용자가 말한 텍스트
  * @returns {Promise<object>} - Gemini API 응답

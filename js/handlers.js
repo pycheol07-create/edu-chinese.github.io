@@ -12,6 +12,7 @@ import * as ui from './ui.js';
  * 번역기 모달의 '번역하기' 버튼 핸들러
  */
 export async function handleTranslation() {
+    // ... (기존 코드와 동일) ...
     const text = dom.koreanInput.value.trim();
     if (!text) {
         ui.showAlert('번역할 한국어 문장을 입력하세요.');
@@ -72,19 +73,17 @@ export async function handleTranslation() {
 }
 
 /**
- * AI 채팅 '전송' 버튼 핸들러
+ * [★ 수정] AI 채팅 '전송' 버튼 핸들러 (롤플레잉 문맥 인식)
  */
 export async function handleSendMessage() {
     const userInput = dom.chatInput.value.trim();
     if (!userInput) return;
     
-    // 이전 추천 답변 삭제
     dom.chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
     
     ui.addMessageToHistory('user', { text: userInput });
     dom.chatInput.value = '';
     
-    // 로딩 인디케이터 추가
     const loadingElement = document.createElement('div');
     loadingElement.className = 'flex justify-start';
     loadingElement.id = 'chat-loading';
@@ -93,8 +92,13 @@ export async function handleSendMessage() {
     dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
     
     try {
+        // [★ 수정] 롤플레잉 문맥(context)이 있는지 확인
+        const roleContext = state.conversationHistory.find(m => m.role === 'system')?.context || null;
+        
         state.conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
-        const result = await api.getChatResponse(userInput, state.conversationHistory);
+        
+        // [★ 수정] api.getChatResponse에 roleContext 전달
+        const result = await api.getChatResponse(userInput, state.conversationHistory, roleContext);
 
         let aiResponseData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
@@ -150,10 +154,9 @@ export async function handleStartChatWithPattern(patternString) {
     if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
     
     dom.chatHistory.innerHTML = '';
-    state.conversationHistory.length = 0; // (수정) 배열을 재할당하는 대신 비웁니다.
+    state.conversationHistory.length = 0; // 대화 기록 초기화
     dom.chatInput.value = '';
     
-    // 로딩 인디케이터
     const loadingElement = document.createElement('div');
     loadingElement.className = 'flex justify-start';
     loadingElement.id = 'chat-loading';
@@ -209,28 +212,82 @@ export async function handleStartChatWithPattern(patternString) {
 }
 
 /**
+ * [★ 새 기능] '상황별 대화' 시나리오 시작 핸들러
+ * @param {string} context - 롤플레잉 상황 (e.g., 'restaurant')
+ */
+export async function handleStartRoleplay(context) {
+    dom.chatModal.classList.remove('hidden');
+    if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
+    
+    dom.chatHistory.innerHTML = '';
+    state.conversationHistory.length = 0; // 대화 기록 초기화
+    dom.chatInput.value = '';
+    
+    const loadingElement = document.createElement('div');
+    loadingElement.className = 'flex justify-start';
+    loadingElement.id = 'chat-loading';
+    loadingElement.innerHTML = `<div class="bg-white p-3 rounded-lg border"><div class="loader"></div></div>`;
+    dom.chatHistory.appendChild(loadingElement);
+    dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
+
+    try {
+        // [★] 1. 롤플레잉 문맥(context)을 대화 기록에 시스템 메시지로 추가
+        state.conversationHistory.push({ role: 'system', context: context });
+
+        // [★] 2. 롤플레잉 시작 API 호출
+        const result = await api.startRoleplayChat(context);
+
+        let aiResponseData;
+        if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
+            const aiResponseText = result.candidates[0].content.parts[0].text;
+            if (!aiResponseText || !aiResponseText.trim().startsWith('{')) {
+                throw new Error("AI response is not valid JSON.");
+            } else {
+                try {
+                    const cleanedText = aiResponseText.trim().replace(/^```json\s*|\s*```$/g, '');
+                    aiResponseData = JSON.parse(cleanedText);
+                    // [★] 3. AI의 첫 메시지를 대화 기록에 추가
+                    state.conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] });
+                } catch (e) {
+                    throw new Error("AI response parsing failed.");
+                }
+            }
+        } else {
+             throw new Error("Invalid response structure from start_roleplay_chat API.");
+        }
+        ui.addMessageToHistory('ai', aiResponseData);
+        
+    } catch (error) {
+        console.error('Start role-play error:', error);
+        ui.showAlert(`대화 시작 중 오류가 발생했습니다: ${error.message}`);
+        // 오류 발생 시 채팅방을 닫거나, 시스템 마커를 제거
+        state.conversationHistory.length = 0;
+        dom.chatModal.classList.add('hidden');
+    } finally {
+        const loadingEl = document.getElementById('chat-loading');
+        if (loadingEl) loadingEl.remove();
+    }
+}
+
+
+/**
  * '답변 추천받기' 버튼 핸들러
  */
 export async function handleSuggestReply() {
+    // ... (기존 코드와 동일) ...
     dom.chatHistory.querySelectorAll('.suggestion-chip').forEach(chip => chip.closest('div.flex.justify-center')?.remove());
-    
     if (state.conversationHistory.length === 0) {
         ui.showAlert('추천할 답변을 생성하기 위한 대화 내용이 없습니다.');
         return;
     }
-    
     dom.suggestReplyBtn.disabled = true;
     dom.suggestReplyBtn.textContent = '추천 생성 중...';
-    
     try {
         const result = await api.getSuggestedReplies(state.conversationHistory);
-        
         let suggestions = [];
-        // [수정] suggest_reply 응답은 JSON 객체 안에 "suggestions" 키를 바로 포함 (candidates 없음)
         if (result.suggestions && Array.isArray(result.suggestions)) {
             suggestions = result.suggestions;
         } else if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
-             // 이중 확인 (api/gemini.js의 응답 형식에 따라)
              const suggestionText = result.candidates[0].content.parts[0].text.trim().replace(/^```json\s*|\s*```$/g, '');
              try {
                 const parsedData = JSON.parse(suggestionText);
@@ -243,14 +300,12 @@ export async function handleSuggestReply() {
         } else {
             console.error("Invalid response structure for suggestions:", result);
         }
-
         if (suggestions.length > 0 && suggestions.every(s => s.chinese && s.pinyin && s.korean)) {
             ui.addSuggestionToHistory(suggestions);
         } else {
              console.warn("Received suggestions are empty or have invalid format:", suggestions);
             ui.showAlert('추천할 만한 답변을 찾지 못했거나 형식이 잘못되었습니다.');
         }
-        
     } catch (error) {
         console.error('Suggest reply error:', error);
         ui.showAlert(`답변 추천 중 오류 발생: ${error.message}`);
@@ -266,6 +321,7 @@ export async function handleSuggestReply() {
  * @param {number} practiceIndex - 패턴 카드의 인덱스
  */
 export async function handleNewPracticeRequest(patternString, practiceIndex) {
+    // ... (기존 코드와 동일) ...
     const koreanEl = document.getElementById(`practice-korean-${practiceIndex}`);
     const inputEl = document.getElementById(`practice-input-${practiceIndex}`);
     const checkBtn = document.getElementById(`check-practice-btn-${practiceIndex}`);
@@ -275,16 +331,13 @@ export async function handleNewPracticeRequest(patternString, practiceIndex) {
     const hintDataEl = document.getElementById(`practice-hint-${practiceIndex}`);
     const practiceContainer = document.getElementById(`practice-container-${practiceIndex}`);
     const counterEl = document.getElementById(`practice-counter-${practiceIndex}`);
-
     if (!practiceContainer) {
         console.error(`Practice container practice-container-${practiceIndex} not found.`);
         return;
     }
-
     let currentCount = parseInt(practiceContainer.dataset.spreeCount, 10);
     const goal = parseInt(practiceContainer.dataset.spreeGoal, 10);
     let nextCount = currentCount + 1;
-
     koreanEl.textContent = '...';
     inputEl.value = '';
     resultEl.innerHTML = '';
@@ -293,11 +346,9 @@ export async function handleNewPracticeRequest(patternString, practiceIndex) {
     hintBtn.style.display = 'none';
     micBtnPractice.style.display = 'none';
     inputEl.disabled = true;
-    counterEl.innerHTML = `<div class="loader-sm mx-auto"></div>`; // 로딩 표시
-
+    counterEl.innerHTML = `<div class="loader-sm mx-auto"></div>`;
     try {
         const result = await api.getNewPractice(patternString);
-
         let practiceData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const practiceText = result.candidates[0].content.parts[0].text.trim().replace(/^```json\s*|\s*```$/g, '');
@@ -306,22 +357,19 @@ export async function handleNewPracticeRequest(patternString, practiceIndex) {
                     throw new Error("AI response for practice is not valid JSON.");
                 }
                 practiceData = JSON.parse(practiceText);
-
                 koreanEl.textContent = `"${practiceData.korean}"`;
                 checkBtn.dataset.answer = practiceData.chinese;
                 checkBtn.dataset.pinyin = practiceData.pinyin;
                 hintBtn.dataset.newVocab = JSON.stringify(practiceData.practiceVocab || []);
                 practiceContainer.dataset.spreeCount = nextCount;
-
                 checkBtn.style.display = '';
                 hintBtn.style.display = '';
                 micBtnPractice.style.display = '';
                 inputEl.disabled = false;
                 hintBtn.disabled = false;
                 hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                counterEl.textContent = `문제 ${nextCount} / ${goal}`; // 카운터 업데이트
+                counterEl.textContent = `문제 ${nextCount} / ${goal}`;
                 inputEl.focus();
-
             } catch (e) {
                 console.error("Failed to parse practice data:", practiceText, e);
                 koreanEl.textContent = "오류: 새 문제를 불러오지 못했습니다.";
@@ -349,6 +397,7 @@ export async function handleNewPracticeRequest(patternString, practiceIndex) {
  * '작문 교정하기' 버튼 핸들러
  */
 export async function handleCorrectWriting() {
+    // ... (기존 코드와 동일) ...
     const text = dom.correctionInput.value.trim();
     if (!text) {
         ui.showAlert('교정받을 중국어 문장을 입력하세요.');
@@ -356,18 +405,14 @@ export async function handleCorrectWriting() {
     }
     dom.correctWritingBtn.disabled = true;
     dom.correctionResult.innerHTML = '<div class="loader mx-auto"></div>';
-
     try {
         const result = await api.correctWriting(text);
-
         let correctionData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const correctionText = result.candidates[0].content.parts[0].text.trim().replace(/^```json\s*|\s*```$/g, '');
-
             if (!correctionText || !correctionText.startsWith('{')) {
                  throw new Error("AI가 유효한 JSON 형식으로 응답하지 않았습니다.");
             }
-
             try {
                 correctionData = JSON.parse(correctionText);
             } catch (e) {
@@ -378,18 +423,15 @@ export async function handleCorrectWriting() {
              console.error("Invalid response structure from correct_writing API:", result);
              correctionData = { corrected_sentence: "(유효하지 않은 응답)", explanation: "AI로부터 유효한 응답을 받지 못했습니다." };
         }
-
         if (correctionData.corrected_sentence && correctionData.explanation) {
              state.addCorrectionToHistory(text, correctionData.corrected_sentence, correctionData.explanation);
         }
-
         let explanationHtml = '';
         if (correctionData.explanation) {
             explanationHtml = `
                 <h4 class="text-md font-semibold text-gray-700 mt-4 pt-3 border-t">✍️ AI 코멘트:</h4>
                 <p class="text-md text-gray-600 mt-1">${correctionData.explanation.replace(/\n/g, '<br>')}</p>`;
         }
-
         dom.correctionResult.innerHTML = `
             <div>
                 <h4 class="text-md font-semibold text-gray-700">💡 교정된 문장:</h4>
@@ -401,7 +443,6 @@ export async function handleCorrectWriting() {
                 </div>
                 ${explanationHtml}
             </div>`;
-
     } catch (error) {
         console.error('Correction error:', error);
         dom.correctionResult.innerHTML = `<p class="text-red-500 text-center">교정 중 오류가 발생했습니다: ${error.message}</p>`;
@@ -414,21 +455,18 @@ export async function handleCorrectWriting() {
  * '작문 주제 추천' 버튼 핸들러
  */
 export async function handleGetWritingTopic() {
+    // ... (기존 코드와 동일) ...
     dom.getTopicBtn.disabled = true;
     dom.getTopicBtn.textContent = '주제 생성 중...';
     dom.writingTopicDisplay.innerHTML = '<div class="loader-sm mx-auto"></div>';
-
     try {
         const result = await api.getWritingTopic();
-
         let topicData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const topicText = result.candidates[0].content.parts[0].text.trim().replace(/^```json\s*|\s*```$/g, '');
-
             if (!topicText || !topicText.startsWith('{')) {
                  throw new Error("AI가 유효한 JSON 형식으로 응답하지 않았습니다.");
             }
-
             try {
                 topicData = JSON.parse(topicText);
             } catch (e) {
@@ -439,7 +477,6 @@ export async function handleGetWritingTopic() {
              console.error("Invalid response structure from get_writing_topic API:", result);
              throw new Error("AI로부터 유효한 응답을 받지 못했습니다.");
         }
-
         if (topicData.topic) {
             dom.writingTopicDisplay.textContent = `"${topicData.topic}"`;
             dom.writingTopicDisplay.classList.remove('italic');
@@ -447,7 +484,6 @@ export async function handleGetWritingTopic() {
         } else {
             throw new Error("AI 응답에 'topic' 키가 없습니다.");
         }
-
     } catch (error) {
         console.error('Get topic error:', error);
         dom.writingTopicDisplay.textContent = `오류: ${error.message}`;

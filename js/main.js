@@ -18,7 +18,6 @@ function setupEventListeners() {
     dom.newPatternBtn.addEventListener('click', () => {
          const newPatterns = state.loadDailyPatterns(); // loadDailyPatterns가 새로 생성/저장
          ui.renderPatterns(newPatterns);
-         // 새 패턴 렌더링 후, 연습문제 즉시 로드
          newPatterns.forEach((p, index) => {
              if (p.practice) {
                  setTimeout(() => handlers.handleNewPracticeRequest(p.pattern, index), 0);
@@ -152,8 +151,6 @@ function setupEventListeners() {
             const goal = parseInt(practiceContainer.dataset.spreeGoal, 10);
             if(counterEl) counterEl.textContent = `문제 ${currentCount} / ${goal}`;
         }
-
-        // [★] '따라 말하기' (Follow Speak) 버튼
         else if (target.closest('.follow-speak-btn')) {
             const button = target.closest('.follow-speak-btn');
             const originalText = button.dataset.text; 
@@ -161,13 +158,10 @@ function setupEventListeners() {
                 speech.toggleRecognition(button, { originalText: originalText }); // 'Evaluation' 모드로 실행
             }
         }
-        
-        // 'TTS' 버튼 (모든 tts-btn)
         else if (target.closest('.tts-btn')) {
             const ttsButton = target.closest('.tts-btn');
-            // [★] 발음 평가 중에는 TTS가 재생되지 않도록 방지
             if (ttsButton.classList.contains('is-playing')) {
-                 api.playTTS(null, ttsButton); // 현재 재생 중인 것을 중지
+                 api.playTTS(null, ttsButton); 
             } else {
                  const textToSpeak = ttsButton.dataset.text; 
                  if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
@@ -175,7 +169,6 @@ function setupEventListeners() {
         }
     });
 
-    // ... (patternContainer keydown 리스너는 동일) ...
     dom.patternContainer.addEventListener('keydown', (e) => {
         if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') {
             e.preventDefault();
@@ -186,7 +179,6 @@ function setupEventListeners() {
             }
         }
     });
-
 
     // ... (번역기, 작문 교정, 교정 노트, 알림, 전체 패턴 모달 리스너는 동일) ...
     dom.openTranslatorBtn.addEventListener('click', () => {
@@ -237,7 +229,7 @@ function setupEventListeners() {
     });
     dom.clearCorrectionHistoryBtn.addEventListener('click', () => {
         if (confirm('정말로 모든 교정 기록을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-            state.correctionHistory.length = 0; // (수정) 재할당 대신 비우기
+            state.correctionHistory.length = 0;
             state.saveCorrectionHistory();
             ui.renderCorrectionHistory();
         }
@@ -258,7 +250,7 @@ function setupEventListeners() {
             const patternIndex = parseInt(selectedPatternDiv.dataset.patternIndex, 10);
             const selectedPattern = state.allPatterns[patternIndex];
             if (selectedPattern) {
-                ui.renderPatterns([selectedPattern]); // 단일 패턴 렌더링
+                ui.renderPatterns([selectedPattern]);
                 if (selectedPattern.practice) {
                     setTimeout(() => handlers.handleNewPracticeRequest(selectedPattern.pattern, 0), 0);
                 }
@@ -268,14 +260,14 @@ function setupEventListeners() {
         }
     });
 
-
     // --- AI 채팅 모달 ---
+    // [★ 수정] '자유 대화' 버튼 리스너
     dom.chatBtn.addEventListener('click', () => {
         dom.chatModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
 
         dom.chatHistory.innerHTML = '';
-        state.conversationHistory.length = 0; // (수정) 재할당 대신 비우기
+        state.conversationHistory.length = 0; // [★] 롤플레잉 문맥 제거
         dom.chatInput.value = '';
         
         const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };
@@ -284,7 +276,7 @@ function setupEventListeners() {
     });
     dom.closeChatBtn.addEventListener('click', () => {
         dom.chatModal.classList.add('hidden');
-        speech.stopRecognition(); // 모달 닫을 때 음성 인식 중지
+        speech.stopRecognition();
         state.stopCurrentAudio();
     });
     dom.sendChatBtn.addEventListener('click', handlers.handleSendMessage);
@@ -295,9 +287,7 @@ function setupEventListeners() {
         }
     });
     
-    // [★ 수정] chatHistory 이벤트 리스너
     dom.chatHistory.addEventListener('click', (e) => {
-        // 'TTS' 버튼
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
@@ -305,33 +295,30 @@ function setupEventListeners() {
             return;
         }
         
-        // [★] '따라 말하기' 버튼
         const followSpeakButton = e.target.closest('.follow-speak-btn');
         if (followSpeakButton) {
             const originalText = followSpeakButton.dataset.text;
             if (originalText) {
-                speech.toggleRecognition(followSpeakButton, { originalText: originalText }); // 'Evaluation' 모드
+                speech.toggleRecognition(followSpeakButton, { originalText: originalText });
             }
             return;
         }
         
-        // '추천 답변' 칩
         const suggestionChip = e.target.closest('.suggestion-chip');
         if (suggestionChip) {
             dom.chatInput.value = suggestionChip.dataset.text;
             dom.chatInput.focus();
-            suggestionChip.closest('div.flex.justify-center').remove(); // 추천 칩 그룹 제거
+            suggestionChip.closest('div.flex.justify-center').remove();
             return;
         }
     });
     
-    // [★ 수정] 채팅 마이크 버튼
     dom.micBtn.addEventListener('click', () => {
-        speech.toggleRecognition(dom.micBtn, { targetInput: dom.chatInput }); // 'Input' 모드
+        speech.toggleRecognition(dom.micBtn, { targetInput: dom.chatInput });
     });
     dom.suggestReplyBtn.addEventListener('click', handlers.handleSuggestReply);
 
-    // ... (퀴즈, FAB, 단어 학습, 간체자 학습 리스너는 동일) ...
+    // --- 퀴즈 모달 ---
     dom.dailyQuizBtn.addEventListener('click', quiz.startQuiz);
     dom.closeQuizBtn.addEventListener('click', () => dom.quizModal.classList.add('hidden'));
     dom.quizContent.addEventListener('click', (e) => {
@@ -345,6 +332,8 @@ function setupEventListeners() {
             return;
         }
     });
+
+    // --- FAB (플로팅 버튼) ---
     if (dom.fabMainBtn && dom.fabContainer) {
         dom.fabMainBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -358,6 +347,8 @@ function setupEventListeners() {
             }
         }
     });
+
+    // --- 단어 학습 모달 ---
     dom.openWordBtn.addEventListener('click', () => {
         dom.wordModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
@@ -378,6 +369,8 @@ function setupEventListeners() {
         const textToSpeak = e.currentTarget.dataset.text;
         if (textToSpeak) api.playTTS(textToSpeak, e.currentTarget);
     });
+
+    // --- 간체자 학습 모달 ---
     dom.openCharBtn.addEventListener('click', () => {
         dom.charModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
@@ -397,6 +390,23 @@ function setupEventListeners() {
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
             if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
+        }
+    });
+    
+    // --- [★ 새 기능] 롤플레잉 모달 리스너 ---
+    dom.openRoleplayBtn.addEventListener('click', () => {
+        dom.roleplayModal.classList.remove('hidden');
+        if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
+    });
+    dom.closeRoleplayBtn.addEventListener('click', () => {
+        dom.roleplayModal.classList.add('hidden');
+    });
+    dom.roleplayScenarioList.addEventListener('click', (e) => {
+        const scenarioButton = e.target.closest('[data-scenario]');
+        if (scenarioButton) {
+            const context = scenarioButton.dataset.scenario;
+            dom.roleplayModal.classList.add('hidden');
+            handlers.handleStartRoleplay(context);
         }
     });
 }

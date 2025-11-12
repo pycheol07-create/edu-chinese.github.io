@@ -18,7 +18,10 @@ export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, tr
     wordFlashcardFront, wordFlashcardBack, wordPinyin, wordMeaning,
     wordTtsBtn, showWordAnswerBtn, nextWordBtn,
     openCharBtn, charModal, closeCharBtn, characterInfo,
-    charTtsBtn, nextCharBtn;
+    charTtsBtn, nextCharBtn,
+    // [★ 새 변수 추가]
+    openRoleplayBtn, roleplayModal, closeRoleplayBtn, roleplayScenarioList;
+
 
 /**
  * DOMContentLoaded 시점에 모든 DOM 요소를 찾아 변수에 할당합니다.
@@ -92,5 +95,11 @@ export function initializeDOM() {
     charTtsBtn = document.getElementById('char-tts-btn');
     nextCharBtn = document.getElementById('next-char-btn');
     
+    // [★ 새 DOM 요소 매핑]
+    openRoleplayBtn = document.getElementById('open-roleplay-btn');
+    roleplayModal = document.getElementById('roleplay-modal');
+    closeRoleplayBtn = document.getElementById('close-roleplay-btn');
+    roleplayScenarioList = document.getElementById('roleplay-scenario-list');
+
     console.log("DOM elements initialized.");
 }
