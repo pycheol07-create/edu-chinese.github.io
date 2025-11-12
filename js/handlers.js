@@ -150,7 +150,7 @@ export async function handleStartChatWithPattern(patternString) {
     if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
     
     dom.chatHistory.innerHTML = '';
-    state.conversationHistory = []; // 대화 기록 초기화
+    state.conversationHistory.length = 0; // (수정) 배열을 재할당하는 대신 비웁니다.
     dom.chatInput.value = '';
     
     // 로딩 인디케이터

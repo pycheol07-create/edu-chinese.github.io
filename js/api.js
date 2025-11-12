@@ -23,23 +23,25 @@ async function callGeminiAPI(action, body) {
 
 /**
  * 텍스트를 음성(TTS)으로 재생합니다.
+ * (수정: state.currentAudio -> state.runTimeState.currentAudio)
  * @param {string} text - 재생할 텍스트
  * @param {HTMLElement} buttonElement - 클릭된 TTS 버튼
  */
 export async function playTTS(text, buttonElement) {
-    if (state.currentAudio) {
-        state.currentAudio.pause();
-        state.currentAudio = null;
-        if (state.currentPlayingButton) {
-            state.currentPlayingButton.classList.remove('is-playing');
+    // (수정) state.runTimeState 객체의 속성으로 접근
+    if (state.runTimeState.currentAudio) {
+        state.runTimeState.currentAudio.pause();
+        state.runTimeState.currentAudio = null;
+        if (state.runTimeState.currentPlayingButton) {
+            state.runTimeState.currentPlayingButton.classList.remove('is-playing');
         }
-        if (state.currentPlayingButton === buttonElement) {
-            state.currentPlayingButton = null;
+        if (state.runTimeState.currentPlayingButton === buttonElement) {
+            state.runTimeState.currentPlayingButton = null;
             return;
         }
     }
     
-    state.currentPlayingButton = buttonElement;
+    state.runTimeState.currentPlayingButton = buttonElement; // (수정)
     if(buttonElement) buttonElement.classList.add('is-playing');
 
     try {
@@ -51,34 +53,31 @@ export async function playTTS(text, buttonElement) {
         }
         
         const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
-        state.currentAudio = audio;
+        state.runTimeState.currentAudio = audio; // (수정)
         audio.play();
         
         audio.onended = () => {
             if(buttonElement) buttonElement.classList.remove('is-playing');
-            state.currentAudio = null;
-            state.currentPlayingButton = null;
+            state.runTimeState.currentAudio = null; // (수정)
+            state.runTimeState.currentPlayingButton = null; // (수정)
         };
         
         audio.onerror = (e) => {
             console.error('Audio playback error:', e);
             showAlert('오디오 재생 중 오류가 발생했습니다.');
             if(buttonElement) buttonElement.classList.remove('is-playing');
-            state.currentAudio = null;
-            state.currentPlayingButton = null;
+            state.runTimeState.currentAudio = null; // (수정)
+            state.runTimeState.currentPlayingButton = null; // (수정)
         };
     } catch (error) {
         console.error('TTS error:', error);
         showAlert(`음성(TTS)을 불러오는 데 실패했습니다: ${error.message}`);
         if(buttonElement) buttonElement.classList.remove('is-playing');
-        state.currentPlayingButton = null;
+        state.runTimeState.currentPlayingButton = null; // (수정)
     }
 }
 
 // --- API를 호출하는 핸들러 함수들 ---
-// 이 함수들은 api.js가 아닌 handlers.js로 이동하는 것이 더 좋습니다.
-// 하지만 원래 계획에 따라 api.js에 우선 배치합니다.
-// (수정) -> 역시 핸들러는 분리하는 것이 맞습니다. 여기서는 순수 API 호출만 남깁니다.
 
 /**
  * 한국어 텍스트를 중국어로 번역 (API 호출)

@@ -228,7 +228,7 @@ function setupEventListeners() {
     });
     dom.clearCorrectionHistoryBtn.addEventListener('click', () => {
         if (confirm('정말로 모든 교정 기록을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-            state.correctionHistory = [];
+            state.correctionHistory.length = 0; // (수정) 재할당 대신 비우기
             state.saveCorrectionHistory();
             ui.renderCorrectionHistory();
         }
@@ -270,7 +270,7 @@ function setupEventListeners() {
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
 
         dom.chatHistory.innerHTML = '';
-        state.conversationHistory = [];
+        state.conversationHistory.length = 0; // (수정) 재할당 대신 비우기
         dom.chatInput.value = '';
         
         const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };

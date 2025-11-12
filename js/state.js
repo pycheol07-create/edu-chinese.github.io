@@ -14,11 +14,15 @@ export let learningCounts = {};
 export let conversationHistory = [];
 export let correctionHistory = [];
 
-// 오디오/기타 상태
+// 오디오/기타 상태 (수정: 재할당이 필요한 변수들을 객체로 감쌉니다)
+export const runTimeState = {
+    currentAudio: null,
+    currentPlayingButton: null,
+    wakeLock: null
+};
+
+// (수정) audioCache는 재할당되지 않으므로 그대로 둡니다.
 export let audioCache = {};
-export let currentAudio = null;
-export let currentPlayingButton = null;
-export let wakeLock = null;
 
 // --- 상태 초기화 및 관리 함수 ---
 
@@ -160,27 +164,29 @@ export function loadDailyPatterns() {
 
 /**
  * 현재 재생 중인 오디오를 중지하고 상태를 초기화합니다.
+ * (수정: runTimeState 객체의 속성을 변경하도록 수정)
  * @param {boolean} [stopButtonOnly=false] - 버튼의 'is-playing' 상태만 해제할지 여부
  */
 export function stopCurrentAudio(stopButtonOnly = false) {
-    if (currentAudio && !stopButtonOnly) {
-        currentAudio.pause();
-        currentAudio = null;
+    if (runTimeState.currentAudio && !stopButtonOnly) {
+        runTimeState.currentAudio.pause();
+        runTimeState.currentAudio = null;
     }
-    if (currentPlayingButton) {
-        currentPlayingButton.classList.remove('is-playing');
-        currentPlayingButton = null;
+    if (runTimeState.currentPlayingButton) {
+        runTimeState.currentPlayingButton.classList.remove('is-playing');
+        runTimeState.currentPlayingButton = null;
     }
 }
 
 /**
  * 화면 꺼짐 방지 WakeLock을 설정합니다.
+ * (수정: runTimeState 객체의 속성을 변경하도록 수정)
  */
 export async function setupScreenWakeLock() {
     if ('wakeLock' in navigator) {
         try {
-            wakeLock = await navigator.wakeLock.request('screen');
-            wakeLock.addEventListener('release', () => console.log('Screen Wake Lock released'));
+            runTimeState.wakeLock = await navigator.wakeLock.request('screen');
+            runTimeState.wakeLock.addEventListener('release', () => console.log('Screen Wake Lock released'));
             console.log('Screen Wake Lock active');
         } catch (err) {
             console.error(`${err.name}, ${err.message}`);
