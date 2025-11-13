@@ -18,7 +18,6 @@ function setupEventListeners() {
     dom.newPatternBtn.addEventListener('click', () => {
          const newPatterns = state.loadDailyPatterns(); // loadDailyPatterns가 새로 생성/저장
          ui.renderPatterns(newPatterns);
-         // 새 패턴 렌더링 후, 연습문제 즉시 로드
          newPatterns.forEach((p, index) => {
              if (p.practice) {
                  setTimeout(() => handlers.handleNewPracticeRequest(p.pattern, index), 0);
@@ -31,7 +30,7 @@ function setupEventListeners() {
     dom.patternContainer.addEventListener('click', (e) => {
         const target = e.target;
         
-        // '학습 완료' 버튼
+        // ... (learn-btn, start-chat-pattern-btn, next-practice-btn 로직은 동일) ...
         if (target.classList.contains('learn-btn')) {
             const pattern = target.dataset.pattern;
             state.learningCounts[pattern] = (state.learningCounts[pattern] || 0) + 1;
@@ -41,7 +40,6 @@ function setupEventListeners() {
                  countDisplay.textContent = state.learningCounts[pattern];
              }
         } 
-        // '이 패턴으로 대화' 버튼
         else if (target.closest('.start-chat-pattern-btn')) {
             const button = target.closest('.start-chat-pattern-btn');
             const patternString = button.dataset.patternString;
@@ -49,7 +47,6 @@ function setupEventListeners() {
                 handlers.handleStartChatWithPattern(patternString);
             }
         }
-        // '다음 문제' 버튼
         else if (target.closest('.next-practice-btn')) {
             const button = target.closest('.next-practice-btn');
             const practiceIndex = button.dataset.practiceIndex;
@@ -59,14 +56,16 @@ function setupEventListeners() {
                 handlers.handleNewPracticeRequest(patternString, practiceIndex);
             }
         }
-        // '연습문제 마이크' 버튼
+        
+        // [★ 수정] '연습문제 마이크' 버튼
         else if (target.closest('.practice-mic-btn')) {
             const button = target.closest('.practice-mic-btn');
             const practiceIndex = button.dataset.practiceIndex;
             const targetInput = document.getElementById(`practice-input-${practiceIndex}`);
             speech.toggleRecognition(button, { targetInput: targetInput }); // 'Input' 모드로 실행
         }
-        // '정답 확인' 버튼
+        
+        // ... (check-practice-btn, show-hint-btn, retry-practice-btn 로직은 동일) ...
         else if (target.classList.contains('check-practice-btn')) {
             const button = target;
             const inputId = button.dataset.inputId;
@@ -99,17 +98,15 @@ function setupEventListeners() {
             } else if (isCorrect) {
                  resultMessageHtml += `<p class="text-green-600 font-bold text-lg mt-3">🎉 ${spreeGoal}문제 완료! 수고하셨습니다!</p>`;
                  const counterEl = document.getElementById(`practice-counter-${index}`);
-                 if (counterEl) counterEl.textContent = ''; // 카운터 내용 지우기
+                 if (counterEl) counterEl.textContent = '';
                  practiceContainer.dataset.spreeCount = '0';
             }
 
             resultDiv.innerHTML = resultMessageHtml + resultButtonsHtml;
-
             button.style.display = 'none';
             document.getElementById(`show-hint-btn-${index}`).style.display = 'none';
             document.getElementById(`practice-mic-btn-${index}`).style.display = 'none';
         }
-        // '힌트 보기' 버튼
         else if (target.closest('.show-hint-btn')) {
             const button = target.closest('.show-hint-btn');
             const newVocab = button.dataset.newVocab;
@@ -134,7 +131,6 @@ function setupEventListeners() {
             }
             button.disabled = true; button.classList.add('opacity-50', 'cursor-not-allowed');
         }
-        // '다시하기' 버튼
         else if (target.classList.contains('retry-practice-btn')) {
             const index = target.dataset.practiceIndex;
             document.getElementById(`practice-input-${index}`).value = '';
@@ -149,15 +145,12 @@ function setupEventListeners() {
             document.getElementById(`practice-input-${index}`).disabled = false;
             document.getElementById(`practice-input-${index}`).focus();
             
-            // 카운터 복원
             const practiceContainer = document.getElementById(`practice-container-${index}`);
             const counterEl = document.getElementById(`practice-counter-${index}`);
             const currentCount = parseInt(practiceContainer.dataset.spreeCount, 10);
             const goal = parseInt(practiceContainer.dataset.spreeGoal, 10);
             if(counterEl) counterEl.textContent = `문제 ${currentCount} / ${goal}`;
         }
-        
-        // '따라 말하기' (Follow Speak) 버튼
         else if (target.closest('.follow-speak-btn')) {
             const button = target.closest('.follow-speak-btn');
             const originalText = button.dataset.text; 
@@ -165,13 +158,10 @@ function setupEventListeners() {
                 speech.toggleRecognition(button, { originalText: originalText }); // 'Evaluation' 모드로 실행
             }
         }
-        
-        // 'TTS' 버튼 (모든 tts-btn)
         else if (target.closest('.tts-btn')) {
             const ttsButton = target.closest('.tts-btn');
-            // 발음 평가 중에는 TTS가 재생되지 않도록 방지
             if (ttsButton.classList.contains('is-playing')) {
-                 api.playTTS(null, ttsButton); // 현재 재생 중인 것을 중지
+                 api.playTTS(null, ttsButton); 
             } else {
                  const textToSpeak = ttsButton.dataset.text; 
                  if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
@@ -179,7 +169,6 @@ function setupEventListeners() {
         }
     });
 
-    // '연습문제' Enter 키 입력
     dom.patternContainer.addEventListener('keydown', (e) => {
         if (e.target.id.startsWith('practice-input-') && e.key === 'Enter') {
             e.preventDefault();
@@ -191,22 +180,37 @@ function setupEventListeners() {
         }
     });
 
-    // --- 번역기 모달 이벤트 ---
+    // ... (번역기, 작문 교정, 교정 노트, 알림, 전체 패턴 모달 리스너는 동일) ...
     dom.openTranslatorBtn.addEventListener('click', () => {
         dom.translatorModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
     });
-    dom.closeTranslatorBtn.addEventListener('click', () => { dom.translatorModal.classList.add('hidden'); state.stopCurrentAudio(); });
+    dom.closeTranslatorBtn.addEventListener('click', () => {
+        dom.translatorModal.classList.add('hidden');
+        state.stopCurrentAudio();
+    });
     dom.translateBtn.addEventListener('click', handlers.handleTranslation);
-    dom.koreanInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlers.handleTranslation(); } });
-    dom.translationResult.addEventListener('click', (e) => { const ttsButton = e.target.closest('.tts-btn'); if (ttsButton) { const textToSpeak = ttsButton.dataset.text; if (textToSpeak) api.playTTS(textToSpeak, ttsButton); } });
-
-    // --- 작문 교정 모달 이벤트 ---
+    dom.koreanInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handlers.handleTranslation();
+        }
+    });
+    dom.translationResult.addEventListener('click', (e) => {
+        const ttsButton = e.target.closest('.tts-btn');
+        if (ttsButton) {
+            const textToSpeak = ttsButton.dataset.text;
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
+        }
+    });
     dom.openCorrectionBtn.addEventListener('click', () => {
         dom.correctionModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
     });
-    dom.closeCorrectionBtn.addEventListener('click', () => { dom.correctionModal.classList.add('hidden'); state.stopCurrentAudio(); });
+    dom.closeCorrectionBtn.addEventListener('click', () => {
+        dom.correctionModal.classList.add('hidden');
+        state.stopCurrentAudio();
+    });
     dom.correctWritingBtn.addEventListener('click', handlers.handleCorrectWriting);
     dom.getTopicBtn.addEventListener('click', handlers.handleGetWritingTopic);
     dom.correctionResult.addEventListener('click', (e) => {
@@ -216,8 +220,6 @@ function setupEventListeners() {
             if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
         }
     });
-
-    // --- 교정 노트 모달 이벤트 ---
     dom.openCorrectionHistoryBtn.addEventListener('click', () => {
         ui.renderCorrectionHistory();
         dom.correctionHistoryModal.classList.remove('hidden');
@@ -239,12 +241,7 @@ function setupEventListeners() {
             if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
         }
     });
-
-
-    // --- 커스텀 알림 ---
     dom.customAlertCloseBtn.addEventListener('click', () => dom.customAlertModal.classList.add('hidden'));
-
-    // --- 전체 패턴 모달 이벤트 ---
     dom.allPatternsBtn.addEventListener('click', () => dom.allPatternsModal.classList.remove('hidden'));
     dom.closeAllPatternsBtn.addEventListener('click', () => dom.allPatternsModal.classList.add('hidden'));
     dom.allPatternsList.addEventListener('click', (e) => {
@@ -254,7 +251,6 @@ function setupEventListeners() {
             const selectedPattern = state.allPatterns[patternIndex];
             if (selectedPattern) {
                 ui.renderPatterns([selectedPattern]);
-                // 단일 패턴 렌더링 후 연습문제 즉시 로드
                 if (selectedPattern.practice) {
                     setTimeout(() => handlers.handleNewPracticeRequest(selectedPattern.pattern, 0), 0);
                 }
@@ -264,10 +260,8 @@ function setupEventListeners() {
         }
     });
 
-    // --- AI 채팅 모달 이벤트 ---
-    
-    // [★ 수정] "AI와 자유 대화" (chatBtn) 리스너 삭제
-    /*
+    // --- AI 채팅 모달 ---
+    // [★ 수정] '자유 대화' 버튼 리스너
     dom.chatBtn.addEventListener('click', () => {
         dom.chatModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
@@ -280,11 +274,9 @@ function setupEventListeners() {
         ui.addMessageToHistory('ai', firstMsg);
         state.conversationHistory.push({ role: 'model', parts: [{ text: JSON.stringify(firstMsg) }] });
     });
-    */
-    
     dom.closeChatBtn.addEventListener('click', () => {
         dom.chatModal.classList.add('hidden');
-        speech.stopRecognition(); // 모달 닫을 때 음성 인식 중지
+        speech.stopRecognition();
         state.stopCurrentAudio();
     });
     dom.sendChatBtn.addEventListener('click', handlers.handleSendMessage);
@@ -294,8 +286,8 @@ function setupEventListeners() {
             handlers.handleSendMessage();
         }
     });
+    
     dom.chatHistory.addEventListener('click', (e) => {
-        // TTS 버튼
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
@@ -303,50 +295,45 @@ function setupEventListeners() {
             return;
         }
         
-        // '따라 말하기' 버튼
         const followSpeakButton = e.target.closest('.follow-speak-btn');
         if (followSpeakButton) {
             const originalText = followSpeakButton.dataset.text;
             if (originalText) {
-                speech.toggleRecognition(followSpeakButton, { originalText: originalText }); // 'Evaluation' 모드
+                speech.toggleRecognition(followSpeakButton, { originalText: originalText });
             }
             return;
         }
         
-        // '추천 답변' 칩
         const suggestionChip = e.target.closest('.suggestion-chip');
         if (suggestionChip) {
             dom.chatInput.value = suggestionChip.dataset.text;
             dom.chatInput.focus();
-            suggestionChip.closest('div.flex.justify-center').remove(); // 추천 칩 그룹 제거
+            suggestionChip.closest('div.flex.justify-center').remove();
             return;
         }
     });
-
+    
     dom.micBtn.addEventListener('click', () => {
-        speech.toggleRecognition(dom.micBtn, { targetInput: dom.chatInput }); // 'Input' 모드
+        speech.toggleRecognition(dom.micBtn, { targetInput: dom.chatInput });
     });
-
     dom.suggestReplyBtn.addEventListener('click', handlers.handleSuggestReply);
 
-    // --- 퀴즈 모달 이벤트 ---
+    // --- 퀴즈 모달 ---
     dom.dailyQuizBtn.addEventListener('click', quiz.startQuiz);
     dom.closeQuizBtn.addEventListener('click', () => dom.quizModal.classList.add('hidden'));
-
     dom.quizContent.addEventListener('click', (e) => {
         const targetButton = e.target.closest('.quiz-option-btn');
         if (targetButton) {
             quiz.handleQuizAnswer(targetButton);
             return;
         }
-
         if (e.target.id === 'close-quiz-modal-btn') {
             dom.quizModal.classList.add('hidden');
             return;
         }
     });
 
-    // --- Expandable FAB (플로팅 버튼 그룹) ---
+    // --- FAB (플로팅 버튼) ---
     if (dom.fabMainBtn && dom.fabContainer) {
         dom.fabMainBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -361,11 +348,11 @@ function setupEventListeners() {
         }
     });
 
-    // --- 단어 학습 모달 이벤트 ---
+    // --- 단어 학습 모달 ---
     dom.openWordBtn.addEventListener('click', () => {
         dom.wordModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
-        features.showNextWord(); // 모달 열 때 첫 단어 표시
+        features.showNextWord();
     });
     dom.closeWordBtn.addEventListener('click', () => {
         dom.wordModal.classList.add('hidden');
@@ -383,11 +370,11 @@ function setupEventListeners() {
         if (textToSpeak) api.playTTS(textToSpeak, e.currentTarget);
     });
 
-    // --- 간체자 학습 모달 이벤트 ---
+    // --- 간체자 학습 모달 ---
     dom.openCharBtn.addEventListener('click', () => {
         dom.charModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
-        features.showNextCharacter(); // 모달 열 때 첫 글자 표시
+        features.showNextCharacter();
     });
     dom.closeCharBtn.addEventListener('click', () => {
         dom.charModal.classList.add('hidden');
@@ -405,8 +392,8 @@ function setupEventListeners() {
             if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
         }
     });
-
-    // --- 롤플레잉 모달 리스너 ---
+    
+    // --- [★ 새 기능] 롤플레잉 모달 리스너 ---
     dom.openRoleplayBtn.addEventListener('click', () => {
         dom.roleplayModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
@@ -419,78 +406,7 @@ function setupEventListeners() {
         if (scenarioButton) {
             const context = scenarioButton.dataset.scenario;
             dom.roleplayModal.classList.add('hidden');
-            // [★ 수정] 이제 '일상 대화' (friend, family 등)도 이 핸들러가 처리합니다.
             handlers.handleStartRoleplay(context);
-        }
-    });
-    
-    // --- 듣기 훈련 모달 리스너 ---
-    dom.openListeningBtn.addEventListener('click', () => {
-        dom.listeningModal.classList.remove('hidden');
-        if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
-    });
-    dom.closeListeningBtn.addEventListener('click', () => {
-        dom.listeningModal.classList.add('hidden');
-    });
-    dom.listeningScenarioList.addEventListener('click', (e) => {
-        const scenarioButton = e.target.closest('[data-scenario]');
-        if (scenarioButton) {
-            const context = scenarioButton.dataset.scenario;
-            dom.listeningModal.classList.add('hidden');
-            handlers.handleStartListeningScript(context);
-        }
-    });
-    dom.closeScriptPlayerBtn.addEventListener('click', () => {
-        dom.scriptPlayerModal.classList.add('hidden');
-        state.stopCurrentAudio(); // 모달 닫을 때 재생 중인 오디오 중지
-    });
-    
-    // "전체 대본 듣기" 버튼 (반복 듣기)
-    dom.playAllScriptBtn.addEventListener('click', (e) => {
-        const turnsToPlay = [];
-        // [★ 수정] 'gender' 정보까지 함께 수집
-        dom.scriptContent.querySelectorAll('.script-turn-visible').forEach(turnEl => {
-            if (turnEl.dataset.text && turnEl.dataset.gender) {
-                turnsToPlay.push({
-                    chinese: turnEl.dataset.text,
-                    gender: turnEl.dataset.gender
-                });
-            }
-        });
-        
-        if (turnsToPlay.length > 0) {
-            api.playTTSequentially(turnsToPlay, e.currentTarget);
-        }
-    });
-
-    // "대본 숨기기/보이기" 버튼
-    dom.toggleScriptBtn.addEventListener('click', (e) => {
-        const isVisible = e.currentTarget.dataset.visible === 'true';
-        if (isVisible) {
-            dom.scriptContent.classList.add('hidden');
-            e.currentTarget.textContent = '대본 보기';
-            e.currentTarget.dataset.visible = 'false';
-            dom.scriptContent.querySelectorAll('.script-turn-visible').forEach(el => {
-                el.classList.remove('script-turn-visible');
-            });
-        } else {
-            dom.scriptContent.classList.remove('hidden');
-            e.currentTarget.textContent = '대본 숨기기';
-            e.currentTarget.dataset.visible = 'true';
-            dom.scriptContent.querySelectorAll('[data-text]').forEach(el => {
-                el.classList.add('script-turn-visible');
-            });
-        }
-    });
-    
-    // '대본 플레이어' 모달 내의 개별 TTS 버튼 (이벤트 위임)
-    dom.scriptContent.addEventListener('click', (e) => {
-        const ttsButton = e.target.closest('.tts-btn');
-        if (ttsButton) {
-            const textToSpeak = ttsButton.dataset.text;
-            // [★ 수정] 개별 TTS도 성별(gender)을 전달
-            const gender = ttsButton.closest('[data-gender]')?.dataset.gender || 'male';
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, gender);
         }
     });
 }

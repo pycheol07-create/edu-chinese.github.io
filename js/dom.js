@@ -6,9 +6,7 @@
 export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translatorModal,
     closeTranslatorBtn, translateBtn, koreanInput, translationResult, customAlertModal,
     customAlertMessage, customAlertCloseBtn, allPatternsBtn, allPatternsModal,
-    closeAllPatternsBtn, allPatternsList, 
-    // [★ 수정] chatBtn 변수 삭제
-    chatModal, closeChatBtn,
+    closeAllPatternsBtn, allPatternsList, chatBtn, chatModal, closeChatBtn,
     chatHistory, chatInput, sendChatBtn, micBtn, suggestReplyBtn,
     dailyQuizBtn, quizModal, closeQuizBtn, quizContent,
     openCorrectionBtn, correctionModal, closeCorrectionBtn, correctionInput,
@@ -21,10 +19,8 @@ export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, tr
     wordTtsBtn, showWordAnswerBtn, nextWordBtn,
     openCharBtn, charModal, closeCharBtn, characterInfo,
     charTtsBtn, nextCharBtn,
-    openRoleplayBtn, roleplayModal, closeRoleplayBtn, roleplayScenarioList,
-    openListeningBtn, listeningModal, closeListeningBtn, listeningScenarioList,
-    scriptPlayerModal, closeScriptPlayerBtn, scriptTitle,
-    playAllScriptBtn, toggleScriptBtn, scriptContent;
+    // [★ 새 변수 추가]
+    openRoleplayBtn, roleplayModal, closeRoleplayBtn, roleplayScenarioList;
 
 
 /**
@@ -47,8 +43,7 @@ export function initializeDOM() {
     allPatternsModal = document.getElementById('all-patterns-modal');
     closeAllPatternsBtn = document.getElementById('close-all-patterns-btn');
     allPatternsList = document.getElementById('all-patterns-list');
-    
-    // [★ 수정] chatBtn = document.getElementById('open-chat-btn'); <- 이 줄 삭제
+    chatBtn = document.getElementById('open-chat-btn');
     chatModal = document.getElementById('chat-modal');
     closeChatBtn = document.getElementById('close-chat-btn');
     chatHistory = document.getElementById('chat-history');
@@ -100,21 +95,11 @@ export function initializeDOM() {
     charTtsBtn = document.getElementById('char-tts-btn');
     nextCharBtn = document.getElementById('next-char-btn');
     
+    // [★ 새 DOM 요소 매핑]
     openRoleplayBtn = document.getElementById('open-roleplay-btn');
     roleplayModal = document.getElementById('roleplay-modal');
     closeRoleplayBtn = document.getElementById('close-roleplay-btn');
     roleplayScenarioList = document.getElementById('roleplay-scenario-list');
-
-    openListeningBtn = document.getElementById('open-listening-btn');
-    listeningModal = document.getElementById('listening-modal');
-    closeListeningBtn = document.getElementById('close-listening-btn');
-    listeningScenarioList = document.getElementById('listening-scenario-list');
-    scriptPlayerModal = document.getElementById('script-player-modal');
-    closeScriptPlayerBtn = document.getElementById('close-script-player-btn');
-    scriptTitle = document.getElementById('script-title');
-    playAllScriptBtn = document.getElementById('play-all-script-btn');
-    toggleScriptBtn = document.getElementById('toggle-script-btn');
-    scriptContent = document.getElementById('script-content');
 
     console.log("DOM elements initialized.");
 }
