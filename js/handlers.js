@@ -109,7 +109,6 @@ export async function handleTranslation() {
  * AI 채팅 '전송' 버튼 핸들러 (롤플레잉 문맥 인식)
  */
 export async function handleSendMessage() {
-    // ... (기존 코드와 동일) ...
     const userInput = dom.chatInput.value.trim();
     if (!userInput) return;
     
@@ -126,20 +125,29 @@ export async function handleSendMessage() {
     dom.chatHistory.scrollTop = dom.chatHistory.scrollHeight;
     
     try {
+        // [★ 수정] (line 133)
+        // 1. roleContext를 찾습니다. (이 코드는 정상입니다)
         const roleContext = state.conversationHistory.find(m => m.role === 'system')?.context || null;
         
+        // 2. 사용자의 새 메시지를 히스토리에 추가합니다. (이 코드는 정상입니다)
         state.conversationHistory.push({ role: 'user', parts: [{ text: userInput }] });
         
-        const result = await api.getChatResponse(userInput, state.conversationHistory, roleContext);
+        // 3. [★ 수정] API로 전송할 '필터링된' 히스토리를 생성합니다.
+        //    Google API가 이해하지 못하는 { role: 'system' } 객체를 제거합니다.
+        const filteredHistory = state.conversationHistory.filter(
+            m => m.role === 'user' || m.role === 'model'
+        );
+        
+        // 4. [★ 수정] 'state.conversationHistory' 대신 'filteredHistory'를 전송합니다.
+        const result = await api.getChatResponse(userInput, filteredHistory, roleContext);
 
         let aiResponseData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
             const aiResponseText = result.candidates[0].content.parts[0].text;
 
-            // [★ 수정] JSON 추출 로직 변경
             const cleanedText = extractJson(aiResponseText);
 
-            if (!cleanedText) { // JSON 추출 실패
+            if (!cleanedText) { 
                 console.error("AI response is not valid JSON (or is empty):", aiResponseText);
                 aiResponseData = {
                     chinese: "哎呀，我好像走神了...",
@@ -149,7 +157,7 @@ export async function handleSendMessage() {
             } else {
                 try {
                     aiResponseData = JSON.parse(cleanedText);
-                    // [★ 수정] 원본 AI 응답(JSON 텍스트)을 히스토리에 저장
+                    // 5. [★ 수정] 클라이언트의 '원본' 히스토리에는 파싱된 JSON 텍스트를 저장합니다.
                     state.conversationHistory.push({ role: 'model', parts: [{ text: cleanedText }] });
                 } catch (e) {
                     console.error("AI response looked like JSON but failed to parse:", aiResponseText, e);
@@ -158,7 +166,7 @@ export async function handleSendMessage() {
                         pinyin: "",
                         korean: "이런... 응답 형식을 처리하는 데 실패했어요. 다시 시도해주세요."
                     };
-                    state.conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] }); // 파싱 실패 시 원본 텍스트 저장
+                    state.conversationHistory.push({ role: 'model', parts: [{ text: aiResponseText }] }); 
                 }
             }
         } else {
@@ -171,7 +179,7 @@ export async function handleSendMessage() {
         }
         ui.addMessageToHistory('ai', aiResponseData);
         
-    } catch (error) {
+    } catch (error) { // [★ 수정] (line 175)
         console.error('Chat error:', error);
         ui.showAlert(`대화 중 오류가 발생했습니다: ${error.message}`);
     } finally {
@@ -324,16 +332,17 @@ export async function handleSuggestReply() {
     dom.suggestReplyBtn.textContent = '추천 생성 중...';
     
     try {
+        // [★ 수정] (line 333)
+        // 1. { role: 'system' } 객체를 필터링합니다. (이 코드는 이미 수정되었습니다.)
         const filteredHistory = state.conversationHistory.filter(
             m => m.role === 'user' || m.role === 'model'
         );
         
-        // [★ 수정] 
-        // api/gemini.js 수정 후, 이 API는 파싱된 JSON을 반환합니다.
+        // 2. api/gemini.js 수정 후, 이 API는 파싱된 JSON을 반환합니다.
         const result = await api.getSuggestedReplies(filteredHistory);
         
         let suggestions = [];
-        // [★ 수정] 서버가 이제 파싱된 JSON을 반환하므로 result.suggestions로 바로 접근
+        // 3. 서버가 이제 파싱된 JSON을 반환하므로 result.suggestions로 바로 접근
         if (result.suggestions && Array.isArray(result.suggestions)) {
             suggestions = result.suggestions;
         } 
@@ -348,7 +357,7 @@ export async function handleSuggestReply() {
             ui.showAlert('추천할 만한 답변을 찾지 못했거나 형식이 잘못되었습니다.');
         }
         
-    } catch (error) {
+    } catch (error) { // [★ 수정] (line 352)
         console.error('Suggest reply error:', error);
         ui.showAlert(`답변 추천 중 오류 발생: ${error.message}`);
     } finally {
@@ -706,9 +715,13 @@ export async function handlePlayAllListeningScript() {
             // [★ 수정] api.playTTS가 Promise를 반환 (reject되면 catch로 이동)
             await api.playTTS(text, ttsButton, line);
 
-            // [★ 수정] (버그 유발 코드 삭제)
-            // 정상 종료(onended) 시에도 currentAudio가 null이 되어 
-            // 루프가 중단되던 버그 수정.
+            // [★ 수정]
+            // 버그 수정: "Playback stopped"가 아닌, 정상 종료(onended) 시
+            // currentAudio가 null이 되어도 루프가 중단되던 버그 수정.
+            // (onended는 Promise를 resolve하므로, catch로 가지 않고
+            //  이 다음 라인으로 넘어옵니다. onpause(수동중지)는 reject합니다.)
+            
+            // [★ 삭제] (버그 유발 코드 삭제)
             /*
             if (state.runTimeState.currentAudio === null) {
                  console.log("Playback stopped.");
@@ -718,7 +731,7 @@ export async function handlePlayAllListeningScript() {
 
             await wait(300); // 대사 사이 0.3초 쉼
         }
-    } catch (error) {
+    } catch (error) { // (line 718)
         console.error("Play All error:", error);
         // "Playback stopped"는 stopCurrentAudio에 의해 발생하는 예상된 오류(Promise reject)
         if (error && error.message !== 'Playback stopped') { 
