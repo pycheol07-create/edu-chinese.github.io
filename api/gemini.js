@@ -377,7 +377,27 @@ export default async function handler(request, response) {
         apiRequestBody = { contents };
 
     } else if (action === 'get_character_info') {
-        const characterSystemPrompt = `... (생략) ...`;
+        // [★ 수정] '간체자 학습' 오류 해결을 위해 프롬프트 수정
+        const characterSystemPrompt = `You are an AI Chinese lexicographer. Your goal is to provide detailed information about a single Chinese character in a specific JSON format.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "char" (string), "pinyin" (string), "meaning" (string), and "examples" (array).
+- "char": The character itself.
+- "pinyin": The main pinyin.
+- "meaning": The primary Korean meaning.
+- "examples": An array of 2-3 common words that use this character.
+- Each object in the "examples" array must have these exact keys: "word" (string), "pinyin" (string), "meaning" (string, in Korean).
+
+- Example for character "好":
+{
+  "char": "好",
+  "pinyin": "hǎo",
+  "meaning": "좋다",
+  "examples": [
+    { "word": "你好", "pinyin": "nǐ hǎo", "meaning": "안녕하세요" },
+    { "word": "好看", "pinyin": "hǎo kàn", "meaning": "보기 좋다, 예쁘다" },
+    { "word": "好久", "pinyin": "hǎo jiǔ", "meaning": "오래" }
+  ]
+}`;
         const contents = [
             { role: "user", parts: [{ text: characterSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I understand. I will provide information for the requested character in the specified JSON format." }] },
@@ -523,4 +543,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1101-18 (UI 변경 및 TTS/답변추천 버그 수정)
+// v.2025.10.20_1101-19 (간체자 학습 프롬프트 수정)
