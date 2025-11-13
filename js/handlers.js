@@ -38,7 +38,12 @@ function extractJson(text) {
  * 번역기 모달의 '번역하기' 버튼 핸들러
  */
 export async function handleTranslation() {
-    // ... (기존 코드) ...
+    // ... (기존 코드와 동일) ...
+    const text = dom.koreanInput.value.trim();
+    if (!text) {
+        ui.showAlert('번역할 한국어 문장을 입력하세요.');
+        return;
+    }
     dom.translateBtn.disabled = true;
     dom.translationResult.innerHTML = '<div class="loader mx-auto"></div>';
     
@@ -323,23 +328,16 @@ export async function handleSuggestReply() {
             m => m.role === 'user' || m.role === 'model'
         );
         
-        // [★ 수정]
-        // 이 API 호출은 서버(api/gemini.js)에서 오류가 발생한 것입니다.
-        // 클라이언트(handlers.js) 측 코드는 정상입니다.
-        // 서버 측에서 'AI로부터 유효한 답변 추천...' 오류를 던졌습니다. (오류 로그 3번 참조)
-        // 이 파일(handlers.js)을 수정한 뒤, api/gemini.js 파일도 수정해야 합니다.
+        // [★ 수정] 
+        // api/gemini.js 수정 후, 이 API는 파싱된 JSON을 반환합니다.
         const result = await api.getSuggestedReplies(filteredHistory);
         
         let suggestions = [];
-        // [★ 수정] 서버가 이제 파싱된 JSON을 반환하므로 result.candidates가 없음
+        // [★ 수정] 서버가 이제 파싱된 JSON을 반환하므로 result.suggestions로 바로 접근
         if (result.suggestions && Array.isArray(result.suggestions)) {
             suggestions = result.suggestions;
         } 
-        // [★ 삭제] result.candidates... 관련 로직 삭제
-        // else if (result.candidates && ...) 
-
         else {
-            // [★ 수정] 서버가 suggestions를 주지 않았을 때의 오류
             console.error("Invalid response structure for suggestions:", result);
         }
 
@@ -351,8 +349,6 @@ export async function handleSuggestReply() {
         }
         
     } catch (error) {
-        // [★] 'Suggest reply error: Error: AI로부터 유효한 답변 추천...'
-        // 이 오류 메시지는 api/gemini.js에서 보낸 오류 메시지입니다.
         console.error('Suggest reply error:', error);
         ui.showAlert(`답변 추천 중 오류 발생: ${error.message}`);
     } finally {
@@ -367,37 +363,55 @@ export async function handleSuggestReply() {
  * @param {number} practiceIndex - 패턴 카드의 인덱스
  */
 export async function handleNewPracticeRequest(patternString, practiceIndex) {
-    // ... (기존 코드와 동일) ...
+    // [★ 수정] 오류 2, 3번 해결: 변수 선언을 try 밖으로 이동
     const koreanEl = document.getElementById(`practice-korean-${practiceIndex}`);
     const inputEl = document.getElementById(`practice-input-${practiceIndex}`);
     const checkBtn = document.getElementById(`check-practice-btn-${practiceIndex}`);
-    // ... (기타 dom 요소)
+    const resultEl = document.getElementById(`practice-result-${practiceIndex}`);
+    const hintDataEl = document.getElementById(`practice-hint-${practiceIndex}`);
     const practiceContainer = document.getElementById(`practice-container-${practiceIndex}`);
     const counterEl = document.getElementById(`practice-counter-${practiceIndex}`);
+    
+    // [★ 수정] 오류 1번 해결: hintBtn, micBtnPractice 정의 추가
+    const hintBtn = document.getElementById(`show-hint-btn-${practiceIndex}`);
+    const micBtnPractice = document.getElementById(`practice-mic-btn-${practiceIndex}`);
+
     if (!practiceContainer) {
         console.error(`Practice container practice-container-${practiceIndex} not found.`);
         return;
     }
-    // ... (로딩 UI 설정) ...
+    
+    // [★ 수정] 오류 3, 4번 해결: currentCount, goal 정의를 try 밖으로 이동
+    let currentCount = parseInt(practiceContainer.dataset.spreeCount, 10);
+    const goal = parseInt(practiceContainer.dataset.spreeGoal, 10);
+
+    // 로딩 UI 설정
     koreanEl.textContent = '...';
     inputEl.value = '';
-    // ...
+    resultEl.innerHTML = '';
+    hintDataEl.innerHTML = '';
+    checkBtn.style.display = 'none';
+    hintBtn.style.display = 'none';
+    micBtnPractice.style.display = 'none';
+    inputEl.disabled = true;
     counterEl.innerHTML = `<div class="loader-sm mx-auto"></div>`;
+    
     try {
+        let nextCount = currentCount + 1; // nextCount는 try 내부에서만 필요
         const result = await api.getNewPractice(patternString);
         let practiceData;
+        
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
-            // [★ 수정] JSON 추출 로직 변경 (오류 1번의 원인)
             const aiResponseText = result.candidates[0].content.parts[0].text;
             const practiceText = extractJson(aiResponseText);
 
             try {
-                if (!practiceText) { // (line 365)
+                if (!practiceText) { 
                     throw new Error("AI response for practice is not valid JSON.");
                 }
                 practiceData = JSON.parse(practiceText);
                 
-                // [★ 추가] AI가 만든 퀴즈(오류 로그)가 아니라 작문 문제를 요구해야 함
+                // [★ 추가] AI가 만든 퀴즈(오류 로그)가 아니라 작문 문제를 요구
                 if (practiceData.question || !practiceData.korean || !practiceData.chinese) {
                     console.error("AI returned a quiz instead of a practice problem:", practiceData);
                     throw new Error("AI가 연습문제가 아닌 퀴즈를 반환했습니다.");
@@ -406,8 +420,7 @@ export async function handleNewPracticeRequest(patternString, practiceIndex) {
                 koreanEl.textContent = `"${practiceData.korean}"`;
                 checkBtn.dataset.answer = practiceData.chinese;
                 checkBtn.dataset.pinyin = practiceData.pinyin;
-                // ... (이하 UI 설정 동일)
-                hintBtn.dataset.newVocab = JSON.stringify(practiceData.practiceVocab || []);
+                hintBtn.dataset.newVocab = JSON.stringify(practiceData.practiceVocab || []); // (line 410)
                 practiceContainer.dataset.spreeCount = nextCount;
                 checkBtn.style.display = '';
                 hintBtn.style.display = '';
@@ -417,26 +430,27 @@ export async function handleNewPracticeRequest(patternString, practiceIndex) {
                 hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 counterEl.textContent = `문제 ${nextCount} / ${goal}`;
                 inputEl.focus();
-            } catch (e) { // (line 382)
-                console.error("Failed to parse practice data:", aiResponseText, e); // [★ 수정] 원본 텍스트(aiResponseText) 로깅
+                
+            } catch (e) { // (line 421)
+                console.error("Failed to parse practice data:", aiResponseText, e); 
                 koreanEl.textContent = "오류: 새 문제를 불러오지 못했습니다.";
                 counterEl.textContent = '오류';
-                practiceContainer.dataset.spreeCount = currentCount;
+                practiceContainer.dataset.spreeCount = currentCount; // (line 424) [★ 수정] 이제 currentCount 접근 가능
                 inputEl.disabled = true;
             }
         } else {
             console.error("Invalid response structure from generate_practice API:", result);
             koreanEl.textContent = "오류: AI 응답이 없습니다.";
             counterEl.textContent = '오류';
-            practiceContainer.dataset.spreeCount = currentCount;
+            practiceContainer.dataset.spreeCount = currentCount; // [★ 수정] 이제 currentCount 접근 가능
             inputEl.disabled = true;
         }
-    } catch (error) {
+    } catch (error) { // (line 435)
         console.error('New practice request error:', error);
         koreanEl.textContent = `오류: ${error.message}`;
         counterEl.textContent = '오류';
-        practiceContainer.dataset.spreeCount = currentCount;
-        inputEl.disabled = true;
+        practiceContainer.dataset.spreeCount = currentCount; // [★ 수정] 이제 currentCount 접근 가능
+        inputEl.disabled = true; // (line 438)
     }
 }
 
