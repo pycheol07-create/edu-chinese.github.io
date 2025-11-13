@@ -695,20 +695,22 @@ export async function handlePlayAllListeningScript() {
             const ttsButton = line.querySelector('.tts-btn');
             if (!text) continue;
 
-            // api.js의 playTTS는 3번째 인자로 lineElement를 받아
-            // 재생 시작 시 'is-playing' 클래스를 추가하고,
-            // 재생 종료 시(onended, onerror, onpause) 클래스를 제거하며
-            // Promise를 반환하도록 수정될 예정입니다.
+            // [★ 수정] api.playTTS가 Promise를 반환 (reject되면 catch로 이동)
             await api.playTTS(text, ttsButton, line);
 
-            // 재생이 (오류나 중지 없이) 정상 종료되었는지 확인
-            // stopCurrentAudio가 호출되면 currentAudio가 null이 됩니다.
-            // [★ 수정] currentAudio가 null이 아니면 (즉, 정상 종료되면) 대기
+            // [★ 수정]
+            // 버그 수정: "Playback stopped"가 아닌, 정상 종료(onended) 시
+            // currentAudio가 null이 되어도 루프가 중단되던 문제 수정.
+            // (onended는 Promise를 resolve하므로, catch로 가지 않고
+            //  이 다음 라인으로 넘어옵니다. onpause(수동중지)는 reject합니다.)
+            
+            // [★ 삭제] (버그 유발 코드 삭제)
+            /*
             if (state.runTimeState.currentAudio === null) {
-                 // 사용자가 중지했음 (stopCurrentAudio가 호출됨)
                  console.log("Playback stopped.");
-                 break; // 루프 탈출
+                 break; 
             }
+            */
 
             await wait(300); // 대사 사이 0.3초 쉼
         }
@@ -718,6 +720,9 @@ export async function handlePlayAllListeningScript() {
         if (error && error.message !== 'Playback stopped') { 
            ui.showAlert(`전체 재생 중 오류가 발생했습니다: ${error.message}`);
         }
+        // [★ 추가] catch로 잡혔다는 것은 루프가 중단되었다는 의미
+        console.log("Play All loop terminated.");
+
     } finally {
         dom.playAllScriptBtn.disabled = false;
         dom.playAllScriptBtn.textContent = '▶︎ 전체 대화 듣기';

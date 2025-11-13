@@ -393,7 +393,26 @@ export default async function handler(request, response) {
         apiRequestBody = { contents };
 
     } else if (action === 'suggest_reply') {
-        const suggestSystemPrompt = `... (생략) ...`;
+        const suggestSystemPrompt = `You are "Ling" (灵), a friendly native Chinese speaker. A user is in a conversation and wants suggestions for what to say next.
+- The user provides the conversation history.
+- Your goal is to provide 3 distinct reply suggestions.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have a single key: "suggestions".
+- "suggestions": An array of 3 suggestion objects.
+- Each suggestion object must have these exact keys: "chinese", "pinyin", "korean".
+
+- Example Request History:
+  [ { "role": "model", "parts": [{"text": "{\"chinese\": \"你好！你吃饭了吗？\", ...}"}] },
+    { "role": "user", "parts": [{"text": "我吃了。"}] },
+    { "role": "model", "parts": [{"text": "{\"chinese\": \"你吃什么了？\", ...}"}] } ]
+- Example Response:
+{
+  "suggestions": [
+    { "chinese": "我吃了炒饭。", "pinyin": "Wǒ chīle chǎofàn.", "korean": "볶음밥 먹었어요." },
+    { "chinese": "还没吃呢，你呢？", "pinyin": "Hái méi chī ne, nǐ ne?", "korean": "아직 안 먹었어요, 당신은요?" },
+    { "chinese": "我吃得很简单。", "pinyin": "Wǒ chī de hěn jiǎndān.", "korean": "저는 간단하게 먹었어요." }
+  ]
+}`;
          const contents = [
             { role: "user", parts: [{ text: suggestSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I will provide reply suggestions including pinyin and Korean meaning in the specified JSON format." }] }, 
@@ -432,24 +451,15 @@ export default async function handler(request, response) {
         return response.status(200).json(data);
     }
 
-    // ... (기존 응답 처리 코드)
-    if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
-        console.error("Invalid response structure from Google API:", data);
-         if (data.promptFeedback && data.promptFeedback.blockReason) {
-             throw new Error(`AI 응답 생성 실패 (안전 필터): ${data.promptFeedback.blockReason}`);
-        } else if (data.candidates && data.candidates.length > 0 && data.candidates[0].finishReason && data.candidates[0].finishReason !== 'STOP') {
-             throw new Error(`AI 응답 생성 중단됨: ${data.candidates[0].finishReason}`);
-        } else if (data.candidates && data.candidates.length === 0) {
-             throw new Error(`AI 응답 생성 실패: Candidates 배열이 비어있습니다.`);
-        }
-        throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다. (candidates 확인 실패)");
-    }
-
-     // [★ 수정] 'suggest_reply' 액션의 파싱 로직을 extractJson 헬퍼 함수를 사용하도록 변경
-     if (action === 'suggest_reply') {
+    // [★ 수정] 'suggest_reply' 액션의 파싱 로직을 (tts처럼) 앞으로 이동시킵니다.
+    // (이 로직은 서버에서 파싱을 완료하고 클라이언트에 깔끔한 JSON을 보내야 합니다.)
+    if (action === 'suggest_reply') {
         try {
-            // 1. AI 응답 텍스트 가져오기
-            const aiResponseText = data.candidates[0].content.parts[0].text;
+            // 1. AI 응답 텍스트 가져오기 (존재하지 않을 수 있음)
+            const aiResponseText = data.candidates[0]?.content?.parts?.[0]?.text;
+            if (!aiResponseText) {
+                 throw new Error("AI response part is missing or empty.");
+            }
             
             // 2. 헬퍼 함수로 JSON 추출
             const cleanedText = extractJson(aiResponseText); 
@@ -470,13 +480,31 @@ export default async function handler(request, response) {
             
         } catch (e) {
             // 5. 파싱 또는 추출 실패 시
-            console.error(`[api/gemini.js] suggest_reply parsing error: ${e.message}`, data.candidates[0].content.parts[0].text);
+            console.error(`[api/gemini.js] suggest_reply parsing error: ${e.message}`, data.candidates?.[0]?.content?.parts?.[0]?.text);
             // handlers.js의 catch 블록으로 이 오류 메시지를 전송
-            throw new Error("AI로부터 유효한 답변 추천(병음, 뜻 포함) JSON 형식을 찾지 못했습니다."); 
+            // [★ 수정] 오류 로그 2번(candidates 확인 실패)을 방지하기 위해 구체적인 오류 메시지 전송
+            throw new Error("AI가 유효한 답변 추천 JSON을 반환하지 않았습니다. (파싱 실패)"); 
         }
     }
 
-    // 번역, 채팅, 패턴 채팅 시작, 롤플레잉, 문제 생성, 작문 교정, 발음 평가 등은 data 전체를 반환
+
+    // [★ 수정] suggest_reply가 위에서 처리되었으므로, 이 체크는 나머지 액션에만 해당됩니다.
+    // (번역, 채팅, 패턴 채팅, 롤플레잉, 듣기 대본, 작문 교정 등)
+    if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
+        console.error("Invalid response structure from Google API (non-suggest_reply):", data);
+         if (data.promptFeedback && data.promptFeedback.blockReason) {
+             throw new Error(`AI 응답 생성 실패 (안전 필터): ${data.promptFeedback.blockReason}`);
+        } else if (data.candidates && data.candidates.length > 0 && data.candidates[0].finishReason && data.candidates[0].finishReason !== 'STOP') {
+             throw new Error(`AI 응답 생성 중단됨: ${data.candidates[0].finishReason}`);
+        } else if (data.candidates && data.candidates.length === 0) {
+             throw new Error(`AI 응답 생성 실패: Candidates 배열이 비어있습니다.`);
+        }
+        throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다. (candidates 확인 실패)");
+    }
+
+    // [★ 수정] suggest_reply 로직이 위로 이동했으므로 여기서는 삭제합니다.
+    
+    // (chat, generate_..., correct_writing 등)은 data 전체를 반환
     // (클라이언트 측의 handlers.js에 있는 extractJson 함수가 이 응답을 처리합니다)
     return response.status(200).json(data);
 
@@ -486,4 +514,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1101-14 (JSON 추출 로직 개선 및 연습문제 프롬프트 수정)
+// v.2025.10.20_1101-15 (전체듣기 버그 및 답변추천 500 오류 수정)
