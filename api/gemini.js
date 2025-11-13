@@ -45,7 +45,7 @@ export default async function handler(request, response) {
 
     // 3. 액션별 요청 본문 설정
     if (action === 'translate') {
-        // [★ 오류 1 수정] 프롬프트 강화: "반드시" 중국어로 번역하고, "반드시" JSON으로 응답하도록 강조.
+        // [★ 수정] 프롬프트 강화: "반드시" 중국어로 번역하고, "반드시" JSON으로 응답하도록 강조.
         const prompt = systemPrompt || `You are a professional Korean-to-Chinese translator. Your task is to translate the following Korean text *into Chinese*.
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object must have keys "chinese", "pinyin", "alternatives" (string array), "explanation" (string, in Korean), and "usedPattern" (string or null).
@@ -57,24 +57,15 @@ export default async function handler(request, response) {
         };
     
     } else if (action === 'chat') {
-        // --- 기본 "Ling" 프롬프트 ---
+        // --- [★ 수정] roleContext가 null일 때 (예: 패턴 기반 채팅) 기본 "Ling" 프롬프트 ---
         let chatSystemPrompt = `You are "Ling" (灵), a friendly native Chinese speaker and language tutor. Your goal is to help a user learning Chinese.
+- This is a general conversation, not a specific role-play.
 - Have a natural, concise conversation (1-2 short sentences).
 - Ask questions to keep the conversation going.
 - **VERY IMPORTANT:** Analyze the user's *last* message for grammatical errors or unnatural expressions.
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
-
-- "chinese": Your *new* conversational response in simplified Chinese (e.g., "你今天过得怎么样？").
-- "pinyin": The pinyin for your "chinese" response.
-- "korean": A natural Korean translation of your "chinese" response.
 - "correction": An object containing feedback on the *user's previous message*, OR \`null\`.
-    - If the user's message was grammatically correct and natural, set "correction" to: \`null\`.
-    - If the user's message had an error:
-        - Set "correction" to an object with keys: "original" (the user's text), "corrected" (the corrected Chinese text), and "explanation" (a simple explanation *in Korean* of what was wrong and why).
-
-- Example if user said "我昨天去公园了玩":
-  {"chinese": "哦，你昨天去公园玩了啊！公园里人多吗？", "pinyin": "Ò, nǐ zuótiān qù gōngyuán wán le a! Gōngyuán lǐ rén duō ma?", "korean": "오, 어제 공원에 놀러 갔군요! 공원에 사람 많았어요?", "correction": {"original": "我昨天去公园了玩", "corrected": "我昨天去公园玩了", "explanation": "'了'는 동사 '玩' 뒤에 와야 해요. '...了玩'은 올바르지 않아요."}}
 - Example if user said "你好":
   {"chinese": "你好！你吃饭了吗？", "pinyin": "Nǐ hǎo! Nǐ chīfàn le ma?", "korean": "안녕하세요! 밥 먹었어요?", "correction": null}
 `;
@@ -89,8 +80,6 @@ export default async function handler(request, response) {
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\` if the user's last message was correct.
-- Example if user said "我要一个这个":
-  {"chinese": "好的，一份宫保鸡丁。您想喝点什么吗？", "pinyin": "Hǎo de, yī fèn gōng bǎo jī dīng. Nín xiǎng hē diǎn shénme ma?", "korean": "네, 쿵파오 치킨 하나요. 마실 것도 필요하신가요?", "correction": null}
 - Example if user said "我点菜了":
   {"chinese": "好的，您请说。", "pinyin": "Hǎo de, nín qǐng shuō.", "korean": "네, 말씀하세요.", "correction": {"original": "我点菜了", "corrected": "我要点菜", "explanation": "'点菜了'는 '주문했어요(과거)'라는 뜻이에요. '주문할게요'는 '我要点菜(wǒ yào diǎncài)'가 더 자연스러워요."}}
 `;
@@ -114,7 +103,6 @@ export default async function handler(request, response) {
 - The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\` if the user's last message was correct.
 `;
-        // [★ 오류 2 수정] 'cafe'와 'finding_way' 프롬프트 추가
         } else if (roleContext === 'cafe') {
             chatSystemPrompt = `You are "Ling" (灵), acting as a friendly BARISTA (咖啡师).
 - Your goal is to take the user's (customer's) coffee order.
@@ -135,7 +123,39 @@ export default async function handler(request, response) {
 - The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\` if the user's last message was correct.
 `;
+        // --- [★ 새 일상 대화 프롬프트 추가] ---
+        } else if (roleContext === 'friend') {
+            chatSystemPrompt = `You are "Ling" (灵), acting as a friendly CHINESE FRIEND (中国朋友).
+- Your goal is to have a casual, friendly conversation with the user.
+- Talk about hobbies, weekend plans, weather, or ask about their day.
+- Be natural, concise (1-2 short sentences), and use casual language (e.g., "你周末干嘛了？", "真的吗？").
+- **VERY IMPORTANT:** Analyze the user's *last* message for grammatical errors or unnatural expressions.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\` if the user's last message was correct.
+`;
+        } else if (roleContext === 'family') {
+            chatSystemPrompt = `You are "Ling" (灵), acting as a caring CHINESE FAMILY MEMBER (中国家人).
+- Your goal is to have a warm, casual conversation with the user (as family).
+- Talk about meals, health, or what happened today.
+- Be natural and caring (e.g., "你吃饭了吗？", "今天累不累？", "别太晚睡").
+- **VERY IMPORTANT:** Analyze the user's *last* message for grammatical errors or unnatural expressions.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\` if the user's last message was correct.
+`;
+        } else if (roleContext === 'colleague') {
+            chatSystemPrompt = `You are "Ling" (灵), acting as a friendly CHINESE COLLEAGUE (同事).
+- Your goal is to have a light, polite conversation (small talk) with the user (your co-worker).
+- Talk about work, lunch plans, or the commute.
+- Be polite and friendly (e.g., "中午一起吃饭吗？", "今天忙不忙？").
+- **VERY IMPORTANT:** Analyze the user's *last* message for grammatical errors or unnatural expressions.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\` if the user's last message was correct.
+`;
         }
+        // [★ 수정 끝]
         
         const contents = [
             { role: "user", parts: [{ text: "Please follow these instructions for all future responses: " + chatSystemPrompt }] },
@@ -161,7 +181,7 @@ export default async function handler(request, response) {
         ];
         apiRequestBody = { contents };
     
-    // [★ 오류 2 수정] 롤플레잉 시작 로직 수정 (cafe, finding_way 추가)
+    // [★ 수정] 롤플레잉 시작 로직 (일상 대화 주제 추가)
     } else if (action === 'start_roleplay_chat') {
         let roleplayStartPrompt = '';
         
@@ -172,50 +192,64 @@ export default async function handler(request, response) {
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\` (this is the first message).
 - Ask a simple, natural opening question.
-- Example: {"chinese": "您好！您想现在点菜吗？", "pinyin": "Nínhǎo! Nín xiǎng xiànzài diǎncài ma?", "korean": "안녕하세요! 지금 주문하시겠어요?", "correction": null}
-- Example: {"chinese": "您好，这是菜单。请问您几位？", "pinyin": "Nínhǎo, zhè shì càidān. Qǐngwèn nín jǐ wèi?", "korean": "안녕하세요, 메뉴입니다. 몇 분이세요?", "correction": null}`;
+- Example: {"chinese": "您好！您想现在点菜吗？", "pinyin": "Nínhǎo! Nín xiǎng xiànzài diǎncài ma?", "korean": "안녕하세요! 지금 주문하시겠어요?", "correction": null}`;
         
         } else if (roleContext === 'shopping') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a friendly SHOPKEEPER (售货员).
 - Your goal is to start a conversation with a customer who just entered your store.
-- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
-- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
-- Set "correction" to \`null\`.
-- Ask a simple, natural opening question.
+- ... (이하 쇼핑 프롬프트, 생략) ...
 - Example: {"chinese": "您好，欢迎光临！您想找点什么？", "pinyin": "Nínhǎo, huānyíng guānglín! Nín xiǎng zhǎo diǎn shénme?", "korean": "안녕하세요, 어서오세요! 찾으시는 거 있으신가요?", "correction": null}`;
        
         } else if (roleContext === 'taxi') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a TAXI DRIVER (出租车司机).
 - Your goal is to start a conversation with a passenger who just got in your taxi.
-- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
-- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
-- Set "correction" to \`null\`.
-- Ask a simple, natural opening question.
+- ... (이하 택시 프롬프트, 생략) ...
 - Example: {"chinese": "您好！请问您要去哪儿？", "pinyin": "Nínhǎo! Qǐngwèn nín yào qù nǎr?", "korean": "안녕하세요! 어디로 가시나요?", "correction": null}`;
         
         } else if (roleContext === 'cafe') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a friendly BARISTA (咖啡师).
 - Your goal is to start a conversation with a customer at a cafe.
-- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
-- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
-- Set "correction" to \`null\`.
-- Ask a simple, natural opening question.
+- ... (이하 카페 프롬프트, 생략) ...
 - Example: {"chinese": "您好，需要点什么？", "pinyin": "Nín hǎo, xūyào diǎn shénme?", "korean": "안녕하세요, 무엇을 도와드릴까요?", "correction": null}`;
 
         } else if (roleContext === 'finding_way') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a helpful LOCAL (本地人) giving directions.
 - Your goal is to start a conversation with a tourist who looks lost.
+- ... (이하 길찾기 프롬프트, 생략) ...
+- Example: {"chinese": "你好，你需要帮助吗？", "pinyin": "Nǐ hǎo, nǐ xūyào bāngzhù ma?", "korean": "안녕하세요, 도움이 필요하신가요?", "correction": null}`;
+        
+        // --- [★ 새 일상 대화 시작 프롬프트 추가] ---
+        } else if (roleContext === 'friend') {
+             roleplayStartPrompt = `You are "Ling" (灵), acting as a friendly CHINESE FRIEND (中国朋友).
+- Your goal is to start a casual, friendly conversation.
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\`.
 - Ask a simple, natural opening question.
-- Example: {"chinese": "你好，你需要帮助吗？", "pinyin": "Nǐ hǎo, nǐ xūyào bāngzhù ma?", "korean": "안녕하세요, 도움이 필요하신가요?", "correction": null}`;
+- Example: {"chinese": "嘿！好久不见，你最近怎么样？", "pinyin": "Hēi! Hǎojiǔ bùjiàn, nǐ zuìjìn zěnme yàng?", "korean": "헤이! 오랜만이야, 요즘 어떻게 지내?", "correction": null}`;
+        
+        } else if (roleContext === 'family') {
+             roleplayStartPrompt = `You are "Ling" (灵), acting as a caring CHINESE FAMILY MEMBER (中国家人).
+- Your goal is to start a warm, casual conversation.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\`.
+- Ask a simple, natural opening question.
+- Example: {"chinese": "下班了？今天累不累？", "pinyin": "Xiàbānle? Jīntiān lèi bù lèi?", "korean": "퇴근했어? 오늘 힘들지 않았어?", "correction": null}`;
+        
+        } else if (roleContext === 'colleague') {
+             roleplayStartPrompt = `You are "Ling" (灵), acting as a friendly CHINESE COLLEAGUE (同事).
+- Your goal is to start some light small talk.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\`.
+- Ask a simple, natural opening question.
+- Example: {"chinese": "嗨，忙完了吗？要不要一起去吃午饭？", "pinyin": "Hāi, máng wánle ma? Yào bùyào yīqǐ qù chī wǔfàn?", "korean": "하이, 다 바쁘셨어요? 점심 같이 드실래요?", "correction": null}`;
         
         } else {
              throw new Error(`Invalid roleContext provided: ${roleContext}`);
         }
 
-        // 'roleplayStartPrompt'가 설정된 후에 'contents'를 구성합니다.
         const contents = [
             { role: "user", parts: [{ text: roleplayStartPrompt }] },
             { role: "model", parts: [{ text: `Okay, I understand. I will act as a ${roleContext} and provide the opening line in the required JSON format.` }] },
@@ -227,26 +261,26 @@ export default async function handler(request, response) {
     } else if (action === 'generate_listening_script') {
         let scriptTitle = "듣기 대본";
         let scriptContextPrompt = "";
+        let speakers = `{ "speaker": "A", "gender": "male" }` // 남성 (기본)
+                     + ` / { "speaker": "B", "gender": "female" }` // 여성
 
         if (roleContext === 'restaurant') {
             scriptTitle = "🍽️ 식당에서 주문하기";
-            scriptContextPrompt = "a simple 4-6 turn dialogue between a customer (A) and a waiter (B) at a Chinese restaurant.";
+            scriptContextPrompt = `a simple 8-10 turn dialogue between a male customer (A) and a female waiter (B) at a Chinese restaurant.`;
         } else if (roleContext === 'airport') {
             scriptTitle = "✈️ 공항에서 체크인하기";
-            scriptContextPrompt = "a simple 4-6 turn dialogue between a passenger (A) and an airline staff (B) at an airport check-in counter.";
+            scriptContextPrompt = `a simple 8-10 turn dialogue between a female passenger (A) and a male airline staff (B) at an airport check-in counter.`;
         } else if (roleContext === 'campus') {
             scriptTitle = "🧑‍🎓 캠퍼스에서 대화하기";
-            scriptContextPrompt = "a simple 4-6 turn dialogue between two students (A and B) on a university campus talking about classes or homework.";
-        // [★ 새 주제 추가]
+            scriptContextPrompt = `a simple 8-10 turn dialogue between a male student (A) and a female student (B) on a university campus.`;
         } else if (roleContext === 'appointment') {
             scriptTitle = "📞 전화로 약속 잡기";
-            scriptContextPrompt = "a simple 4-6 turn dialogue between two friends (A and B) making an appointment over the phone.";
+            scriptContextPrompt = `a simple 8-10 turn dialogue between two friends, one male (A) and one female (B), making an appointment over the phone.`;
         } else if (roleContext === 'refund') {
             scriptTitle = "👕 물건 환불하기";
-            scriptContextPrompt = "a simple 4-6 turn dialogue between a customer (A) and a shopkeeper (B) about returning an item.";
-        // [★ 추가 완료]
+            scriptContextPrompt = `a simple 8-10 turn dialogue between a female customer (A) and a male shopkeeper (B) about returning an item.`;
         } else {
-            scriptContextPrompt = "a simple 4-6 turn dialogue between two native Chinese speakers (A and B).";
+            scriptContextPrompt = `a simple 8-10 turn dialogue between a male speaker (A) and a female speaker (B).`;
         }
 
         const scriptSystemPrompt = `You are a scriptwriter for Chinese language learners.
@@ -255,22 +289,23 @@ export default async function handler(request, response) {
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object must have these exact keys: "title" (string) and "dialogue" (array of objects).
 - The "title" key should be: "${scriptTitle}"
-- Each object in the "dialogue" array must have these exact keys: "speaker" (string, "A" or "B"), "chinese" (string), "pinyin" (string), and "korean" (string).
+- Each object in the "dialogue" array must have these exact keys: "speaker" (string, "A" or "B"), "gender" (string, "male" or "female"), "chinese" (string), "pinyin" (string), and "korean" (string).
+- **IMPORTANT**: Speaker A must *always* be "male". Speaker B must *always* be "female".
 
 - Example Response (for 'restaurant'):
 {
   "title": "🍽️ 식당에서 주문하기",
   "dialogue": [
-    { "speaker": "A", "chinese": "你好，我想点菜。", "pinyin": "Nǐ hǎo, wǒ xiǎng diǎn cài.", "korean": "안녕하세요, 주문하고 싶어요." },
-    { "speaker": "B", "chinese": "好的，这是菜单。您想吃点什么？", "pinyin": "Hǎo de, zhè shì càidān. Nín xiǎng chī diǎn shénme?", "korean": "네, 메뉴입니다. 무엇을 드시겠어요?" },
-    { "speaker": "A", "chinese": "我要一个宫保鸡丁。", "pinyin": "Wǒ yào yīgè gōng bǎo jī dīng.", "korean": "저는 쿵파오 치킨 하나 주세요." },
-    { "speaker": "B", "chinese": "好的。您想喝点什么吗？", "pinyin": "Hǎo de. Nín xiǎng hē diǎn shénme ma?", "korean": "알겠습니다. 마실 것도 필요하신가요?" }
+    { "speaker": "A", "gender": "male", "chinese": "你好，我想点菜。", "pinyin": "Nǐ hǎo, wǒ xiǎng diǎn cài.", "korean": "안녕하세요, 주문하고 싶어요." },
+    { "speaker": "B", "gender": "female", "chinese": "好的，这是菜单。您想吃点什么？", "pinyin": "Hǎo de, zhè shì càidān. Nín xiǎng chī diǎn shénme?", "korean": "네, 메뉴입니다. 무엇을 드시겠어요?" },
+    { "speaker": "A", "gender": "male", "chinese": "我要一个宫保鸡丁。", "pinyin": "Wǒ yào yīgè gōng bǎo jī dīng.", "korean": "저는 쿵파오 치킨 하나 주세요." },
+    { "speaker": "B", "gender": "female", "chinese": "好的。您想喝点什么吗？", "pinyin": "Hǎo de. Nín xiǎng hē diǎn shénme ma?", "korean": "알겠습니다. 마실 것도 필요하신가요?" }
   ]
 }
 `;
         const contents = [
             { role: "user", parts: [{ text: scriptSystemPrompt }] },
-            { role: "model", parts: [{ text: "Okay, I understand. I will generate the listening script in the requested JSON format." }] },
+            { role: "model", parts: [{ text: "Okay, I understand. I will generate the 8-10 turn listening script in the requested JSON format, with A as male and B as female." }] },
             { role: "user", parts: [{ text: "Please generate the script now." }] }
         ];
         apiRequestBody = { contents };

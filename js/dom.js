@@ -1,11 +1,14 @@
 // js/dom.js
 
 // 이 파일은 모든 DOM 요소 변수를 초기화하고 내보냅니다.
+// main.js의 initializeDOM() 함수와 전역 변수 부분을 여기로 옮깁니다.
 
 export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translatorModal,
     closeTranslatorBtn, translateBtn, koreanInput, translationResult, customAlertModal,
     customAlertMessage, customAlertCloseBtn, allPatternsBtn, allPatternsModal,
-    closeAllPatternsBtn, allPatternsList, chatBtn, chatModal, closeChatBtn,
+    closeAllPatternsBtn, allPatternsList, 
+    // [★ 수정] chatBtn 변수 삭제
+    chatModal, closeChatBtn,
     chatHistory, chatInput, sendChatBtn, micBtn, suggestReplyBtn,
     dailyQuizBtn, quizModal, closeQuizBtn, quizContent,
     openCorrectionBtn, correctionModal, closeCorrectionBtn, correctionInput,
@@ -19,7 +22,6 @@ export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, tr
     openCharBtn, charModal, closeCharBtn, characterInfo,
     charTtsBtn, nextCharBtn,
     openRoleplayBtn, roleplayModal, closeRoleplayBtn, roleplayScenarioList,
-    // [★ 새 변수 추가]
     openListeningBtn, listeningModal, closeListeningBtn, listeningScenarioList,
     scriptPlayerModal, closeScriptPlayerBtn, scriptTitle,
     playAllScriptBtn, toggleScriptBtn, scriptContent;
@@ -45,7 +47,8 @@ export function initializeDOM() {
     allPatternsModal = document.getElementById('all-patterns-modal');
     closeAllPatternsBtn = document.getElementById('close-all-patterns-btn');
     allPatternsList = document.getElementById('all-patterns-list');
-    chatBtn = document.getElementById('open-chat-btn');
+    
+    // [★ 수정] chatBtn = document.getElementById('open-chat-btn'); <- 이 줄 삭제
     chatModal = document.getElementById('chat-modal');
     closeChatBtn = document.getElementById('close-chat-btn');
     chatHistory = document.getElementById('chat-history');
@@ -102,7 +105,6 @@ export function initializeDOM() {
     closeRoleplayBtn = document.getElementById('close-roleplay-btn');
     roleplayScenarioList = document.getElementById('roleplay-scenario-list');
 
-    // [★ 새 DOM 요소 매핑]
     openListeningBtn = document.getElementById('open-listening-btn');
     listeningModal = document.getElementById('listening-modal');
     closeListeningBtn = document.getElementById('close-listening-btn');

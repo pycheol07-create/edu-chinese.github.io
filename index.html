@@ -66,14 +66,13 @@
             pointer-events: auto;
         }
 
-        /* FAB가 열렸을 때 서브 버튼별 애니메이션 지연 */
+        /* [★ 수정] FAB 애니메이션 딜레이 수정 (chat-btn 제거) */
         #fab-container.is-open #open-translator-btn { transition-delay: 0.0s; }
         #fab-container.is-open #open-correction-btn { transition-delay: 0.1s; }
         #fab-container.is-open #open-word-btn { transition-delay: 0.2s; }
         #fab-container.is-open #open-char-btn { transition-delay: 0.3s; }
         #fab-container.is-open #open-roleplay-btn { transition-delay: 0.4s; }
         #fab-container.is-open #open-listening-btn { transition-delay: 0.5s; }
-        #fab-container.is-open #open-chat-btn { transition-delay: 0.6s; }
 
 
         /* FAB가 열렸을 때 메인 버튼 아이콘 회전 */
@@ -162,12 +161,6 @@
 
         <div id="fab-menu" class="flex flex-col-reverse items-center space-y-3 space-y-reverse mb-3">
 
-            <button id="open-chat-btn" title="AI와 자유 대화" class="fab-sub-button bg-purple-600 hover:bg-purple-700 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-3.04 8.3-7.146 9.574a18.79 18.79 0 0 1-8.708 0C3.04 20.3 0 16.556 0 12c0-4.556 3.04-8.3 7.146-9.574a18.79 18.79 0 0 1 8.708 0C17.96 3.7 21 7.444 21 12Z" />
-                </svg>
-            </button>
-            
             <button id="open-listening-btn" title="듣기 훈련" class="fab-sub-button bg-teal-500 hover:bg-teal-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
@@ -467,6 +460,22 @@
                     <p class="text-lg font-semibold">🗺️ 길 묻기</p>
                     <p class="text-sm text-gray-500">지나가는 사람에게 길을 묻습니다.</p>
                 </button>
+                
+                <div class="border-t pt-3 mt-3">
+                    <p class="text-sm font-semibold text-gray-700 mb-2 text-center">일상 대화 (Ling 👩)</p>
+                    <button data-scenario="friend" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <p class="text-lg font-semibold">🧑‍🤝‍🧑 친구와 대화하기</p>
+                        <p class="text-sm text-gray-500">안부, 취미, 약속 등 가벼운 대화를 합니다.</p>
+                    </button>
+                    <button data-scenario="family" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors mt-2">
+                        <p class="text-lg font-semibold">🏠 가족과 대화하기</p>
+                        <p class="text-sm text-gray-500">주말 계획, 식사 등 가족 간의 대화를 합니다.</p>
+                    </button>
+                    <button data-scenario="colleague" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors mt-2">
+                        <p class="text-lg font-semibold">👔 직장 동료와 대화하기</p>
+                        <p class="text-sm text-gray-500">업무, 점심 식사 등 가벼운 스몰톡을 합니다.</p>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -536,6 +545,6 @@
     </div>
 
 
-    <script type="module" src="./js/main.js"></script> 
+    <script type(="module") src(="./js/main.js")></script> 
 </body>
 </html>
