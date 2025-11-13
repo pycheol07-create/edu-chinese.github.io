@@ -300,6 +300,8 @@ export default async function handler(request, response) {
         else if (scenario === 'shopping') scenarioKorean = '쇼핑';
         else if (scenario === 'taxi') scenarioKorean = '택시';
         else if (scenario === 'airport') scenarioKorean = '공항';
+        // [★ 수정] 'today_conversation' 시나리오 이름 매핑 추가
+        else if (scenario === 'today_conversation') scenarioKorean = '오늘의 패턴 대화';
         
         const listeningSystemPrompt = `You are a creative scriptwriter. Your task is to generate a short, natural dialogue for a specific situation.
 - The situation is: "${scenarioKorean}" (in ${scenario}).
@@ -433,7 +435,7 @@ export default async function handler(request, response) {
         
         apiRequestBody = {
             input: { text: text },
-            voice: { languageCode: 'cmn-CN', name: voiceName },
+            voice: { languageCode: 'cmn-CN', name: voiceName }, // [★ 수정]
             audioConfig: { audioEncoding: 'MP3' }
         };
     } else {
@@ -521,4 +523,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1101-17 (TTS 목소리 구분 및 답변 추천 프롬프트 수정)
+// v.2025.10.20_1101-18 (UI 변경 및 TTS/답변추천 버그 수정)
