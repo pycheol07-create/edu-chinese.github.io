@@ -164,7 +164,8 @@ function setupEventListeners() {
                  api.playTTS(null, ttsButton); 
             } else {
                  const textToSpeak = ttsButton.dataset.text; 
-                 if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
+                 // [★ 수정] 패턴 카드의 TTS는 화자 정보(speaker)가 없으므로 null 전달
+                 if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
             }
         }
     });
@@ -200,7 +201,7 @@ function setupEventListeners() {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
         }
     });
     dom.openCorrectionBtn.addEventListener('click', () => {
@@ -217,7 +218,7 @@ function setupEventListeners() {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
         }
     });
     dom.openCorrectionHistoryBtn.addEventListener('click', () => {
@@ -238,7 +239,7 @@ function setupEventListeners() {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
         }
     });
     dom.customAlertCloseBtn.addEventListener('click', () => dom.customAlertModal.classList.add('hidden'));
@@ -282,7 +283,7 @@ function setupEventListeners() {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
             return;
         }
         const followSpeakButton = e.target.closest('.follow-speak-btn');
@@ -342,7 +343,7 @@ function setupEventListeners() {
     dom.nextWordBtn.addEventListener('click', features.showNextWord);
     dom.wordTtsBtn.addEventListener('click', (e) => {
         const textToSpeak = e.currentTarget.dataset.text;
-        if (textToSpeak) api.playTTS(textToSpeak, e.currentTarget);
+        if (textToSpeak) api.playTTS(textToSpeak, e.currentTarget, null, null);
     });
 
     // --- 간체자 학습 모달 ---
@@ -358,13 +359,13 @@ function setupEventListeners() {
     dom.nextCharBtn.addEventListener('click', features.showNextCharacter);
     dom.charTtsBtn.addEventListener('click', (e) => {
         const textToSpeak = e.currentTarget.dataset.text;
-        if (textToSpeak) api.playTTS(textToSpeak, e.currentTarget);
+        if (textToSpeak) api.playTTS(textToSpeak, e.currentTarget, null, null);
     });
     dom.characterInfo.addEventListener('click', (e) => {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
         }
     });
     
@@ -423,10 +424,14 @@ function setupEventListeners() {
     dom.listeningScriptDisplay.addEventListener('click', (e) => {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
-            const textToSpeak = ttsButton.dataset.text;
+            const lineElement = ttsButton.closest('.listening-line');
+            const textToSpeak = lineElement?.dataset.text;
+            // [★ 수정] 화자 정보(speaker)를 lineElement에서 가져와 전달
+            const speaker = lineElement?.dataset.speaker || null; // 'Man' or 'Woman'
+            
             if (textToSpeak) {
-                const lineElement = ttsButton.closest('.listening-line');
-                api.playTTS(textToSpeak, ttsButton, lineElement);
+                // api.js의 playTTS를 수정하여 화자 정보(speaker)를 전달
+                api.playTTS(textToSpeak, ttsButton, lineElement, speaker);
             }
         }
     });

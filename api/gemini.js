@@ -9,8 +9,8 @@ export default async function handler(request, response) {
   }
 
   // 2. 프런트엔드에서 보낸 요청 데이터를 받습니다.
-  // [★ 수정] pattern1, pattern2, scenario 추가
-  const { action, text, systemPrompt, history, pattern, originalText, userText, roleContext, pattern1, pattern2, scenario } = request.body;
+  // [★ 수정] pattern1, pattern2, scenario, speaker 추가
+  const { action, text, systemPrompt, history, pattern, originalText, userText, roleContext, pattern1, pattern2, scenario, speaker } = request.body;
 
   // [★ 새로 추가] AI 응답에서 JSON 블록만 추출하는 헬퍼 함수
   /**
@@ -424,9 +424,16 @@ export default async function handler(request, response) {
     }
     else if (action === 'tts') {
         apiUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
+        
+        // [★ 수정] 3번 문제(목소리) 해결: speaker 값에 따라 목소리 선택
+        let voiceName = 'cmn-CN-Wavenet-B'; // 기본값 (남성)
+        if (speaker === 'Woman') {
+            voiceName = 'cmn-CN-Wavenet-A'; // 여성
+        }
+        
         apiRequestBody = {
             input: { text: text },
-            voice: { languageCode: 'cmn-CN', name: 'cmn-CN-Wavenet-B' },
+            voice: { languageCode: 'cmn-CN', name: voiceName },
             audioConfig: { audioEncoding: 'MP3' }
         };
     } else {
@@ -514,4 +521,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1101-16 (답변 추천 500 오류 수정)
+// v.2025.10.20_1101-17 (TTS 목소리 구분 및 답변 추천 프롬프트 수정)

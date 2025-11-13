@@ -18,7 +18,8 @@ export let correctionHistory = [];
 export const runTimeState = {
     currentAudio: null,
     currentPlayingButton: null,
-    wakeLock: null
+    wakeLock: null,
+    isPlayAllRunning: false // [★ 새로 추가] '전체 듣기'가 실행 중인지 여부
 };
 
 // (수정) audioCache는 재할당되지 않으므로 그대로 둡니다.
@@ -176,6 +177,8 @@ export function stopCurrentAudio(stopButtonOnly = false) {
         runTimeState.currentPlayingButton.classList.remove('is-playing');
         runTimeState.currentPlayingButton = null;
     }
+    // [★ 새로 추가] '전체 듣기' 상태도 강제로 중지
+    runTimeState.isPlayAllRunning = false; 
 }
 
 /**

@@ -694,57 +694,62 @@ const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  * '전체 대화 듣기' 버튼 핸들러 (스크립트 순차 재생)
  */
 export async function handlePlayAllListeningScript() {
-    const lines = dom.listeningScriptDisplay.querySelectorAll('.listening-line');
-    if (lines.length === 0) return;
-
-    // 이미 재생 중일 때 클릭하면 중지
-    if (state.runTimeState.currentAudio) {
-        state.stopCurrentAudio();
+    // [★ 수정] '전체 듣기' 버그 수정 (1, 2번 문제)
+    
+    // 1. 이미 재생 중일 때 (isPlayAllRunning 플래그가 true) '중지' 요청
+    if (state.runTimeState.isPlayAllRunning) {
+        console.log("Requesting stop play all...");
+        state.stopCurrentAudio(); // 오디오 중지 및 isPlayAllRunning = false로 설정
         return;
     }
 
-    dom.playAllScriptBtn.disabled = true;
+    // 2. '전체 듣기' 새로 시작
+    const lines = dom.listeningScriptDisplay.querySelectorAll('.listening-line');
+    if (lines.length === 0) return;
+
+    // 3. '전체 듣기' 상태 플래그 활성화
+    state.runTimeState.isPlayAllRunning = true; 
+    dom.playAllScriptBtn.disabled = true; // 잠시 비활성화 (더블 클릭 방지)
     dom.playAllScriptBtn.textContent = '...전체 대화 재생 중... (중지하려면 클릭)';
+    dom.playAllScriptBtn.disabled = false; // 다시 활성화 (중지 버튼으로 사용)
+
 
     try {
         for (const line of lines) {
+            // [★ 추가] 루프가 도는 매 순간, '중지' 요청이 있었는지(플래그가 false가 되었는지) 확인
+            if (!state.runTimeState.isPlayAllRunning) {
+                console.log("Play all loop stopped by flag.");
+                break; // '중지' 요청이 감지되면 루프 탈출
+            }
+            
             const text = line.dataset.text;
             const ttsButton = line.querySelector('.tts-btn');
+            const speaker = line.dataset.speaker || null; // [★ 수정] 화자 정보 전달
             if (!text) continue;
 
-            // [★ 수정] api.playTTS가 Promise를 반환 (reject되면 catch로 이동)
-            await api.playTTS(text, ttsButton, line);
+            await api.playTTS(text, ttsButton, line, speaker); // [★ 수정] speaker 전달
 
-            // [★ 수정]
-            // 버그 수정: "Playback stopped"가 아닌, 정상 종료(onended) 시
-            // currentAudio가 null이 되어도 루프가 중단되던 버그 수정.
-            // (onended는 Promise를 resolve하므로, catch로 가지 않고
-            //  이 다음 라인으로 넘어옵니다. onpause(수동중지)는 reject합니다.)
-            
             // [★ 삭제] (버그 유발 코드 삭제)
-            /*
-            if (state.runTimeState.currentAudio === null) {
-                 console.log("Playback stopped.");
-                 break; 
-            }
-            */
+            // if (state.runTimeState.currentAudio === null) { ... }
 
             await wait(300); // 대사 사이 0.3초 쉼
         }
-    } catch (error) { // (line 718)
+    } catch (error) {
         console.error("Play All error:", error);
         // "Playback stopped"는 stopCurrentAudio에 의해 발생하는 예상된 오류(Promise reject)
         if (error && error.message !== 'Playback stopped') { 
            ui.showAlert(`전체 재생 중 오류가 발생했습니다: ${error.message}`);
         }
-        // [★ 추가] catch로 잡혔다는 것은 루프가 중단되었다는 의미
         console.log("Play All loop terminated.");
 
     } finally {
+        // [★ 수정] '전체 듣기' 상태 플래그 비활성화
+        state.runTimeState.isPlayAllRunning = false; 
         dom.playAllScriptBtn.disabled = false;
         dom.playAllScriptBtn.textContent = '▶︎ 전체 대화 듣기';
         lines.forEach(line => line.classList.remove('is-playing'));
-        // 루프가 끝나거나 중지되었을 때 오디오 상태 최종 정리
+        
+        // (stopCurrentAudio가 이미 호출되었을 수 있으므로 확인 후 호출)
         if (state.runTimeState.currentAudio) {
             state.stopCurrentAudio();
         }

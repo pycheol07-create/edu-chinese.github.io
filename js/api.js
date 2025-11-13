@@ -22,14 +22,15 @@ async function callGeminiAPI(action, body) {
 }
 
 /**
- * [★ 수정] 텍스트를 음성(TTS)으로 재생합니다.
+ * [★ 수정] 텍스트를 음성(TTS)으로 재생합니다. (speaker 인자 추가)
  * (전체 듣기 기능을 위해 Promise를 반환하고, lineElement 하이라이트를 지원하도록 수정)
  * @param {string} text - 재생할 텍스트
  * @param {HTMLElement | null} buttonElement - (선택) 클릭된 TTS 버튼
  * @param {HTMLElement | null} lineElement - (선택) 하이라이트할 대화 라인 요소
+ * @param {string | null} speaker - (선택) 'Man' or 'Woman', 목소리 구분을 위함
  * @returns {Promise<void>} - (lineElement가 있을 경우) 재생이 완료/중지되면 resolve/reject되는 Promise
  */
-export function playTTS(text, buttonElement = null, lineElement = null) {
+export function playTTS(text, buttonElement = null, lineElement = null, speaker = null) {
     // Promise로 감싸서 비동기 재생 완료를 핸들링
     const playPromise = new Promise(async (resolve, reject) => {
         if (state.runTimeState.currentAudio) {
@@ -52,11 +53,15 @@ export function playTTS(text, buttonElement = null, lineElement = null) {
         if(lineElement) lineElement.classList.add('is-playing');
 
         try {
-            let audioData = state.audioCache[text];
+            // [★ 수정] 캐시 키를 텍스트 + 화자로 구성 (목소리가 다를 수 있으므로)
+            const cacheKey = `${speaker || 'default'}:${text}`;
+            let audioData = state.audioCache[cacheKey];
+            
             if (!audioData) {
-                const result = await callGeminiAPI('tts', { text });
+                // [★ 수정] speaker 정보(Man/Woman)를 API로 전송
+                const result = await callGeminiAPI('tts', { text, speaker });
                 audioData = result.audioContent;
-                state.audioCache[text] = audioData;
+                state.audioCache[cacheKey] = audioData;
             }
             
             const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
@@ -109,7 +114,7 @@ export function playTTS(text, buttonElement = null, lineElement = null) {
     if (!lineElement) {
         playPromise.catch(error => {
             // "Playback stopped"는 사용자가 의도한 중지이므로 콘솔에 오류를 찍지 않음
-            if (error.message !== 'Playback stopped') {
+            if (error && error.message !== 'Playback stopped') {
                 console.error("TTS playback error (unhandled):", error);
             }
         });
