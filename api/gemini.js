@@ -197,25 +197,37 @@ export default async function handler(request, response) {
         } else if (roleContext === 'shopping') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a friendly SHOPKEEPER (售货员).
 - Your goal is to start a conversation with a customer who just entered your store.
-- ... (이하 쇼핑 프롬프트, 생략) ...
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\`.
+- Ask a simple, natural opening question.
 - Example: {"chinese": "您好，欢迎光临！您想找点什么？", "pinyin": "Nínhǎo, huānyíng guānglín! Nín xiǎng zhǎo diǎn shénme?", "korean": "안녕하세요, 어서오세요! 찾으시는 거 있으신가요?", "correction": null}`;
        
         } else if (roleContext === 'taxi') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a TAXI DRIVER (出租车司机).
 - Your goal is to start a conversation with a passenger who just got in your taxi.
-- ... (이하 택시 프롬프트, 생략) ...
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\`.
+- Ask a simple, natural opening question.
 - Example: {"chinese": "您好！请问您要去哪儿？", "pinyin": "Nínhǎo! Qǐngwèn nín yào qù nǎr?", "korean": "안녕하세요! 어디로 가시나요?", "correction": null}`;
         
         } else if (roleContext === 'cafe') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a friendly BARISTA (咖啡师).
 - Your goal is to start a conversation with a customer at a cafe.
-- ... (이하 카페 프롬프트, 생략) ...
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\`.
+- Ask a simple, natural opening question.
 - Example: {"chinese": "您好，需要点什么？", "pinyin": "Nín hǎo, xūyào diǎn shénme?", "korean": "안녕하세요, 무엇을 도와드릴까요?", "correction": null}`;
 
         } else if (roleContext === 'finding_way') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a helpful LOCAL (本地人) giving directions.
 - Your goal is to start a conversation with a tourist who looks lost.
-- ... (이하 길찾기 프롬프트, 생략) ...
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\`.
+- Ask a simple, natural opening question.
 - Example: {"chinese": "你好，你需要帮助吗？", "pinyin": "Nǐ hǎo, nǐ xūyào bāngzhù ma?", "korean": "안녕하세요, 도움이 필요하신가요?", "correction": null}`;
         
         // --- [★ 새 일상 대화 시작 프롬프트 추가] ---
@@ -392,7 +404,7 @@ export default async function handler(request, response) {
 - The JSON object must have these exact keys: "is_correct" (boolean) and "feedback" (string, in Korean).
 
 - Example (Correct): Original "你好", User said "你好" -> {"is_correct": true, "feedback": "👍 완벽해요! 발음이 정확합니다."}
-- Example (Wrong Tone): Original "你好 (nǐ hǎo)", User said "你号 (nǐ hào)" -> {"is_correct": false, "feedback": "🤔 'hǎo'의 3성 성조가 조금 약했어요. '하오'↘︎↗︎ 느낌으로 다시 시도해보세요!"}
+- Example (Wrong Tone): Original "你好 (nǐ hǎo)", User said "你号 (nǐ hǎo)" -> {"is_correct": false, "feedback": "🤔 'hǎo'의 3성 성조가 조금 약했어요. '하오'↘︎↗︎ 느낌으로 다시 시도해보세요!"}
 - Example (Missing Word): Original "我很高兴", User said "很高兴" -> {"is_correct": false, "feedback": "🤔 '我 (wǒ)' 발음이 빠졌네요. 다시 시도해보세요!"}
 - Example (Similar): Original "今天天气很好", User said "今天天气很好" -> {"is_correct": true, "feedback": "👍 훌륭해요! 정확합니다."}
 `;
@@ -427,7 +439,7 @@ export default async function handler(request, response) {
             audioConfig: { audioEncoding: 'MP3' }
         };
 
-        // [★] 듣기 대본의 '화자 B'를 여성 목소리로 변경
+        // [★] 듣기 대본의 '화자'를 여성 목소리로 변경 (A:남, B:여)
         if (roleContext === 'female') {
              apiRequestBody.voice.name = 'cmn-CN-Wavenet-A'; // cmn-CN-Wavenet-A: 여성
         }

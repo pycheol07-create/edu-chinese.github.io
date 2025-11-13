@@ -69,7 +69,7 @@ export function renderPatterns(patterns, showIndex = false) {
 
         const indexHtml = showIndex ? `<span class="bg-blue-100 text-blue-800 text-sm font-semibold mr-3 px-3 py-1 rounded-full">${index + 1}</span>` : '';
 
-        // [★ 수정] 생략되었던 "직접 말해보기" (practiceHtml) 코드를 복구합니다.
+        // [★ 수정] "직접 말해보기" (practiceHtml) 코드를 복구합니다.
         const practiceHtml = p.practice ? `
             <div class="mt-6">
                 <h3 class="text-lg font-bold text-gray-700 border-b pb-1">🗣️ 직접 말해보기</h3>
@@ -100,6 +100,7 @@ export function renderPatterns(patterns, showIndex = false) {
                     <div id="practice-result-${index}" class="mt-3 text-center"></div>
                 </div>
             </div>` : '';
+        // [★ 수정 끝]
 
         card.innerHTML = `
             <div class="flex items-center justify-between mb-3">
@@ -274,14 +275,19 @@ export function renderScriptPlayer(title, dialogue) {
 
     dialogue.forEach(turn => {
         const turnEl = document.createElement('div');
-        turnEl.className = 'p-4 script-turn-visible'; // [★] data-text를 가진 상위 div
-        turnEl.dataset.text = turn.chinese; // [★] '전체 듣기'가 수집할 텍스트
+        // [★ 수정] data-gender 속성 추가
+        turnEl.className = 'p-4 script-turn-visible';
+        turnEl.dataset.text = turn.chinese;
+        turnEl.dataset.gender = turn.gender; // 'male' or 'female'
         
-        const speakerClass = turn.speaker === 'A' ? 'text-blue-600' : 'text-green-600';
+        // [★ 수정] gender에 따라 아이콘과 배경색 클래스 할당
+        const isMale = turn.gender === 'male';
+        const speakerClass = isMale ? 'speaker-a' : 'speaker-b';
+        const speakerIcon = isMale ? '👨' : '👩'; // A/B 대신 남/여 아이콘
 
         turnEl.innerHTML = `
             <div class="flex items-start space-x-3">
-                <span class="flex-shrink-0 w-10 h-10 rounded-full ${speakerClass} bg-gray-100 flex items-center justify-center font-bold text-lg">${turn.speaker}</span>
+                <span class="flex-shrink-0 w-10 h-10 rounded-full ${speakerClass} flex items-center justify-center font-bold text-lg">${speakerIcon}</span>
                 <div class="flex-1">
                     <div class="flex items-center">
                         <p class="text-lg chinese-text text-gray-800">${turn.chinese}</p>
