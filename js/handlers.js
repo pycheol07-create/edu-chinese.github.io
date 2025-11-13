@@ -594,9 +594,9 @@ export async function handleTodayConversationRequest() {
 
     dom.listeningScriptDisplay.innerHTML = '<div class="loader mx-auto"></div>';
     dom.listeningPlaybackControls.classList.add('hidden');
-    dom.getTodayConversationBtn.disabled = true;
-    dom.getTodayConversationBtn.textContent = '대화 생성 중...';
-    dom.situationalListeningControls.querySelectorAll('button').forEach(btn => btn.disabled = true);
+    // [★ 수정] dom.getTodayConversationBtn -> dom.listeningScenarioList
+    dom.listeningScenarioList.querySelectorAll('button').forEach(btn => btn.disabled = true);
+
 
     try {
         const result = await api.getTodayConversationScript(pattern1, pattern2); 
@@ -629,9 +629,8 @@ export async function handleTodayConversationRequest() {
         dom.listeningScriptDisplay.innerHTML = `<p class="text-red-500 text-center">대화 생성 중 오류가 발생했습니다: ${error.message}</p>`;
         dom.listeningControls.classList.remove('hidden'); // [★ 추가] 오류 시 컨트롤 다시 표시
     } finally {
-        dom.getTodayConversationBtn.disabled = false;
-        dom.getTodayConversationBtn.textContent = '오늘의 패턴 대화 듣기';
-        dom.situationalListeningControls.querySelectorAll('button').forEach(btn => btn.disabled = false);
+        // [★ 수정] dom.getTodayConversationBtn -> dom.listeningScenarioList
+        dom.listeningScenarioList.querySelectorAll('button').forEach(btn => btn.disabled = false);
     }
 }
 
@@ -644,8 +643,8 @@ export async function handleSituationalListeningRequest(scenario) {
     dom.listeningPlaybackControls.classList.add('hidden');
     
     // 모든 버튼 비활성화
-    dom.getTodayConversationBtn.disabled = true;
-    dom.situationalListeningControls.querySelectorAll('button').forEach(btn => btn.disabled = true);
+    // [★ 수정] dom.getTodayConversationBtn -> dom.listeningScenarioList
+    dom.listeningScenarioList.querySelectorAll('button').forEach(btn => btn.disabled = true);
 
     try {
         const result = await api.getSituationalListeningScript(scenario); 
@@ -679,8 +678,8 @@ export async function handleSituationalListeningRequest(scenario) {
         dom.listeningControls.classList.remove('hidden'); // [★ 추가] 오류 시 컨트롤 다시 표시
     } finally {
         // 모든 버튼 다시 활성화
-        dom.getTodayConversationBtn.disabled = false;
-        dom.situationalListeningControls.querySelectorAll('button').forEach(btn => btn.disabled = false);
+        // [★ 수정] dom.getTodayConversationBtn -> dom.listeningScenarioList
+        dom.listeningScenarioList.querySelectorAll('button').forEach(btn => btn.disabled = false);
     }
 }
 
@@ -734,12 +733,13 @@ export async function handlePlayAllListeningScript() {
 
             await wait(300); // 대사 사이 0.3초 쉼
         }
-    } catch (error) {
+    } catch (error) { // (line 718)
         console.error("Play All error:", error);
         // "Playback stopped"는 stopCurrentAudio에 의해 발생하는 예상된 오류(Promise reject)
         if (error && error.message !== 'Playback stopped') { 
            ui.showAlert(`전체 재생 중 오류가 발생했습니다: ${error.message}`);
         }
+        // [★ 추가] catch로 잡혔다는 것은 루프가 중단되었다는 의미
         console.log("Play All loop terminated.");
 
     } finally {

@@ -21,10 +21,10 @@ export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, tr
     openCharBtn, charModal, closeCharBtn, characterInfo,
     charTtsBtn, nextCharBtn,
     openRoleplayBtn, roleplayModal, closeRoleplayBtn, roleplayScenarioList,
-    // [★ 수정] 듣기 학습 관련 변수 (listeningControls 추가)
-    openListeningBtn, listeningModal, closeListeningBtn, getTodayConversationBtn,
-    situationalListeningControls, listeningScriptDisplay, listeningPlaybackControls,
-    playAllScriptBtn, listeningControls;
+    // [★ 수정] 듣기 학습 관련 변수
+    openListeningBtn, listeningModal, closeListeningBtn,
+    listeningScriptDisplay, listeningPlaybackControls,
+    playAllScriptBtn, listeningControls, listeningScenarioList; // (getTodayConversationBtn, situationalListeningControls 삭제. listeningScenarioList 추가)
 
 
 /**
@@ -101,16 +101,17 @@ export function initializeDOM() {
     closeRoleplayBtn = document.getElementById('close-roleplay-btn');
     roleplayScenarioList = document.getElementById('roleplay-scenario-list');
 
-    // [★ 수정] 듣기 학습 관련 DOM 할당 (listeningControls 추가)
+    // [★ 수정] 듣기 학습 관련 DOM 할당
     openListeningBtn = document.getElementById('open-listening-btn');
     listeningModal = document.getElementById('listening-modal');
     closeListeningBtn = document.getElementById('close-listening-btn');
-    getTodayConversationBtn = document.getElementById('get-today-conversation-btn');
-    situationalListeningControls = document.getElementById('situational-listening-controls');
+    // [★ 삭제] getTodayConversationBtn
+    // [★ 삭제] situationalListeningControls
     listeningScriptDisplay = document.getElementById('listening-script-display');
     listeningPlaybackControls = document.getElementById('listening-playback-controls');
     playAllScriptBtn = document.getElementById('play-all-script-btn');
-    listeningControls = document.getElementById('listening-controls'); // ★ 추가
+    listeningControls = document.getElementById('listening-controls'); 
+    listeningScenarioList = document.getElementById('listening-scenario-list'); // [★ 추가]
 
 
     console.log("DOM elements initialized.");

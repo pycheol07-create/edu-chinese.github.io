@@ -465,19 +465,25 @@
                 </button>
             </div>
 
-            <div id="listening-controls" class="flex-shrink-0">
-                <div class="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <button id="get-today-conversation-btn" class="w-full mb-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg">
-                        오늘의 패턴 대화 듣기 
+            <div id="listening-controls" class="flex-shrink-0 mb-4">
+                <p class="text-gray-600 mb-4">학습할 대화 주제를 선택하세요.</p>
+                <div id="listening-scenario-list" class="space-y-3 max-h-[60vh] overflow-y-auto">
+                    <button data-scenario="today_conversation" class="w-full text-left p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200">
+                        <p class="text-lg font-semibold">🌟 오늘의 패턴 대화</p>
+                        <p class="text-sm text-gray-500">오늘 학습한 패턴 2개를 활용한 대화를 듣습니다.</p>
                     </button>
-                    
-                    <h3 class="text-sm font-semibold text-gray-500 uppercase mb-2">상황별 듣기</h3>
-                    <div id="situational-listening-controls" class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        <button data-scenario="restaurant" class="situational-listening-btn w-full text-sm p-2 bg-gray-200 hover:bg-gray-300 rounded-lg">🍽️ 식당</button>
-                        <button data-scenario="shopping" class="situational-listening-btn w-full text-sm p-2 bg-gray-200 hover:bg-gray-300 rounded-lg">🛍️ 쇼핑</button>
-                        <button data-scenario="taxi" class="situational-listening-btn w-full text-sm p-2 bg-gray-200 hover:bg-gray-300 rounded-lg">🚕 택시</button>
-                        <button data-scenario="airport" class="situational-listening-btn w-full text-sm p-2 bg-gray-200 hover:bg-gray-300 rounded-lg">✈️ 공항</button>
-                    </div>
+                    <button data-scenario="restaurant" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <p class="text-lg font-semibold">🍽️ 식당</p>
+                    </button>
+                    <button data-scenario="shopping" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <p class="text-lg font-semibold">🛍️ 쇼핑</p>
+                    </button>
+                    <button data-scenario="taxi" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <p class="text-lg font-semibold">🚕 택시</p>
+                    </button>
+                    <button data-scenario="airport" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <p class="text-lg font-semibold">✈️ 공항</p>
+                    </button>
                 </div>
             </div>
 

@@ -161,7 +161,7 @@ function setupEventListeners() {
         else if (target.closest('.tts-btn')) {
             const ttsButton = target.closest('.tts-btn');
             if (ttsButton.classList.contains('is-playing')) {
-                 api.playTTS(null, ttsButton); 
+                 api.playTTS(null, ttsButton, null, null); // [★ 수정]
             } else {
                  const textToSpeak = ttsButton.dataset.text; 
                  // [★ 수정] 패턴 카드의 TTS는 화자 정보(speaker)가 없으므로 null 전달
@@ -201,7 +201,7 @@ function setupEventListeners() {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null); // [★ 수정]
         }
     });
     dom.openCorrectionBtn.addEventListener('click', () => {
@@ -218,7 +218,7 @@ function setupEventListeners() {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null); // [★ 수정]
         }
     });
     dom.openCorrectionHistoryBtn.addEventListener('click', () => {
@@ -239,7 +239,7 @@ function setupEventListeners() {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null); // [★ 수정]
         }
     });
     dom.customAlertCloseBtn.addEventListener('click', () => dom.customAlertModal.classList.add('hidden'));
@@ -283,7 +283,7 @@ function setupEventListeners() {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null); // [★ 수정]
             return;
         }
         const followSpeakButton = e.target.closest('.follow-speak-btn');
@@ -343,7 +343,7 @@ function setupEventListeners() {
     dom.nextWordBtn.addEventListener('click', features.showNextWord);
     dom.wordTtsBtn.addEventListener('click', (e) => {
         const textToSpeak = e.currentTarget.dataset.text;
-        if (textToSpeak) api.playTTS(textToSpeak, e.currentTarget, null, null);
+        if (textToSpeak) api.playTTS(textToSpeak, e.currentTarget, null, null); // [★ 수정]
     });
 
     // --- 간체자 학습 모달 ---
@@ -359,13 +359,13 @@ function setupEventListeners() {
     dom.nextCharBtn.addEventListener('click', features.showNextCharacter);
     dom.charTtsBtn.addEventListener('click', (e) => {
         const textToSpeak = e.currentTarget.dataset.text;
-        if (textToSpeak) api.playTTS(textToSpeak, e.currentTarget, null, null);
+        if (textToSpeak) api.playTTS(textToSpeak, e.currentTarget, null, null); // [★ 수정]
     });
     dom.characterInfo.addEventListener('click', (e) => {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
             const textToSpeak = ttsButton.dataset.text;
-            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null);
+            if (textToSpeak) api.playTTS(textToSpeak, ttsButton, null, null); // [★ 수정]
         }
     });
     
@@ -403,17 +403,16 @@ function setupEventListeners() {
         dom.listeningPlaybackControls.classList.add('hidden');
     });
 
-    // '오늘의 패턴 대화 듣기' 버튼
-    dom.getTodayConversationBtn.addEventListener('click', () => {
-        handlers.handleTodayConversationRequest(); 
-    });
-
-    // '상황별 듣기' 버튼 (이벤트 위임)
-    dom.situationalListeningControls.addEventListener('click', (e) => {
-        const button = e.target.closest('.situational-listening-btn');
+    // [★ 수정] '듣기 시나리오 목록' (이벤트 위임)
+    dom.listeningScenarioList.addEventListener('click', (e) => {
+        const button = e.target.closest('button[data-scenario]');
         if (button) {
             const scenario = button.dataset.scenario;
-            handlers.handleSituationalListeningRequest(scenario); 
+            if (scenario === 'today_conversation') {
+                handlers.handleTodayConversationRequest(); 
+            } else {
+                handlers.handleSituationalListeningRequest(scenario); 
+            }
         }
     });
 
