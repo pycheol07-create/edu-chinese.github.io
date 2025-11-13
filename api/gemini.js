@@ -267,9 +267,10 @@ export default async function handler(request, response) {
         }
 
     } else if (action === 'generate_today_conversation') {
+        // [★ 수정] 대화 턴 수 증가
         const conversationSystemPrompt = `You are a creative scriptwriter. Your task is to generate a short, natural dialogue based on two specific Chinese patterns provided by the user.
 - The dialogue must be between two speakers: "Man" (👨‍💼) and "Woman" (👩‍💼).
-- The dialogue must be 3 to 5 turns long (3-5 lines for Man, 3-5 lines for Woman, total 6-10 lines).
+- The dialogue must be 5 to 7 turns long (5-7 lines for Man, 5-7 lines for Woman, total 10-14 lines).
 - You MUST naturally incorporate both patterns: "${pattern1}" and "${pattern2}".
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object must have these exact keys: "title" (string) and "script" (array).
@@ -300,13 +301,13 @@ export default async function handler(request, response) {
         else if (scenario === 'shopping') scenarioKorean = '쇼핑';
         else if (scenario === 'taxi') scenarioKorean = '택시';
         else if (scenario === 'airport') scenarioKorean = '공항';
-        // [★ 수정] 'today_conversation' 시나리오 이름 매핑 추가
         else if (scenario === 'today_conversation') scenarioKorean = '오늘의 패턴 대화';
         
+        // [★ 수정] 대화 턴 수 증가
         const listeningSystemPrompt = `You are a creative scriptwriter. Your task is to generate a short, natural dialogue for a specific situation.
 - The situation is: "${scenarioKorean}" (in ${scenario}).
 - The dialogue must be between two speakers: "Man" (👨‍💼) and "Woman" (👩‍💼).
-- The dialogue must be 3 to 5 turns long (3-5 lines for Man, 3-5 lines for Woman, total 6-10 lines).
+- The dialogue must be 5 to 7 turns long (5-7 lines for Man, 5-7 lines for Woman, total 10-14 lines).
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object must have these exact keys: "title" (string) and "script" (array).
 - The "title" should be a concise Korean title for the dialogue (e.g., "식당에서 주문하기").
@@ -543,4 +544,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1101-19 (간체자 학습 프롬프트 수정)
+// v.2025.10.20_1101-20 (대화 턴 수 증가)
