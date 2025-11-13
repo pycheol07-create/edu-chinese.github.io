@@ -55,7 +55,7 @@
             background-color: #ecfdf5; /* Tailwind green-50 */
             border-color: #22c55e; /* Tailwind green-500 */
         }
-        /* 듣기 모달이 'is-fullscreen'일 때 스타일 */
+        /* [★ 새로 추가] 듣기 모달이 'is-fullscreen'일 때 스타일 */
         #listening-modal.is-fullscreen > div {
              width: 100%;
              max-width: 100%;
@@ -77,14 +77,14 @@
             transform: translateY(0) scale(1);
             pointer-events: auto;
         }
-        /* FAB 애니메이션 딜레이 (총 7개 버튼) */
+        /* [★ 수정] FAB 애니메이션 딜레이 (총 7개 버튼) */
         #fab-container.is-open #open-translator-btn { transition-delay: 0.0s; }
         #fab-container.is-open #open-correction-btn { transition-delay: 0.05s; }
         #fab-container.is-open #open-word-btn { transition-delay: 0.1s; }
         #fab-container.is-open #open-char-btn { transition-delay: 0.15s; }
-        #fab-container.is-open #all-patterns-btn { transition-delay: 0.2s; } 
-        #fab-container.is-open #open-listening-btn { transition-delay: 0.25s; } 
-        #fab-container.is-open #open-roleplay-btn { transition-delay: 0.3s; } 
+        #fab-container.is-open #all-patterns-btn { transition-delay: 0.2s; } /* ★ 추가 */
+        #fab-container.is-open #open-listening-btn { transition-delay: 0.25s; } /* ★ 추가 */
+        #fab-container.is-open #open-roleplay-btn { transition-delay: 0.3s; } /* ★ 수정 */
         
         #fab-main-btn svg {
             transition: transform 0.3s ease-in-out;
@@ -146,7 +146,7 @@
                 <button id="new-pattern-btn" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 shadow-lg text-lg">
                     새로운 패턴 보기
                 </button>
-            </div>
+                </div>
             <p class="text-xs text-gray-400 mt-4">매일 자정이 지나면 새로운 패턴이 자동으로 표시됩니다.</p>
         </footer>
     </div>
@@ -411,22 +411,22 @@
                 </button>
             </div>
             <p class="text-gray-600 mb-6">대화하고 싶은 주제를 선택하세요.</p>
-            <div id="roleplay-scenario-list" class="flex overflow-x-auto space-x-2 pb-2">
-                <button data-scenario="daily_friend" class="flex-shrink-0 text-left p-4 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors border border-purple-200 w-36">
+            <div id="roleplay-scenario-list" class="space-y-3 max-h-[60vh] overflow-y-auto">
+                <button data-scenario="daily_friend" class="w-full text-left p-4 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors border border-purple-200">
                     <p class="text-lg font-semibold">🧑‍🤝‍🧑 일상대화</p>
-                    <p class="text-sm text-gray-500">친구와 대화합니다.</p>
+                    <p class="text-sm text-gray-500">친구, 가족, 동료 등과 편하게 대화합니다.</p>
                 </button>
-                <button data-scenario="restaurant" class="flex-shrink-0 text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors w-36">
+                <button data-scenario="restaurant" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                     <p class="text-lg font-semibold">🍽️ 식당에서</p>
-                    <p class="text-sm text-gray-500">주문을 해봅니다.</p>
+                    <p class="text-sm text-gray-500">음식을 주문하고 계산을 요청합니다.</p>
                 </button>
-                <button data-scenario="shopping" class="flex-shrink-0 text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors w-36">
+                <button data-scenario="shopping" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                     <p class="text-lg font-semibold">🛍️ 가게에서</p>
-                    <p class="text-sm text-gray-500">쇼핑을 해봅니다.</p>
+                    <p class="text-sm text-gray-500">물건을 찾고 가격을 흥정합니다.</p>
                 </button>
-                <button data-scenario="taxi" class="flex-shrink-0 text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors w-36">
+                <button data-scenario="taxi" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                     <p class="text-lg font-semibold">🚕 택시에서</p>
-                    <p class="text-sm text-gray-500">목적지를 말합니다.</p>
+                    <p class="text-sm text-gray-500">목적지를 말하고 경로를 묻습니다.</p>
                 </button>
             </div>
         </div>
