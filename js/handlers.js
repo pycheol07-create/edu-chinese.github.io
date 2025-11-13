@@ -592,6 +592,7 @@ export async function handleTodayConversationRequest() {
     const pattern1 = dailyPatterns[0].pattern;
     const pattern2 = dailyPatterns[1].pattern;
 
+    dom.listeningScriptDisplay.classList.remove('hidden'); // [★ 수정] 로딩 전 스크립트 창 보이기
     dom.listeningScriptDisplay.innerHTML = '<div class="loader mx-auto"></div>';
     dom.listeningPlaybackControls.classList.add('hidden');
     // [★ 수정] dom.getTodayConversationBtn -> dom.listeningScenarioList
@@ -639,6 +640,7 @@ export async function handleTodayConversationRequest() {
  * @param {string} scenario - 선택된 시나리오 (e.g., 'restaurant')
  */
 export async function handleSituationalListeningRequest(scenario) {
+    dom.listeningScriptDisplay.classList.remove('hidden'); // [★ 수정] 로딩 전 스크립트 창 보이기
     dom.listeningScriptDisplay.innerHTML = '<div class="loader mx-auto"></div>';
     dom.listeningPlaybackControls.classList.add('hidden');
     
