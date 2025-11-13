@@ -242,7 +242,12 @@ function setupEventListeners() {
         }
     });
     dom.customAlertCloseBtn.addEventListener('click', () => dom.customAlertModal.classList.add('hidden'));
-    dom.allPatternsBtn.addEventListener('click', () => dom.allPatternsModal.classList.remove('hidden'));
+    
+    // [★ 수정] 'allPatternsBtn' 리스너 (FAB로 이동했지만 ID가 동일하므로 코드는 동일)
+    dom.allPatternsBtn.addEventListener('click', () => {
+        dom.allPatternsModal.classList.remove('hidden');
+        if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
+    });
     dom.closeAllPatternsBtn.addEventListener('click', () => dom.allPatternsModal.classList.add('hidden'));
     dom.allPatternsList.addEventListener('click', (e) => {
         const selectedPatternDiv = e.target.closest('[data-pattern-index]');
@@ -380,22 +385,26 @@ function setupEventListeners() {
         }
     });
 
-    // --- [★ 새로 추가] 듣기 학습 모달 리스너 ---
+    // --- [★ 수정] 듣기 학습 모달 리스너 ---
     dom.openListeningBtn.addEventListener('click', () => {
         dom.listeningModal.classList.remove('hidden');
+        if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
     });
 
     dom.closeListeningBtn.addEventListener('click', () => {
         dom.listeningModal.classList.add('hidden');
         state.stopCurrentAudio();
-        // 모달 닫을 때 UI 초기화
+        
+        // [★ 수정] 모달 닫을 때 UI 초기화 (풀스크린 및 컨트롤 숨김 해제)
+        dom.listeningModal.classList.remove('is-fullscreen'); // 풀스크린 해제
+        dom.listeningControls.classList.remove('hidden'); // 컨트롤 보이기
         dom.listeningScriptDisplay.innerHTML = '<p class="text-gray-400 text-center">듣고 싶은 주제를 선택하세요.</p>';
         dom.listeningPlaybackControls.classList.add('hidden');
     });
 
     // '오늘의 패턴 대화 듣기' 버튼
     dom.getTodayConversationBtn.addEventListener('click', () => {
-        handlers.handleTodayConversationRequest(); // handlers.js에서 생성 예정
+        handlers.handleTodayConversationRequest(); 
     });
 
     // '상황별 듣기' 버튼 (이벤트 위임)
@@ -403,13 +412,12 @@ function setupEventListeners() {
         const button = e.target.closest('.situational-listening-btn');
         if (button) {
             const scenario = button.dataset.scenario;
-            handlers.handleSituationalListeningRequest(scenario); // handlers.js에서 생성 예정
+            handlers.handleSituationalListeningRequest(scenario); 
         }
     });
 
     // '전체 대화 듣기' 버튼
-    // [★ 수정] 오타 수정: ()View(...) 를 올바른 함수 참조로 변경
-    dom.playAllScriptBtn.addEventListener('click', handlers.handlePlayAllListeningScript); // handlers.js에서 생성 예정
+    dom.playAllScriptBtn.addEventListener('click', handlers.handlePlayAllListeningScript); 
 
     // 스크립트 개별 TTS 버튼 (이벤트 위임)
     dom.listeningScriptDisplay.addEventListener('click', (e) => {
@@ -418,7 +426,6 @@ function setupEventListeners() {
             const textToSpeak = ttsButton.dataset.text;
             if (textToSpeak) {
                 const lineElement = ttsButton.closest('.listening-line');
-                // api.js의 playTTS를 수정하여 세 번째 인자로 lineElement를 넘길 것입니다.
                 api.playTTS(textToSpeak, ttsButton, lineElement);
             }
         }

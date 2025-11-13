@@ -609,12 +609,16 @@ export async function handleTodayConversationRequest() {
         if (scriptData.script) {
             ui.renderListeningScript(scriptData.title, scriptData.script); 
             dom.listeningPlaybackControls.classList.remove('hidden');
+            // [★ 수정] 풀스크린으로 변경
+            dom.listeningModal.classList.add('is-fullscreen');
+            dom.listeningControls.classList.add('hidden'); // 컨트롤 숨기기
         } else {
             throw new Error("AI 응답에 'script' 키가 없습니다.");
         }
     } catch (error) {
         console.error('Today Conversation error:', error);
         dom.listeningScriptDisplay.innerHTML = `<p class="text-red-500 text-center">대화 생성 중 오류가 발생했습니다: ${error.message}</p>`;
+        dom.listeningControls.classList.remove('hidden'); // [★ 추가] 오류 시 컨트롤 다시 표시
     } finally {
         dom.getTodayConversationBtn.disabled = false;
         dom.getTodayConversationBtn.textContent = '오늘의 패턴 대화 듣기';
@@ -654,12 +658,16 @@ export async function handleSituationalListeningRequest(scenario) {
         if (scriptData.script) {
             ui.renderListeningScript(scriptData.title, scriptData.script);
             dom.listeningPlaybackControls.classList.remove('hidden');
+            // [★ 수정] 풀스크린으로 변경
+            dom.listeningModal.classList.add('is-fullscreen');
+            dom.listeningControls.classList.add('hidden'); // 컨트롤 숨기기
         } else {
             throw new Error("AI 응답에 'script' 키가 없습니다.");
         }
     } catch (error) {
         console.error('Situational Listening error:', error);
         dom.listeningScriptDisplay.innerHTML = `<p class="text-red-500 text-center">대화 생성 중 오류가 발생했습니다: ${error.message}</p>`;
+        dom.listeningControls.classList.remove('hidden'); // [★ 추가] 오류 시 컨트롤 다시 표시
     } finally {
         // 모든 버튼 다시 활성화
         dom.getTodayConversationBtn.disabled = false;
@@ -698,13 +706,9 @@ export async function handlePlayAllListeningScript() {
             // [★ 수정] api.playTTS가 Promise를 반환 (reject되면 catch로 이동)
             await api.playTTS(text, ttsButton, line);
 
-            // [★ 수정]
-            // 버그 수정: "Playback stopped"가 아닌, 정상 종료(onended) 시
-            // currentAudio가 null이 되어도 루프가 중단되던 문제 수정.
-            // (onended는 Promise를 resolve하므로, catch로 가지 않고
-            //  이 다음 라인으로 넘어옵니다. onpause(수동중지)는 reject합니다.)
-            
-            // [★ 삭제] (버그 유발 코드 삭제)
+            // [★ 수정] (버그 유발 코드 삭제)
+            // 정상 종료(onended) 시에도 currentAudio가 null이 되어 
+            // 루프가 중단되던 버그 수정.
             /*
             if (state.runTimeState.currentAudio === null) {
                  console.log("Playback stopped.");
