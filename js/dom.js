@@ -21,10 +21,10 @@ export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, tr
     openCharBtn, charModal, closeCharBtn, characterInfo,
     charTtsBtn, nextCharBtn,
     openRoleplayBtn, roleplayModal, closeRoleplayBtn, roleplayScenarioList,
-    // [★ 새로 추가] 듣기 학습 관련 변수
+    // [★ 수정] 듣기 학습 관련 변수 (listeningControls 추가)
     openListeningBtn, listeningModal, closeListeningBtn, getTodayConversationBtn,
     situationalListeningControls, listeningScriptDisplay, listeningPlaybackControls,
-    playAllScriptBtn;
+    playAllScriptBtn, listeningControls;
 
 
 /**
@@ -57,10 +57,6 @@ export function initializeDOM() {
     suggestReplyBtn = document.getElementById('suggest-reply-btn');
 
     // [★ 삭제] 퀴즈 관련 DOM 할당 코드 삭제
-    // dailyQuizBtn = document.getElementById('daily-quiz-btn');
-    // quizModal = document.getElementById('quiz-modal');
-    // closeQuizBtn = document.getElementById('close-quiz-btn');
-    // quizContent = document.getElementById('quiz-content');
 
     openCorrectionBtn = document.getElementById('open-correction-btn');
     correctionModal = document.getElementById('correction-modal');
@@ -105,7 +101,7 @@ export function initializeDOM() {
     closeRoleplayBtn = document.getElementById('close-roleplay-btn');
     roleplayScenarioList = document.getElementById('roleplay-scenario-list');
 
-    // [★ 새로 추가] 듣기 학습 관련 DOM 할당
+    // [★ 수정] 듣기 학습 관련 DOM 할당 (listeningControls 추가)
     openListeningBtn = document.getElementById('open-listening-btn');
     listeningModal = document.getElementById('listening-modal');
     closeListeningBtn = document.getElementById('close-listening-btn');
@@ -114,6 +110,7 @@ export function initializeDOM() {
     listeningScriptDisplay = document.getElementById('listening-script-display');
     listeningPlaybackControls = document.getElementById('listening-playback-controls');
     playAllScriptBtn = document.getElementById('play-all-script-btn');
+    listeningControls = document.getElementById('listening-controls'); // ★ 추가
 
 
     console.log("DOM elements initialized.");

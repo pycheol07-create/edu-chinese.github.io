@@ -416,7 +416,9 @@ export default async function handler(request, response) {
          const contents = [
             { role: "user", parts: [{ text: suggestSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I will provide reply suggestions including pinyin and Korean meaning in the specified JSON format." }] }, 
-            ...history
+            ...history,
+            // [★ 수정] 500 오류 해결: AI에게 작업을 명확히 지시하는 마지막 프롬프트를 추가합니다.
+            { role: "user", parts: [{ text: "Please provide 3 suggestions for a reply to the last message, based on our conversation." }] }
         ];
         apiRequestBody = { contents };
     }
@@ -502,8 +504,6 @@ export default async function handler(request, response) {
         throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다. (candidates 확인 실패)");
     }
 
-    // [★ 수정] suggest_reply 로직이 위로 이동했으므로 여기서는 삭제합니다.
-    
     // (chat, generate_..., correct_writing 등)은 data 전체를 반환
     // (클라이언트 측의 handlers.js에 있는 extractJson 함수가 이 응답을 처리합니다)
     return response.status(200).json(data);
@@ -514,4 +514,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1101-15 (전체듣기 버그 및 답변추천 500 오류 수정)
+// v.2025.10.20_1101-16 (답변 추천 500 오류 수정)
