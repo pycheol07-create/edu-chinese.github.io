@@ -66,13 +66,12 @@
             pointer-events: auto;
         }
 
-        /* [★ 수정] FAB가 열렸을 때 서브 버튼별 애니메이션 지연 (롤플레잉 포함) */
+        /* [★ 수정] FAB가 열렸을 때 서브 버튼별 애니메이션 지연 (자유대화 버튼 삭제 반영) */
         #fab-container.is-open #open-translator-btn { transition-delay: 0.0s; }
         #fab-container.is-open #open-correction-btn { transition-delay: 0.1s; }
         #fab-container.is-open #open-word-btn { transition-delay: 0.2s; }
         #fab-container.is-open #open-char-btn { transition-delay: 0.3s; }
-        #fab-container.is-open #open-roleplay-btn { transition-delay: 0.4s; } /* ★ 새 버튼 */
-        #fab-container.is-open #open-chat-btn { transition-delay: 0.5s; } /* ★ 딜레이 수정 */
+        #fab-container.is-open #open-roleplay-btn { transition-delay: 0.4s; } /* ★ 딜레이 수정 */
 
 
         /* FAB가 열렸을 때 메인 버튼 아이콘 회전 */
@@ -150,17 +149,10 @@
     <div id="fab-container" class="fixed bottom-6 right-6 flex flex-col items-center z-30">
 
         <div id="fab-menu" class="flex flex-col-reverse items-center space-y-3 space-y-reverse mb-3">
-
-            <button id="open-chat-btn" title="AI와 자유 대화" class="fab-sub-button bg-purple-600 hover:bg-purple-700 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
+            
+            <button id="open-roleplay-btn" title="AI와 대화하기" class="fab-sub-button bg-purple-600 hover:bg-purple-700 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-3.04 8.3-7.146 9.574a18.79 18.79 0 0 1-8.708 0C3.04 20.3 0 16.556 0 12c0-4.556 3.04-8.3 7.146-9.574a18.79 18.79 0 0 1 8.708 0C17.96 3.7 21 7.444 21 12Z" />
-                </svg>
-            </button>
-            
-            <button id="open-roleplay-btn" title="상황별 대화" class="fab-sub-button bg-blue-500 hover:bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A1.875 1.875 0 0 1 18 22.5H6a1.875 1.875 0 0 1-1.499-2.382ZM19.5 11.25c.621 0 1.125.504 1.125 1.125v2.625c0 .621-.504 1.125-1.125 1.125H18v-4.875h1.5Z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 11.25c-.621 0-1.125.504-1.125 1.125v2.625c0 .621.504 1.125 1.125 1.125H6v-4.875H4.5Z" />
                 </svg>
             </button>
             
@@ -419,29 +411,57 @@
     </div>
 
     <div id="roleplay-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 relative">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 relative">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-gray-800">상황별 대화 🧑‍💼</h2>
+                <h2 class="text-2xl font-bold text-gray-800">AI와 대화하기 💬</h2>
                 <button id="close-roleplay-btn" class="p-1 rounded-full hover:bg-gray-200">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
-            <p class="text-gray-600 mb-6">연습하고 싶은 상황을 선택하세요.</p>
-            <div id="roleplay-scenario-list" class="space-y-3">
-                <button data-scenario="restaurant" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-                    <p class="text-lg font-semibold">🍽️ 식당에서 주문하기</p>
-                    <p class="text-sm text-gray-500">종업원과 대화하며 음식을 주문해봅니다.</p>
-                </button>
-                <button data-scenario="shopping" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-                    <p class="text-lg font-semibold">🛍️ 가게에서 쇼핑하기</p>
-                    <p class="text-sm text-gray-500">점원에게 원하는 물건을 찾고 계산해봅니다.</p>
-                </button>
-                <button data-scenario="taxi" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-                    <p class="text-lg font-semibold">🚕 택시에서 목적지 말하기</p>
-                    <p class="text-sm text-gray-500">택시 기사님께 목적지를 설명합니다.</p>
-                </button>
+            <p class="text-gray-600 mb-6">대화하고 싶은 주제나 상황을 선택하세요.</p>
+            
+            <div id="roleplay-scenario-list" class="space-y-3 max-h-[60vh] overflow-y-auto">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-500 uppercase mb-2">일상 대화</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button data-scenario="daily_friend" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                            <p class="text-lg font-semibold">🧑‍🤝‍🧑 친구</p>
+                            <p class="text-sm text-gray-500">가까운 친구와 편하게 대화합니다.</p>
+                        </button>
+                        <button data-scenario="daily_lover" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                            <p class="text-lg font-semibold">❤️ 연인</p>
+                            <p class="text-sm text-gray-500">애정 표현과 데이트에 대해 얘기합니다.</p>
+                        </button>
+                        <button data-scenario="daily_family" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                            <p class="text-lg font-semibold">👨‍👩‍👧‍👦 가족</p>
+                            <p class="text-sm text-gray-500">가족의 안부를 묻고 일상을 공유합니다.</p>
+                        </button>
+                        <button data-scenario="daily_colleague" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                            <p class="text-lg font-semibold">💼 직장동료</p>
+                            <p class="text-sm text-gray-500">업무와 회사 생활에 대해 대화합니다.</p>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-3">
+                     <h3 class="text-sm font-semibold text-gray-500 uppercase mb-2">상황별 대화</h3>
+                    <div class="space-y-3">
+                        <button data-scenario="restaurant" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                            <p class="text-lg font-semibold">🍽️ 식당에서 주문하기</p>
+                            <p class="text-sm text-gray-500">종업원과 대화하며 음식을 주문해봅니다.</p>
+                        </button>
+                        <button data-scenario="shopping" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                            <p class="text-lg font-semibold">🛍️ 가게에서 쇼핑하기</p>
+                            <p class="text-sm text-gray-500">점원에게 원하는 물건을 찾고 계산해봅니다.</p>
+                        </button>
+                        <button data-scenario="taxi" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                            <p class="text-lg font-semibold">🚕 택시에서 목적지 말하기</p>
+                            <p class="text-sm text-gray-500">택시 기사님께 목적지를 설명합니다.</p>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

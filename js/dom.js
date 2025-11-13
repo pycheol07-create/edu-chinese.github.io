@@ -6,7 +6,9 @@
 export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, translatorModal,
     closeTranslatorBtn, translateBtn, koreanInput, translationResult, customAlertModal,
     customAlertMessage, customAlertCloseBtn, allPatternsBtn, allPatternsModal,
-    closeAllPatternsBtn, allPatternsList, chatBtn, chatModal, closeChatBtn,
+    closeAllPatternsBtn, allPatternsList, 
+    // [★ 수정] chatBtn 변수 선언 제거
+    chatModal, closeChatBtn,
     chatHistory, chatInput, sendChatBtn, micBtn, suggestReplyBtn,
     dailyQuizBtn, quizModal, closeQuizBtn, quizContent,
     openCorrectionBtn, correctionModal, closeCorrectionBtn, correctionInput,
@@ -43,7 +45,8 @@ export function initializeDOM() {
     allPatternsModal = document.getElementById('all-patterns-modal');
     closeAllPatternsBtn = document.getElementById('close-all-patterns-btn');
     allPatternsList = document.getElementById('all-patterns-list');
-    chatBtn = document.getElementById('open-chat-btn');
+    
+    // [★ 수정] chatBtn = document.getElementById('open-chat-btn'); 코드 삭제
     chatModal = document.getElementById('chat-modal');
     closeChatBtn = document.getElementById('close-chat-btn');
     chatHistory = document.getElementById('chat-history');
