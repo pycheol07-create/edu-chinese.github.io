@@ -302,9 +302,6 @@ function setupEventListeners() {
     dom.suggestReplyBtn.addEventListener('click', handlers.handleSuggestReply);
 
     // [★ 삭제] 퀴즈 모달 리스너 삭제
-    // dom.dailyQuizBtn.addEventListener('click', quiz.startQuiz);
-    // dom.closeQuizBtn.addEventListener('click', () => dom.quizModal.classList.add('hidden'));
-    // dom.quizContent.addEventListener('click', (e) => { ... });
 
     // --- FAB (플로팅 버튼) ---
     if (dom.fabMainBtn && dom.fabContainer) {
@@ -411,8 +408,8 @@ function setupEventListeners() {
     });
 
     // '전체 대화 듣기' 버튼
-    dom.playAllScriptBtn.addEventListener('click', ()View(handlers.handlePlayAllListeningScript); // handlers.js에서 생성 예정
-    });
+    // [★ 수정] 오타 수정: ()View(...) 를 올바른 함수 참조로 변경
+    dom.playAllScriptBtn.addEventListener('click', handlers.handlePlayAllListeningScript); // handlers.js에서 생성 예정
 
     // 스크립트 개별 TTS 버튼 (이벤트 위임)
     dom.listeningScriptDisplay.addEventListener('click', (e) => {
