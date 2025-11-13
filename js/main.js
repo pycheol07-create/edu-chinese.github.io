@@ -267,7 +267,20 @@ function setupEventListeners() {
     // --- AI 채팅 모달 이벤트 ---
     
     // [★ 수정] "AI와 자유 대화" (chatBtn) 리스너 삭제
-    // dom.chatBtn.addEventListener('click', () => { ... });
+    /*
+    dom.chatBtn.addEventListener('click', () => {
+        dom.chatModal.classList.remove('hidden');
+        if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
+
+        dom.chatHistory.innerHTML = '';
+        state.conversationHistory.length = 0; // [★] 롤플레잉 문맥 제거
+        dom.chatInput.value = '';
+        
+        const firstMsg = { chinese: '你好！我叫灵，很高兴认识你。我们用中文聊聊吧！', pinyin: 'Nǐ hǎo! Wǒ jiào Líng, hěn gāoxìng rènshi nǐ. Wǒmen yòng Zhōngwén liáoliao ba!', korean: '안녕하세요! 제 이름은 링이에요, 만나서 반가워요. 우리 중국어로 대화해요!' };
+        ui.addMessageToHistory('ai', firstMsg);
+        state.conversationHistory.push({ role: 'model', parts: [{ text: JSON.stringify(firstMsg) }] });
+    });
+    */
     
     dom.closeChatBtn.addEventListener('click', () => {
         dom.chatModal.classList.add('hidden');
@@ -318,7 +331,7 @@ function setupEventListeners() {
 
     // --- 퀴즈 모달 이벤트 ---
     dom.dailyQuizBtn.addEventListener('click', quiz.startQuiz);
-    dom.closeQuizBtn.addEventListener('click', () => quizModal.classList.add('hidden'));
+    dom.closeQuizBtn.addEventListener('click', () => dom.quizModal.classList.add('hidden'));
 
     dom.quizContent.addEventListener('click', (e) => {
         const targetButton = e.target.closest('.quiz-option-btn');
