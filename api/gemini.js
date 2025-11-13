@@ -12,6 +12,32 @@ export default async function handler(request, response) {
   // [★ 수정] pattern1, pattern2, scenario 추가
   const { action, text, systemPrompt, history, pattern, originalText, userText, roleContext, pattern1, pattern2, scenario } = request.body;
 
+  // [★ 새로 추가] AI 응답에서 JSON 블록만 추출하는 헬퍼 함수
+  /**
+   * 텍스트에서 ```json ... ``` 블록을 추출합니다.
+   * @param {string} text - AI가 응답한 전체 텍스트
+   * @returns {string | null} - 추출된 JSON 문자열 또는 null
+   */
+  function extractJson(text) {
+    if (!text) return null;
+    
+    // 1. ```json ... ``` 블록 찾기
+    const match = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (match && match[1]) {
+        return match[1].trim();
+    }
+    
+    // 2. 만약 백틱이 없다면, 텍스트가 { 로 시작하고 } 로 끝나는지 확인
+    const trimmedText = text.trim();
+    if (trimmedText.startsWith('{') && trimmedText.endsWith('}')) {
+        return trimmedText;
+    }
+
+    console.warn("[api/gemini.js] Could not find or extract JSON block from text:", text);
+    return null; // JSON을 찾지 못함
+  }
+
+
   try {
     let apiUrl;
     let apiRequestBody;
@@ -240,8 +266,6 @@ export default async function handler(request, response) {
             apiRequestBody = { contents };
         }
 
-    // --- [★ 새로 추가] 듣기 학습 관련 API 액션 ---
-
     } else if (action === 'generate_today_conversation') {
         const conversationSystemPrompt = `You are a creative scriptwriter. Your task is to generate a short, natural dialogue based on two specific Chinese patterns provided by the user.
 - The dialogue must be between two speakers: "Man" (👨‍💼) and "Woman" (👩‍💼).
@@ -304,10 +328,27 @@ export default async function handler(request, response) {
         ];
         apiRequestBody = { contents };
 
-    // --- [★ 추가 끝] ---
-
     } else if (action === 'generate_practice') {
-        const practiceSystemPrompt = `... (생략) ...`;
+        const practiceSystemPrompt = `You are an AI language tutor. Your goal is to create a single practice problem for a user learning Chinese based on a specific pattern.
+- The user needs to translate a Korean sentence into Chinese.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "korean" (string), "chinese" (string), "pinyin" (string), "practiceVocab" (array).
+- "korean": A simple Korean sentence that *requires* the pattern "${pattern}" to be translated naturally.
+- "chinese": The correct Chinese translation of the "korean" sentence, using the pattern "${pattern}".
+- "pinyin": The pinyin for the "chinese" sentence.
+- "practiceVocab": An array of 1-3 key vocabulary objects found in the "chinese" sentence. Each object must have keys: "word", "pinyin", "meaning".
+
+- Example for pattern "A是A, 但是B":
+{
+  "korean": "이 옷, 예쁘긴 예쁜데 너무 비싸요.",
+  "chinese": "这件衣服好看是好看, 但是太贵了。",
+  "pinyin": "zhè jiàn yīfu hǎokàn shì hǎokàn, dànshì tài guì le.",
+  "practiceVocab": [
+    {"word": "衣服", "pinyin": "yīfu", "meaning": "옷"},
+    {"word": "好看", "pinyin": "hǎokàn", "meaning": "예쁘다"},
+    {"word": "贵", "pinyin": "guì", "meaning": "비싸다"}
+  ]
+}`;
         const contents = [
             { role: "user", parts: [{ text: practiceSystemPrompt }] },
             { role: "model", parts: [{ text: `Okay, I understand. I will generate a new practice problem for the pattern "${pattern}" in the specified JSON format, including "practiceVocab".` }] },
@@ -404,34 +445,39 @@ export default async function handler(request, response) {
         throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다. (candidates 확인 실패)");
     }
 
+     // [★ 수정] 'suggest_reply' 액션의 파싱 로직을 extractJson 헬퍼 함수를 사용하도록 변경
      if (action === 'suggest_reply') {
-        let suggestionData = null;
-        let foundSuggestions = false;
-        for (const part of data.candidates[0].content.parts) {
-            try {
-                const cleanedText = part.text.trim();
-                const jsonText = cleanedText.replace(/^```json\s*|\s*```$/g, '');
-                const parsedPart = JSON.parse(jsonText);
+        try {
+            // 1. AI 응답 텍스트 가져오기
+            const aiResponseText = data.candidates[0].content.parts[0].text;
+            
+            // 2. 헬퍼 함수로 JSON 추출
+            const cleanedText = extractJson(aiResponseText); 
 
-                if (parsedPart.suggestions && Array.isArray(parsedPart.suggestions)) {
-                    suggestionData = parsedPart;
-                    foundSuggestions = true;
-                    break; 
-                }
-            } catch (e) {
-                console.warn("Ignoring non-JSON or invalid JSON part in suggest_reply:", part.text);
+            if (!cleanedText) { // JSON 추출 실패
+                throw new Error("AI response did not contain a valid JSON block.");
             }
-        }
 
-        if (foundSuggestions && suggestionData) {
-            return response.status(200).json(suggestionData);
-        } else {
-            console.error("Could not find valid 'suggestions' JSON object array in any response parts:", JSON.stringify(data.candidates[0].content.parts, null, 2));
+            // 3. 추출된 JSON 파싱
+            const suggestionData = JSON.parse(cleanedText);
+
+            // 4. 데이터 확인 후 반환
+            if (suggestionData && suggestionData.suggestions && Array.isArray(suggestionData.suggestions)) {
+                return response.status(200).json(suggestionData);
+            } else {
+                throw new Error("Parsed JSON does not contain 'suggestions' array.");
+            }
+            
+        } catch (e) {
+            // 5. 파싱 또는 추출 실패 시
+            console.error(`[api/gemini.js] suggest_reply parsing error: ${e.message}`, data.candidates[0].content.parts[0].text);
+            // handlers.js의 catch 블록으로 이 오류 메시지를 전송
             throw new Error("AI로부터 유효한 답변 추천(병음, 뜻 포함) JSON 형식을 찾지 못했습니다."); 
         }
     }
 
     // 번역, 채팅, 패턴 채팅 시작, 롤플레잉, 문제 생성, 작문 교정, 발음 평가 등은 data 전체를 반환
+    // (클라이언트 측의 handlers.js에 있는 extractJson 함수가 이 응답을 처리합니다)
     return response.status(200).json(data);
 
   } catch (error) {
@@ -440,4 +486,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1101-13 (듣기 학습 기능 추가)
+// v.2025.10.20_1101-14 (JSON 추출 로직 개선 및 연습문제 프롬프트 수정)
