@@ -22,57 +22,102 @@ async function callGeminiAPI(action, body) {
 }
 
 /**
- * 텍스트를 음성(TTS)으로 재생합니다.
+ * [★ 수정] 텍스트를 음성(TTS)으로 재생합니다.
+ * (전체 듣기 기능을 위해 Promise를 반환하고, lineElement 하이라이트를 지원하도록 수정)
  * @param {string} text - 재생할 텍스트
- * @param {HTMLElement} buttonElement - 클릭된 TTS 버튼
+ * @param {HTMLElement | null} buttonElement - (선택) 클릭된 TTS 버튼
+ * @param {HTMLElement | null} lineElement - (선택) 하이라이트할 대화 라인 요소
+ * @returns {Promise<void>} - (lineElement가 있을 경우) 재생이 완료/중지되면 resolve/reject되는 Promise
  */
-export async function playTTS(text, buttonElement) {
-    if (state.runTimeState.currentAudio) {
-        state.runTimeState.currentAudio.pause();
-        state.runTimeState.currentAudio = null;
-        if (state.runTimeState.currentPlayingButton) {
-            state.runTimeState.currentPlayingButton.classList.remove('is-playing');
+export function playTTS(text, buttonElement = null, lineElement = null) {
+    // Promise로 감싸서 비동기 재생 완료를 핸들링
+    const playPromise = new Promise(async (resolve, reject) => {
+        if (state.runTimeState.currentAudio) {
+            // 다른 오디오가 재생 중이면 중지
+            // (주의: stopCurrentAudio는 currentAudio.onpause를 트리거하여
+            //  이전 Promise를 reject시킬 수 있음)
+            state.stopCurrentAudio();
+            
+            // 만약 '중지' 버튼으로 동일한 버튼을 누른 거라면, 여기서 재생을 멈추고 resolve
+            if (state.runTimeState.currentPlayingButton === buttonElement) {
+                state.runTimeState.currentPlayingButton = null;
+                resolve();
+                return;
+            }
         }
-        if (state.runTimeState.currentPlayingButton === buttonElement) {
-            state.runTimeState.currentPlayingButton = null;
-            return;
-        }
-    }
-    
-    state.runTimeState.currentPlayingButton = buttonElement;
-    if(buttonElement) buttonElement.classList.add('is-playing');
+        
+        // 새 오디오 재생 시작
+        state.runTimeState.currentPlayingButton = buttonElement;
+        if(buttonElement) buttonElement.classList.add('is-playing');
+        if(lineElement) lineElement.classList.add('is-playing');
 
-    try {
-        let audioData = state.audioCache[text];
-        if (!audioData) {
-            const result = await callGeminiAPI('tts', { text });
-            audioData = result.audioContent;
-            state.audioCache[text] = audioData;
+        try {
+            let audioData = state.audioCache[text];
+            if (!audioData) {
+                const result = await callGeminiAPI('tts', { text });
+                audioData = result.audioContent;
+                state.audioCache[text] = audioData;
+            }
+            
+            const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
+            state.runTimeState.currentAudio = audio;
+            audio.play();
+            
+            // --- 오디오 이벤트 핸들러 ---
+            
+            audio.onended = () => {
+                if(buttonElement) buttonElement.classList.remove('is-playing');
+                if(lineElement) lineElement.classList.remove('is-playing');
+                state.runTimeState.currentAudio = null;
+                state.runTimeState.currentPlayingButton = null;
+                resolve(); // 재생 완료
+            };
+            
+            audio.onerror = (e) => {
+                console.error('Audio playback error:', e);
+                showAlert('오디오 재생 중 오류가 발생했습니다.');
+                if(buttonElement) buttonElement.classList.remove('is-playing');
+                if(lineElement) lineElement.classList.remove('is-playing');
+                state.runTimeState.currentAudio = null;
+                state.runTimeState.currentPlayingButton = null;
+                reject(new Error('Audio playback error')); // 오류로 reject
+            };
+
+            // [★ 추가] stopCurrentAudio()에 의해 .pause()가 호출될 때
+            audio.onpause = () => {
+                 if(buttonElement) buttonElement.classList.remove('is-playing');
+                 if(lineElement) lineElement.classList.remove('is-playing');
+                 // currentAudio가 null이 된 것은 stopCurrentAudio()가 원인임
+                 if (state.runTimeState.currentAudio === null) {
+                    reject(new Error('Playback stopped')); // 중지로 reject
+                 }
+                 // (그 외의 이유로 pause되면 아무것도 하지 않음)
+            };
+
+        } catch (error) {
+            console.error('TTS error:', error);
+            showAlert(`음성(TTS)을 불러오는 데 실패했습니다: ${error.message}`);
+            if(buttonElement) buttonElement.classList.remove('is-playing');
+            if(lineElement) lineElement.classList.remove('is-playing');
+            state.runTimeState.currentPlayingButton = null;
+            reject(error); // TTS API 오류로 reject
         }
-        
-        const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
-        state.runTimeState.currentAudio = audio;
-        audio.play();
-        
-        audio.onended = () => {
-            if(buttonElement) buttonElement.classList.remove('is-playing');
-            state.runTimeState.currentAudio = null;
-            state.runTimeState.currentPlayingButton = null;
-        };
-        
-        audio.onerror = (e) => {
-            console.error('Audio playback error:', e);
-            showAlert('오디오 재생 중 오류가 발생했습니다.');
-            if(buttonElement) buttonElement.classList.remove('is-playing');
-            state.runTimeState.currentAudio = null;
-            state.runTimeState.currentPlayingButton = null;
-        };
-    } catch (error) {
-        console.error('TTS error:', error);
-        showAlert(`음성(TTS)을 불러오는 데 실패했습니다: ${error.message}`);
-        if(buttonElement) buttonElement.classList.remove('is-playing');
-        state.runTimeState.currentPlayingButton = null;
+    });
+
+    // lineElement가 제공되지 않은 경우 (일반 버튼 클릭) 
+    // Promise를 반환하지 않고, 오류만 콘솔에 기록 (기존 방식)
+    if (!lineElement) {
+        playPromise.catch(error => {
+            // "Playback stopped"는 사용자가 의도한 중지이므로 콘솔에 오류를 찍지 않음
+            if (error.message !== 'Playback stopped') {
+                console.error("TTS playback error (unhandled):", error);
+            }
+        });
+        return; // undefined 반환
     }
+
+    // lineElement가 제공된 경우 (전체 듣기) Promise 반환
+    return playPromise;
 }
 
 // --- API를 호출하는 핸들러 함수들 ---
@@ -169,4 +214,25 @@ export function getCharacterInfo(char) {
  */
 export function evaluatePronunciation(original, user) {
     return callGeminiAPI('evaluate_pronunciation', { originalText: original, userText: user });
+}
+
+// --- [★ 새로 추가] 듣기 학습 API 함수 ---
+
+/**
+ * '오늘의 대화' 스크립트 요청 (API 호출)
+ * @param {string} pattern1 - 오늘 사용된 패턴 1
+ * @param {string} pattern2 - 오늘 사용된 패턴 2
+ * @returns {Promise<object>} - Gemini API 응답
+ */
+export function getTodayConversationScript(pattern1, pattern2) {
+    return callGeminiAPI('generate_today_conversation', { pattern1, pattern2 });
+}
+
+/**
+ * '상황별 듣기' 스크립트 요청 (API 호출)
+ * @param {string} scenario - 듣기 시나리오 (e.g., 'restaurant')
+ * @returns {Promise<object>} - Gemini API 응답
+ */
+export function getSituationalListeningScript(scenario) {
+    return callGeminiAPI('generate_situational_listening', { scenario });
 }

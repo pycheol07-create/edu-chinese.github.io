@@ -240,3 +240,51 @@ export function renderCorrectionHistory() {
         dom.correctionHistoryList.appendChild(itemEl);
     });
 }
+
+
+// --- [★ 새로 추가] 듣기 스크립트 렌더링 함수 ---
+
+/**
+ * 듣기 모달에 AI가 생성한 스크립트를 렌더링합니다.
+ * @param {string} title - 대화 제목
+ * @param {Array<object>} scriptLines - 대화 스크립트 객체 배열
+ */
+export function renderListeningScript(title, scriptLines) {
+    if (!dom.listeningScriptDisplay) return;
+
+    // 스피커(화자) 아이콘 매핑
+    const speakerIcons = {
+        "Man": "👨‍💼",
+        "Woman": "👩‍💼",
+        "A": "🧑‍A",
+        "B": "🧑‍B",
+        "Male": "👨",
+        "Female": "👩"
+    };
+
+    const scriptHtml = scriptLines.map((line, index) => {
+        // AI 응답이 Man/Woman이 아닐 경우(e.g. A/B) 대비
+        const icon = speakerIcons[line.speaker] || '👤'; 
+        
+        return `
+            <div id="listening-line-${index}" class="listening-line p-3 mb-2 bg-white rounded-lg border border-gray-200 transition-colors duration-300" data-text="${line.chinese}">
+                <div class="flex items-center justify-between">
+                    <span class="text-lg font-semibold">${icon} ${line.speaker}</span>
+                    <button class="tts-btn p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${line.chinese}" title="듣기">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"></path></svg>
+                    </button>
+                </div>
+                <p class="text-xl chinese-text text-gray-800 mt-2">${line.chinese}</p>
+                <p class="text-md text-gray-500">${line.pinyin}</p>
+                <p class="text-md text-gray-600 mt-2 pt-2 border-t border-gray-100">${line.korean}</p>
+            </div>
+        `;
+    }).join('');
+
+    dom.listeningScriptDisplay.innerHTML = `
+        <h3 class="text-xl font-bold text-center mb-4">${title}</h3>
+        <div class="space-y-2">
+            ${scriptHtml}
+        </div>
+    `;
+}

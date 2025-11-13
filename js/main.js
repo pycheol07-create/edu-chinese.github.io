@@ -5,7 +5,7 @@ import * as dom from './dom.js';
 import * as ui from './ui.js';
 import * as api from './api.js';
 import * as handlers from './handlers.js';
-import * as quiz from './quiz.js';
+// [★ 삭제] import * as quiz from './quiz.js';
 import * as speech from './speech.js';
 import * as features from './features.js';
 
@@ -261,9 +261,6 @@ function setupEventListeners() {
     });
 
     // --- AI 채팅 모달 ---
-    // [★ 수정] '자유 대화' 버튼 리스너 (dom.chatBtn) 삭제
-    // ( dom.chatBtn.addEventListener('click', ...) 블록 전체 삭제 )
-
     dom.closeChatBtn.addEventListener('click', () => {
         dom.chatModal.classList.add('hidden');
         speech.stopRecognition();
@@ -276,7 +273,6 @@ function setupEventListeners() {
             handlers.handleSendMessage();
         }
     });
-    
     dom.chatHistory.addEventListener('click', (e) => {
         const ttsButton = e.target.closest('.tts-btn');
         if (ttsButton) {
@@ -284,7 +280,6 @@ function setupEventListeners() {
             if (textToSpeak) api.playTTS(textToSpeak, ttsButton);
             return;
         }
-        
         const followSpeakButton = e.target.closest('.follow-speak-btn');
         if (followSpeakButton) {
             const originalText = followSpeakButton.dataset.text;
@@ -293,7 +288,6 @@ function setupEventListeners() {
             }
             return;
         }
-        
         const suggestionChip = e.target.closest('.suggestion-chip');
         if (suggestionChip) {
             dom.chatInput.value = suggestionChip.dataset.text;
@@ -302,26 +296,15 @@ function setupEventListeners() {
             return;
         }
     });
-    
     dom.micBtn.addEventListener('click', () => {
         speech.toggleRecognition(dom.micBtn, { targetInput: dom.chatInput });
     });
     dom.suggestReplyBtn.addEventListener('click', handlers.handleSuggestReply);
 
-    // --- 퀴즈 모달 ---
-    dom.dailyQuizBtn.addEventListener('click', quiz.startQuiz);
-    dom.closeQuizBtn.addEventListener('click', () => dom.quizModal.classList.add('hidden'));
-    dom.quizContent.addEventListener('click', (e) => {
-        const targetButton = e.target.closest('.quiz-option-btn');
-        if (targetButton) {
-            quiz.handleQuizAnswer(targetButton);
-            return;
-        }
-        if (e.target.id === 'close-quiz-modal-btn') {
-            dom.quizModal.classList.add('hidden');
-            return;
-        }
-    });
+    // [★ 삭제] 퀴즈 모달 리스너 삭제
+    // dom.dailyQuizBtn.addEventListener('click', quiz.startQuiz);
+    // dom.closeQuizBtn.addEventListener('click', () => dom.quizModal.classList.add('hidden'));
+    // dom.quizContent.addEventListener('click', (e) => { ... });
 
     // --- FAB (플로팅 버튼) ---
     if (dom.fabMainBtn && dom.fabContainer) {
@@ -383,7 +366,7 @@ function setupEventListeners() {
         }
     });
     
-    // --- [★ 새 기능] 롤플레잉 모달 리스너 ---
+    // --- 롤플레잉 모달 리스너 ---
     dom.openRoleplayBtn.addEventListener('click', () => {
         dom.roleplayModal.classList.remove('hidden');
         if (dom.fabContainer) dom.fabContainer.classList.remove('is-open');
@@ -397,6 +380,50 @@ function setupEventListeners() {
             const context = scenarioButton.dataset.scenario;
             dom.roleplayModal.classList.add('hidden');
             handlers.handleStartRoleplay(context);
+        }
+    });
+
+    // --- [★ 새로 추가] 듣기 학습 모달 리스너 ---
+    dom.openListeningBtn.addEventListener('click', () => {
+        dom.listeningModal.classList.remove('hidden');
+    });
+
+    dom.closeListeningBtn.addEventListener('click', () => {
+        dom.listeningModal.classList.add('hidden');
+        state.stopCurrentAudio();
+        // 모달 닫을 때 UI 초기화
+        dom.listeningScriptDisplay.innerHTML = '<p class="text-gray-400 text-center">듣고 싶은 주제를 선택하세요.</p>';
+        dom.listeningPlaybackControls.classList.add('hidden');
+    });
+
+    // '오늘의 패턴 대화 듣기' 버튼
+    dom.getTodayConversationBtn.addEventListener('click', () => {
+        handlers.handleTodayConversationRequest(); // handlers.js에서 생성 예정
+    });
+
+    // '상황별 듣기' 버튼 (이벤트 위임)
+    dom.situationalListeningControls.addEventListener('click', (e) => {
+        const button = e.target.closest('.situational-listening-btn');
+        if (button) {
+            const scenario = button.dataset.scenario;
+            handlers.handleSituationalListeningRequest(scenario); // handlers.js에서 생성 예정
+        }
+    });
+
+    // '전체 대화 듣기' 버튼
+    dom.playAllScriptBtn.addEventListener('click', ()View(handlers.handlePlayAllListeningScript); // handlers.js에서 생성 예정
+    });
+
+    // 스크립트 개별 TTS 버튼 (이벤트 위임)
+    dom.listeningScriptDisplay.addEventListener('click', (e) => {
+        const ttsButton = e.target.closest('.tts-btn');
+        if (ttsButton) {
+            const textToSpeak = ttsButton.dataset.text;
+            if (textToSpeak) {
+                const lineElement = ttsButton.closest('.listening-line');
+                // api.js의 playTTS를 수정하여 세 번째 인자로 lineElement를 넘길 것입니다.
+                api.playTTS(textToSpeak, ttsButton, lineElement);
+            }
         }
     });
 }

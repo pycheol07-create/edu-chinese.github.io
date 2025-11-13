@@ -9,8 +9,8 @@ export default async function handler(request, response) {
   }
 
   // 2. 프런트엔드에서 보낸 요청 데이터를 받습니다.
-  // [수정] roleContext, originalText, userText 추가
-  const { action, text, systemPrompt, history, pattern, originalText, userText, roleContext } = request.body;
+  // [★ 수정] pattern1, pattern2, scenario 추가
+  const { action, text, systemPrompt, history, pattern, originalText, userText, roleContext, pattern1, pattern2, scenario } = request.body;
 
   try {
     let apiUrl;
@@ -51,7 +51,6 @@ export default async function handler(request, response) {
             contents: [{ parts: [{ text: `${prompt}\n\nKorean: "${text}"` }] }]
         };
     
-    // [★ 수정] chat 액션, roleContext에 따라 프롬프트 변경
     } else if (action === 'chat') {
         // --- 기본 "Ling" 프롬프트 (친구, 또는 패턴 대화) ---
         let chatSystemPrompt = `You are "Ling" (灵), a friendly native Chinese speaker and language tutor. Your goal is to help a user learning Chinese.
@@ -131,11 +130,10 @@ export default async function handler(request, response) {
 - Set "correction" to \`null\` if the user's last message was correct.
 `;
         }
-        // [★ 수정 끝] (daily_friend는 기본 Ling 프롬프트를 사용)
         
         const contents = [
             { role: "user", parts: [{ text: "Please follow these instructions for all future responses: " + chatSystemPrompt }] },
-            { role: "model", parts: [{ text: "Okay, I understand. I will act as instructed and respond in the required JSON format." }] }, // [수정] 범용적인 응답으로
+            { role: "model", parts: [{ text: "Okay, I understand. I will act as instructed and respond in the required JSON format." }] }, 
             ...history,
             { role: "user", parts: [{ text: text }] }
         ];
@@ -157,7 +155,6 @@ export default async function handler(request, response) {
         ];
         apiRequestBody = { contents };
     
-    // [★ 새 기능 추가] 롤플레잉 시작
     } else if (action === 'start_roleplay_chat') {
         let roleplayStartPrompt = '';
         
@@ -230,10 +227,8 @@ export default async function handler(request, response) {
 - Example: {"chinese": "早！今天感觉怎么样？", "pinyin": "Zǎo! Jīntiān gǎnjué zěnmeyàng?", "korean": "좋은 아침! 오늘 컨디션 어때요?", "correction": null}`;
         
         } else {
-            // 기본값 (혹시 모를 경우)
              roleplayStartPrompt = `{"chinese": "您好！", "pinyin": "Nínhǎo!", "korean": "안녕하세요!", "correction": null}`;
              apiRequestBody = { contents: [{ parts: [{ text: roleplayStartPrompt }] }] };
-             // 이 경우는 JSON을 직접 반환하도록 설정
         }
 
         if (action === 'start_roleplay_chat' && roleContext) {
@@ -244,7 +239,72 @@ export default async function handler(request, response) {
             ];
             apiRequestBody = { contents };
         }
-    // [★ 추가 완료]
+
+    // --- [★ 새로 추가] 듣기 학습 관련 API 액션 ---
+
+    } else if (action === 'generate_today_conversation') {
+        const conversationSystemPrompt = `You are a creative scriptwriter. Your task is to generate a short, natural dialogue based on two specific Chinese patterns provided by the user.
+- The dialogue must be between two speakers: "Man" (👨‍💼) and "Woman" (👩‍💼).
+- The dialogue must be 3 to 5 turns long (3-5 lines for Man, 3-5 lines for Woman, total 6-10 lines).
+- You MUST naturally incorporate both patterns: "${pattern1}" and "${pattern2}".
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "title" (string) and "script" (array).
+- The "title" should be a concise Korean title for the dialogue.
+- Each object in the "script" array must have these exact keys: "speaker" (string: "Man" or "Woman"), "chinese" (string), "pinyin" (string), and "korean" (string).
+
+- Example Response (for "越来越..." and "A是A, 但是B"):
+{
+  "title": "날씨가 점점 덥네요",
+  "script": [
+    { "speaker": "Man", "chinese": "天气越来越热了。", "pinyin": "Tiānqì yuèláiyuè rè le.", "korean": "날씨가 점점 더워지네요." },
+    { "speaker": "Woman", "chinese": "是啊。不过, 这个冰淇淋好吃是好吃, 但是太甜了。", "pinyin": "Shì a. Búguò, zhège bīngqílín hǎochī shì hǎochī, dànshì tài tián le.", "korean": "맞아요. 근데 이 아이스크림, 맛있긴 맛있는데 너무 달아요." },
+    { "speaker": "Man", "chinese": "那我这杯咖啡给你喝吧？", "pinyin": "Nà wǒ zhè bēi kāfēi gěi nǐ hē ba?", "korean": "그럼 제 커피 좀 마실래요?" },
+    { "speaker": "Woman", "chinese": "谢谢！你真是个好人。", "pinyin": "Xièxie! Nǐ zhēn shì ge hǎo rén.", "korean": "고마워요! 정말 좋은 분이시네요." },
+    { "speaker": "Man", "chinese": "哈哈, 没什么。", "pinyin": "Haha, méi shénme.", "korean": "하하, 별거 아니에요." }
+  ]
+}`;
+        const contents = [
+            { role: "user", parts: [{ text: conversationSystemPrompt }] },
+            { role: "model", parts: [{ text: "Okay, I understand. I will generate a dialogue script based on the two patterns in the required JSON format." }] },
+            { role: "user", parts: [{ text: `Please generate the script using "${pattern1}" and "${pattern2}".` }] } 
+        ];
+        apiRequestBody = { contents };
+
+    } else if (action === 'generate_situational_listening') {
+        let scenarioKorean = scenario;
+        if (scenario === 'restaurant') scenarioKorean = '식당';
+        else if (scenario === 'shopping') scenarioKorean = '쇼핑';
+        else if (scenario === 'taxi') scenarioKorean = '택시';
+        else if (scenario === 'airport') scenarioKorean = '공항';
+        
+        const listeningSystemPrompt = `You are a creative scriptwriter. Your task is to generate a short, natural dialogue for a specific situation.
+- The situation is: "${scenarioKorean}" (in ${scenario}).
+- The dialogue must be between two speakers: "Man" (👨‍💼) and "Woman" (👩‍💼).
+- The dialogue must be 3 to 5 turns long (3-5 lines for Man, 3-5 lines for Woman, total 6-10 lines).
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "title" (string) and "script" (array).
+- The "title" should be a concise Korean title for the dialogue (e.g., "식당에서 주문하기").
+- Each object in the "script" array must have these exact keys: "speaker" (string: "Man" or "Woman"), "chinese" (string), "pinyin" (string), and "korean" (string).
+
+- Example Response (for "restaurant"):
+{
+  "title": "식당에서 주문하기",
+  "script": [
+    { "speaker": "Woman", "chinese": "你好, 我们想点菜。", "pinyin": "Nǐ hǎo, wǒmen xiǎng diǎncài.", "korean": "안녕하세요, 주문하고 싶어요." },
+    { "speaker": "Man", "chinese": "好的, 请看菜单。今天有什么想吃的吗？", "pinyin": "Hǎo de, qǐng kàn càidān. Jīntiān yǒu shénme xiǎng chī de ma?", "korean": "네, 메뉴판 보세요. 오늘 뭐 드시고 싶으신 거 있으세요?" },
+    { "speaker": "Woman", "chinese": "这个麻婆豆腐看起来不错。辣吗？", "pinyin": "Zhège mápó dòufu kànqǐlái búcuò. Là ma?", "korean": "이 마파두부 괜찮아 보이네요. 매운가요?" },
+    { "speaker": "Man", "chinese": "有点儿辣, 但是很香。", "pinyin": "Yǒudiǎnr là, dànshì hěn xiāng.", "korean": "조금 맵긴 한데, 아주 향기로워요." },
+    { "speaker": "Woman", "chinese": "那就要一个这个吧。", "pinyin": "Nà jiù yào yí ge zhège ba.", "korean": "그럼 이걸로 하나 주세요." }
+  ]
+}`;
+        const contents = [
+            { role: "user", parts: [{ text: listeningSystemPrompt }] },
+            { role: "model", parts: [{ text: "Okay, I understand. I will generate a dialogue script for the specified situation in the required JSON format." }] },
+            { role: "user", parts: [{ text: `Please generate the script for the "${scenario}" situation.` }] } 
+        ];
+        apiRequestBody = { contents };
+
+    // --- [★ 추가 끝] ---
 
     } else if (action === 'generate_practice') {
         const practiceSystemPrompt = `... (생략) ...`;
@@ -380,4 +440,4 @@ export default async function handler(request, response) {
   }
 }
 
-// v.2025.10.20_1101-12 (롤플레잉 기능 추가)
+// v.2025.10.20_1101-13 (듣기 학습 기능 추가)

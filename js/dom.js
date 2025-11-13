@@ -7,10 +7,9 @@ export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, tr
     closeTranslatorBtn, translateBtn, koreanInput, translationResult, customAlertModal,
     customAlertMessage, customAlertCloseBtn, allPatternsBtn, allPatternsModal,
     closeAllPatternsBtn, allPatternsList, 
-    // [★ 수정] chatBtn 변수 선언 제거
     chatModal, closeChatBtn,
     chatHistory, chatInput, sendChatBtn, micBtn, suggestReplyBtn,
-    dailyQuizBtn, quizModal, closeQuizBtn, quizContent,
+    // [★ 삭제] 퀴즈 관련 변수 삭제
     openCorrectionBtn, correctionModal, closeCorrectionBtn, correctionInput,
     correctWritingBtn, correctionResult, getTopicBtn, writingTopicDisplay,
     correctionHistoryModal, openCorrectionHistoryBtn, closeCorrectionHistoryBtn,
@@ -21,8 +20,11 @@ export let patternContainer, currentDateEl, newPatternBtn, openTranslatorBtn, tr
     wordTtsBtn, showWordAnswerBtn, nextWordBtn,
     openCharBtn, charModal, closeCharBtn, characterInfo,
     charTtsBtn, nextCharBtn,
-    // [★ 새 변수 추가]
-    openRoleplayBtn, roleplayModal, closeRoleplayBtn, roleplayScenarioList;
+    openRoleplayBtn, roleplayModal, closeRoleplayBtn, roleplayScenarioList,
+    // [★ 새로 추가] 듣기 학습 관련 변수
+    openListeningBtn, listeningModal, closeListeningBtn, getTodayConversationBtn,
+    situationalListeningControls, listeningScriptDisplay, listeningPlaybackControls,
+    playAllScriptBtn;
 
 
 /**
@@ -46,7 +48,6 @@ export function initializeDOM() {
     closeAllPatternsBtn = document.getElementById('close-all-patterns-btn');
     allPatternsList = document.getElementById('all-patterns-list');
     
-    // [★ 수정] chatBtn = document.getElementById('open-chat-btn'); 코드 삭제
     chatModal = document.getElementById('chat-modal');
     closeChatBtn = document.getElementById('close-chat-btn');
     chatHistory = document.getElementById('chat-history');
@@ -55,10 +56,11 @@ export function initializeDOM() {
     micBtn = document.getElementById('mic-btn');
     suggestReplyBtn = document.getElementById('suggest-reply-btn');
 
-    dailyQuizBtn = document.getElementById('daily-quiz-btn');
-    quizModal = document.getElementById('quiz-modal');
-    closeQuizBtn = document.getElementById('close-quiz-btn');
-    quizContent = document.getElementById('quiz-content');
+    // [★ 삭제] 퀴즈 관련 DOM 할당 코드 삭제
+    // dailyQuizBtn = document.getElementById('daily-quiz-btn');
+    // quizModal = document.getElementById('quiz-modal');
+    // closeQuizBtn = document.getElementById('close-quiz-btn');
+    // quizContent = document.getElementById('quiz-content');
 
     openCorrectionBtn = document.getElementById('open-correction-btn');
     correctionModal = document.getElementById('correction-modal');
@@ -98,11 +100,21 @@ export function initializeDOM() {
     charTtsBtn = document.getElementById('char-tts-btn');
     nextCharBtn = document.getElementById('next-char-btn');
     
-    // [★ 새 DOM 요소 매핑]
     openRoleplayBtn = document.getElementById('open-roleplay-btn');
     roleplayModal = document.getElementById('roleplay-modal');
     closeRoleplayBtn = document.getElementById('close-roleplay-btn');
     roleplayScenarioList = document.getElementById('roleplay-scenario-list');
+
+    // [★ 새로 추가] 듣기 학습 관련 DOM 할당
+    openListeningBtn = document.getElementById('open-listening-btn');
+    listeningModal = document.getElementById('listening-modal');
+    closeListeningBtn = document.getElementById('close-listening-btn');
+    getTodayConversationBtn = document.getElementById('get-today-conversation-btn');
+    situationalListeningControls = document.getElementById('situational-listening-controls');
+    listeningScriptDisplay = document.getElementById('listening-script-display');
+    listeningPlaybackControls = document.getElementById('listening-playback-controls');
+    playAllScriptBtn = document.getElementById('play-all-script-btn');
+
 
     console.log("DOM elements initialized.");
 }

@@ -502,3 +502,160 @@ export async function handleGetWritingTopic() {
         dom.getTopicBtn.textContent = '💡 다른 주제 추천받기';
     }
 }
+
+
+// --- [★ 새로 추가] 듣기 학습 핸들러 ---
+
+/**
+ * '오늘의 패턴 대화 듣기' 버튼 핸들러
+ */
+export async function handleTodayConversationRequest() {
+    const dailyPatterns = state.loadDailyPatterns(); // 현재 로드된 오늘의 패턴 가져오기
+    if (!dailyPatterns || dailyPatterns.length < 2) {
+        ui.showAlert("오늘의 패턴 2개를 먼저 불러와주세요.");
+        return;
+    }
+    const pattern1 = dailyPatterns[0].pattern;
+    const pattern2 = dailyPatterns[1].pattern;
+
+    dom.listeningScriptDisplay.innerHTML = '<div class="loader mx-auto"></div>';
+    dom.listeningPlaybackControls.classList.add('hidden');
+    dom.getTodayConversationBtn.disabled = true;
+    dom.getTodayConversationBtn.textContent = '대화 생성 중...';
+    dom.situationalListeningControls.querySelectorAll('button').forEach(btn => btn.disabled = true);
+
+    try {
+        // api.js에 추가될 함수
+        const result = await api.getTodayConversationScript(pattern1, pattern2); 
+        
+        let scriptData;
+        if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
+            const scriptText = result.candidates[0].content.parts[0].text.trim().replace(/^```json\s*|\s*```$/g, '');
+            if (!scriptText || !scriptText.startsWith('{')) {
+                 throw new Error("AI가 유효한 JSON 형식으로 응답하지 않았습니다.");
+            }
+            scriptData = JSON.parse(scriptText); // { title: "...", script: [...] }
+        } else {
+            throw new Error("AI로부터 유효한 스크립트를 받지 못했습니다.");
+        }
+
+        if (scriptData.script) {
+            // ui.js에 추가될 함수
+            ui.renderListeningScript(scriptData.title, scriptData.script); 
+            dom.listeningPlaybackControls.classList.remove('hidden');
+        } else {
+            throw new Error("AI 응답에 'script' 키가 없습니다.");
+        }
+    } catch (error) {
+        console.error('Today Conversation error:', error);
+        dom.listeningScriptDisplay.innerHTML = `<p class="text-red-500 text-center">대화 생성 중 오류가 발생했습니다: ${error.message}</p>`;
+    } finally {
+        dom.getTodayConversationBtn.disabled = false;
+        dom.getTodayConversationBtn.textContent = '오늘의 패턴 대화 듣기';
+        dom.situationalListeningControls.querySelectorAll('button').forEach(btn => btn.disabled = false);
+    }
+}
+
+/**
+ * '상황별 듣기' 버튼 핸들러
+ * @param {string} scenario - 선택된 시나리오 (e.g., 'restaurant')
+ */
+export async function handleSituationalListeningRequest(scenario) {
+    dom.listeningScriptDisplay.innerHTML = '<div class="loader mx-auto"></div>';
+    dom.listeningPlaybackControls.classList.add('hidden');
+    
+    // 모든 버튼 비활성화
+    dom.getTodayConversationBtn.disabled = true;
+    dom.situationalListeningControls.querySelectorAll('button').forEach(btn => btn.disabled = true);
+
+    try {
+        // api.js에 추가될 함수
+        const result = await api.getSituationalListeningScript(scenario); 
+
+        let scriptData;
+        if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
+            const scriptText = result.candidates[0].content.parts[0].text.trim().replace(/^```json\s*|\s*```$/g, '');
+             if (!scriptText || !scriptText.startsWith('{')) {
+                 throw new Error("AI가 유효한 JSON 형식으로 응답하지 않았습니다.");
+            }
+            scriptData = JSON.parse(scriptText);
+        } else {
+            throw new Error("AI로부터 유효한 스크립트를 받지 못했습니다.");
+        }
+
+        if (scriptData.script) {
+            // ui.js에 추가될 함수
+            ui.renderListeningScript(scriptData.title, scriptData.script);
+            dom.listeningPlaybackControls.classList.remove('hidden');
+        } else {
+            throw new Error("AI 응답에 'script' 키가 없습니다.");
+        }
+    } catch (error) {
+        console.error('Situational Listening error:', error);
+        dom.listeningScriptDisplay.innerHTML = `<p class="text-red-500 text-center">대화 생성 중 오류가 발생했습니다: ${error.message}</p>`;
+    } finally {
+        // 모든 버튼 다시 활성화
+        dom.getTodayConversationBtn.disabled = false;
+        dom.situationalListeningControls.querySelectorAll('button').forEach(btn => btn.disabled = false);
+    }
+}
+
+/**
+ * 비동기 딜레이를 위한 헬퍼 함수
+ * @param {number} ms - 기다릴 시간 (밀리초)
+ */
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * '전체 대화 듣기' 버튼 핸들러 (스크립트 순차 재생)
+ */
+export async function handlePlayAllListeningScript() {
+    const lines = dom.listeningScriptDisplay.querySelectorAll('.listening-line');
+    if (lines.length === 0) return;
+
+    // 이미 재생 중일 때 클릭하면 중지
+    if (state.runTimeState.currentAudio) {
+        state.stopCurrentAudio();
+        return;
+    }
+
+    dom.playAllScriptBtn.disabled = true;
+    dom.playAllScriptBtn.textContent = '...전체 대화 재생 중... (중지하려면 클릭)';
+
+    try {
+        for (const line of lines) {
+            const text = line.dataset.text;
+            const ttsButton = line.querySelector('.tts-btn');
+            if (!text) continue;
+
+            // api.js의 playTTS는 3번째 인자로 lineElement를 받아
+            // 재생 시작 시 'is-playing' 클래스를 추가하고,
+            // 재생 종료 시(onended, onerror, onpause) 클래스를 제거하며
+            // Promise를 반환하도록 수정될 예정입니다.
+            await api.playTTS(text, ttsButton, line);
+
+            // 재생이 (오류나 중지 없이) 정상 종료되었는지 확인
+            // stopCurrentAudio가 호출되면 currentAudio가 null이 됩니다.
+            if (!state.runTimeState.currentAudio) {
+                console.log("Playback stopped.");
+                break; // 사용자가 중지했으므로 루프 탈출
+            }
+
+            await wait(300); // 대사 사이 0.3초 쉼
+        }
+    } catch (error) {
+        console.error("Play All error:", error);
+        // "Playback stopped"는 stopCurrentAudio에 의해 발생하는 예상된 오류(Promise reject)
+        if (error.message !== 'Playback stopped') { 
+           ui.showAlert(`전체 재생 중 오류가 발생했습니다: ${error.message}`);
+        }
+    } finally {
+        dom.playAllScriptBtn.disabled = false;
+        dom.playAllScriptBtn.textContent = '▶︎ 전체 대화 듣기';
+        lines.forEach(line => line.classList.remove('is-playing'));
+        // 루프가 끝나거나 중지되었을 때 오디오 상태 최종 정리
+        if (state.runTimeState.currentAudio) {
+            state.stopCurrentAudio();
+        }
+    }
+}
