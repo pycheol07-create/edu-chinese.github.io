@@ -4,6 +4,32 @@ import * as state from './state.js';
 import * as api from './api.js';
 import { showAlert } from './ui.js';
 
+// [★ 새로 추가] AI 응답에서 JSON 블록만 추출하는 헬퍼 함수
+/**
+ * 텍스트에서 ```json ... ``` 블록을 추출합니다.
+ * @param {string} text - AI가 응답한 전체 텍스트
+ * @returns {string | null} - 추출된 JSON 문자열 또는 null
+ */
+function extractJson(text) {
+    if (!text) return null;
+    
+    // 1. ```json ... ``` 블록 찾기
+    const match = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (match && match[1]) {
+        return match[1].trim();
+    }
+    
+    // 2. 만약 백틱이 없다면, 텍스트가 { 로 시작하고 } 로 끝나는지 확인
+    const trimmedText = text.trim();
+    if (trimmedText.startsWith('{') && trimmedText.endsWith('}')) {
+        return trimmedText;
+    }
+
+    console.warn("Could not find or extract JSON block from text:", text);
+    return null; // JSON을 찾지 못함
+}
+
+
 /**
  * 단어 학습 모달에 다음 랜덤 단어를 표시합니다.
  */
@@ -57,8 +83,13 @@ export async function showNextCharacter() {
         
         let charData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
-            const charText = result.candidates[0].content.parts[0].text.trim().replace(/^```json\s*|\s*```$/g, '');
-            if (!charText || !charText.startsWith('{')) {
+            
+            // [★ 수정] AI 응답 텍스트 원본
+            const aiResponseText = result.candidates[0].content.parts[0].text;
+            // [★ 수정] 새로운 extractJson 함수 사용
+            const charText = extractJson(aiResponseText);
+
+            if (!charText) { // [★ 수정]
                 throw new Error("AI가 유효한 JSON 형식으로 응답하지 않았습니다.");
             }
             try {
@@ -72,15 +103,13 @@ export async function showNextCharacter() {
             throw new Error("AI로부터 유효한 응답을 받지 못했습니다.");
         }
 
-        // [★ 수정 시작]
-        // 1. 메인 TTS 버튼에 글자 설정 (데이터 파싱 직후)
+        // [★ 수정] TTS 버튼 설정 (데이터 파싱 직후)
         if (dom.charTtsBtn) dom.charTtsBtn.dataset.text = charData.char;
 
-        // 2. examples가 유효한 배열인지 확인하고, 아닐 경우 기본 메시지 설정
+        // [★ 수정] examples가 유효한 배열인지 확인 (이전 턴에서 이미 수정한 내용)
         let examplesHtml = '<p class="text-sm text-gray-500">예시 단어가 없습니다.</p>'; // 기본값
         
         if (Array.isArray(charData.examples) && charData.examples.length > 0) {
-            // 3. 유효한 배열일 때만 .map() 실행
             examplesHtml = charData.examples.map(ex => `
                 <div class="p-2 bg-white rounded-md shadow-sm">
                     <div class="flex items-center justify-between">
@@ -96,9 +125,8 @@ export async function showNextCharacter() {
                 </div>
             `).join('');
         }
-        // [★ 수정 끝]
 
-        // 결과 표시 (이제 examplesHtml은 항상 안전함)
+        // 결과 표시
         dom.characterInfo.innerHTML = `
             <div class="text-center">
                 <p class="text-6xl font-bold chinese-text text-red-700">${charData.char}</p>
@@ -112,9 +140,7 @@ export async function showNextCharacter() {
                 </div>
             </div>`;
         
-        // (TTS 버튼 설정 코드는 위로 이동했음)
-
-    } catch (error) { // 여기가 108번째 줄 근처입니다.
+    } catch (error) {
         console.error('Get character info error:', error);
         dom.characterInfo.innerHTML = `<p class="text-red-500 text-center">글자 정보를 불러오는 중 오류가 발생했습니다: ${error.message}</p>`;
     }
