@@ -15,8 +15,9 @@ import * as features from './features.js';
 function setupEventListeners() {
     
     // '새로운 패턴 보기' 버튼
+    // [★ 수정] state.loadDailyPatterns() -> state.forceNewDailyPatterns()
     dom.newPatternBtn.addEventListener('click', () => {
-         const newPatterns = state.loadDailyPatterns(); // loadDailyPatterns가 새로 생성/저장
+         const newPatterns = state.forceNewDailyPatterns(); // 강제로 새 패턴 생성/저장
          ui.renderPatterns(newPatterns);
          newPatterns.forEach((p, index) => {
              if (p.practice) {
