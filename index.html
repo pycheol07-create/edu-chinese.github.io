@@ -2,482 +2,268 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="data:,">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>오늘의 중국어 패턴</title>
+    <title>물류팀 업무현황</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-        }
-        .chinese-text {
-            font-family: 'Noto Sans SC', sans-serif;
-        }
-        /* 로딩 스피너 스타일 */
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 4px solid #3498db;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        .loader-sm {
-            border: 2px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 2px solid #3498db;
-            width: 16px;
-            height: 16px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        /* TTS 재생 중 애니메이션 */
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.7; }
-        }
-        .tts-btn.is-playing svg {
-            color: #3b82f6; /* Tailwind blue-500 */
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-        /* 마이크 녹음 중 애니메이션 */
-        .mic-btn.is-recording svg, .follow-speak-btn.is-recording svg {
-            color: #ef4444; /* Tailwind red-500 */
-            animation: pulse 1.2s ease-in-out infinite;
-        }
-        /* 듣기 모달 스크립트 재생 중 하이라이트 */
-        .listening-line.is-playing {
-            background-color: #ecfdf5; /* Tailwind green-50 */
-            border-color: #22c55e; /* Tailwind green-500 */
-        }
-        /* [★ 새로 추가] 듣기 모달이 'is-fullscreen'일 때 스타일 */
-        #listening-modal.is-fullscreen > div {
-             width: 100%;
-             max-width: 100%;
-             height: 100%;
-             max-height: 100%;
-             border-radius: 0;
-        }
-
-
-        /* FAB (플로팅 버튼) 관련 스타일 */
-        .fab-sub-button {
-            opacity: 0;
-            transform: translateY(1rem) scale(0.9);
-            pointer-events: none;
-            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
-        }
-        #fab-container.is-open .fab-sub-button {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-            pointer-events: auto;
-        }
-        /* [★ 수정] FAB 애니메이션 딜레이 (총 7개 버튼) */
-        #fab-container.is-open #open-translator-btn { transition-delay: 0.0s; }
-        #fab-container.is-open #open-correction-btn { transition-delay: 0.05s; }
-        #fab-container.is-open #open-word-btn { transition-delay: 0.1s; }
-        #fab-container.is-open #open-char-btn { transition-delay: 0.15s; }
-        #fab-container.is-open #all-patterns-btn { transition-delay: 0.2s; } /* ★ 추가 */
-        #fab-container.is-open #open-listening-btn { transition-delay: 0.25s; } /* ★ 추가 */
-        #fab-container.is-open #open-roleplay-btn { transition-delay: 0.3s; } /* ★ 수정 */
-        
-        #fab-main-btn svg {
-            transition: transform 0.3s ease-in-out;
-        }
-        #fab-container.is-open #fab-main-btn svg {
-            transform: rotate(45deg);
-        }
-
-        /* 모바일 입력창 오버플로우 방지 */
-        .min-w-0 {
-            min-width: 0;
-        }
-
-        /* 플래시카드 스타일 */
-        .flashcard {
-            perspective: 1000px;
-            cursor: pointer;
-        }
-        .flashcard-inner {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            transition: transform 0.6s;
-            transform-style: preserve-3d;
-        }
-        .flashcard.is-flipped .flashcard-inner {
-            transform: rotateY(180deg);
-        }
-        .flashcard-front, .flashcard-back {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-        }
-        .flashcard-back {
-            transform: rotateY(180deg);
-        }
-
-    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 text-gray-800">
+    <div id="toast-container" class="fixed bottom-5 right-5 z-[200] space-y-2 w-full max-w-xs"></div>
 
-    <div class="w-full max-w-3xl mx-auto p-4 md:p-8 py-8">
-        <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 chinese-text">🇨🇳 오늘의 중국어 회화 패턴 🇨🇳</h1>
-            <p id="current-date" class="text-gray-500 mt-2"></p>
-        </header>
+    <div id="app-content" class="w-full min-h-screen bg-white p-6 md:p-8 flex flex-col">
 
-        <main id="pattern-container" class="space-y-6">
-            </main>
-
-        <footer class="text-center mt-8">
-            <div class="flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0 md:space-x-4">
-                <button id="new-pattern-btn" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 shadow-lg text-lg">
-                    새로운 패턴 보기
-                </button>
-                </div>
-            <p class="text-xs text-gray-400 mt-4">매일 자정이 지나면 새로운 패턴이 자동으로 표시됩니다.</p>
-        </footer>
-    </div>
-
-    <div id="fab-container" class="fixed bottom-6 right-6 flex flex-col items-center z-30">
-        <div id="fab-menu" class="flex flex-col-reverse items-center space-y-3 space-y-reverse mb-3">
-            
-            <button id="open-roleplay-btn" title="AI와 대화하기" class="fab-sub-button bg-purple-600 hover:bg-purple-700 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-3.04 8.3-7.146 9.574a18.79 18.79 0 0 1-8.708 0C3.04 20.3 0 16.556 0 12c0-4.556 3.04-8.3 7.146-9.574a18.79 18.79 0 0 1 8.708 0C17.96 3.7 21 7.444 21 12Z" />
-                </svg>
-            </button>
-
-            <button id="open-listening-btn" title="듣기 학습" class="fab-sub-button bg-teal-500 hover:bg-teal-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
-                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
-                 </svg>
-            </button>
-            
-            <button id="all-patterns-btn" title="전체 패턴 보기" class="fab-sub-button bg-gray-500 hover:bg-gray-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
-                </svg>
-            </button>
-            
-            <button id="open-char-btn" title="간체자 학습" class="fab-sub-button bg-red-500 hover:bg-red-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 0 1-3.827-5.802" />
-                </svg>
-            </button>
-            
-            <button id="open-word-btn" title="단어장" class="fab-sub-button bg-cyan-500 hover:bg-cyan-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-                </svg>
-            </button>
-
-            <button id="open-correction-btn" title="AI 자유 작문 교정" class="fab-sub-button bg-orange-500 hover:bg-orange-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                </svg>
-            </button>
-
-            <button id="open-translator-btn" title="번역하기" class="fab-sub-button bg-green-500 hover:bg-green-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21V3m0 18c-4.638 0-8.4-3.762-8.4-8.4s3.762-8.4 8.4-8.4 8.4 3.762 8.4 8.4-3.762 8.4-8.4 8.4ZM12 3v18Z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.284 14.251a9.004 9.004 0 0 0 17.432 0M3.284 9.749a9.004 9.004 0 0 1 17.432 0" />
-                </svg>
-            </button>
-        </div>
-
-        <button id="fab-main-btn" title="메뉴 열기" class="bg-blue-600 hover:bg-blue-700 text-white w-16 h-16 rounded-full shadow-xl flex items-center justify-center transition-transform duration-300 transform hover:scale-110 z-10">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-8 h-8">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-        </button>
-    </div>
-
-    <div id="translator-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 relative flex flex-col max-h-[90vh]">
-            <div class="flex-shrink-0">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold text-gray-800">이렇게 말하고 싶어요!</h2>
-                    <button id="close-translator-btn" class="p-1 rounded-full hover:bg-gray-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-                <p class="text-gray-600 mb-4">자연스러운 원어민 표현이 궁금한 한국어 문장을 입력해보세요.</p>
-                <textarea id="korean-input" class="w-full p-2 border border-gray-300 rounded-md h-24" placeholder="예) 지금 너무 귀찮아서 나중에 씻을거야"></textarea>
-                <button id="translate-btn" class="w-full mt-4 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg">원어민 표현 찾아보기</button>
-            </div>
-            <div id="translation-result" class="mt-4 p-4 bg-gray-50 rounded-md min-h-[100px] overflow-y-auto">
-                 <p class="text-gray-400 text-center">결과가 여기에 표시됩니다.</p>
-            </div>
-        </div>
-    </div>
-
-    <div id="correction-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 relative flex flex-col max-h-[90vh]">
-            <div class="flex-shrink-0">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold text-gray-800">AI 자유 작문 교정 ✍️</h2>
-                    <button id="close-correction-btn" class="p-1 rounded-full hover:bg-gray-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-                <p class="text-gray-600 mb-4">연습하고 싶은 중국어 문장을 자유롭게 작성해보세요. AI가 문법과 어색한 표현을 교정해 드립니다.</p>
-                <div id="topic-suggestion-container" class="mb-4 p-3 bg-gray-50 rounded-lg text-center">
-                    <p id="writing-topic-display" class="text-gray-700 italic">"주제 추천받기" 버튼을 눌러보세요!</p>
-                    <button id="get-topic-btn" class="mt-2 text-sm text-blue-600 hover:text-blue-800">💡 오늘의 작문 주제 추천받기</button>
-                </div>
-                <textarea id="correction-input" class="w-full p-2 border border-gray-300 rounded-md h-32 chinese-text" placeholder="예) 我昨天去公园了玩。"></textarea>
-                <div class="flex items-center space-x-2 mt-4">
-                    <button id="correct-writing-btn" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg">교정받기</button>
-                    <button id="open-correction-history-btn" title="내 교정 노트 보기" class="flex-shrink-0 p-2 bg-gray-200 hover:bg-gray-300 rounded-lg">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-700">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div id="correction-result" class="mt-4 p-4 bg-gray-50 rounded-md min-h-[100px] overflow-y-auto">
-                 <p class="text-gray-400 text-center">결과가 여기에 표시됩니다.</p>
-            </div>
-        </div>
-    </div>
-
-    <div id="correction-history-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
-       <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6 relative flex flex-col max-h-[90vh]">
-            <div class="flex-shrink-0">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold text-gray-800">내 교정 노트 📖</h2>
-                    <button id="close-correction-history-btn" class="p-1 rounded-full hover:bg-gray-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-                <p class="text-gray-600 mb-4">지금까지 교정받은 내역입니다. 클릭하면 TTS로 들을 수 있습니다.</p>
-            </div>
-            <div id="correction-history-list" class="mt-2 overflow-y-auto divide-y flex-grow">
-                </div>
-            <button id="clear-correction-history-btn" class="mt-4 w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
-                모든 기록 삭제하기
-            </button>
-        </div>
-    </div>
-
-    <div id="custom-alert-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 text-center">
-            <p id="custom-alert-message" class="text-gray-700 mb-4"></p>
-            <button id="custom-alert-close-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg">확인</button>
-        </div>
-    </div>
-
-    <div id="all-patterns-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
-       <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6 relative flex flex-col max-h-[90vh]">
-            <div class="flex-shrink-0">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold text-gray-800">전체 패턴 목록</h2>
-                    <button id="close-all-patterns-btn" class="p-1 rounded-full hover:bg-gray-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-                <p class="text-gray-600 mb-4">학습하고 싶은 패턴을 선택하세요.</p>
-            </div>
-            <div id="all-patterns-list" class="mt-2 overflow-y-auto divide-y">
-                </div>
-        </div>
-    </div>
-
-    <div id="chat-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 relative flex flex-col max-h-[90vh]">
-            <div class="flex-shrink-0 flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-gray-800">AI와 대화하기 🇨🇳</h2>
-                <button id="close-chat-btn" class="p-1 rounded-full hover:bg-gray-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        <div class="relative">
+            <div class="flex justify-between items-center md:hidden mb-4 pt-4">
+                <h1 class="text-3xl font-bold text-gray-900">물류팀 업무현황</h1>
+                <button id="hamburger-btn" class="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                 </button>
             </div>
-            <div id="chat-history" class="flex-grow bg-gray-50 p-4 rounded-lg overflow-y-auto mb-4 space-y-4">
-                </div>
-            <div class="flex-shrink-0">
-                <div class="flex items-center space-x-2">
-                    <button id="mic-btn" title="음성 입력" class="mic-btn p-2 rounded-full text-gray-500 hover:bg-gray-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 pointer-events-none">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6V7.5a6 6 0 0 0-12 0v5.25a6 6 0 0 0 6 6Z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5v2.25a7.5 7.5 0 0 1-15 0v-2.25" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 18.75a8.25 8.25 0 0 0 10.5 0" />
-                        </svg>
-                    </button>
-                    <input type="text" id="chat-input" class="w-full p-2 border border-gray-300 rounded-md chinese-text" placeholder="중국어로 메시지를 입력하세요...">
-                    <button id="send-chat-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">전송</button>
-                </div>
-                 <div class="mt-2 text-right">
-                    <button id="suggest-reply-btn" class="text-sm text-blue-600 hover:text-blue-800">💡 답변 추천받기</button>
-                 </div>
-            </div>
-        </div>
-    </div>
 
-    <div id="word-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 relative flex flex-col" style="min-height: 350px;">
-            <div class="flex-shrink-0 flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-gray-800">단어 학습 📖</h2>
-                <button id="close-word-btn" class="p-1 rounded-full hover:bg-gray-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <div class="flex-grow flex flex-col justify-center items-center">
-                <div id="word-flashcard" class="flashcard w-full bg-cyan-50 border border-cyan-200 rounded-lg" style="height: 150px;">
-                    <div class="flashcard-inner">
-                        <div id="word-flashcard-front" class="flashcard-front">
-                            <p class="text-4xl font-bold chinese-text text-cyan-800">단어</p>
+            <div id="nav-content"
+                 class="hidden md:flex flex-col md:flex-row md:justify-between md:items-center gap-4 md:gap-2 w-full
+                        absolute md:relative top-20 md:top-auto left-0 md:left-auto right-0 md:right-auto
+                        bg-white md:bg-transparent shadow-lg md:shadow-none z-40 p-4 md:p-0 rounded-lg md:rounded-none border md:border-none">
+
+                <div id="current-date-display" class="text-lg font-bold text-gray-700 hidden md:text-lg md:mr-auto"></div>
+
+                <div id="top-right-controls" class="flex flex-col items-start md:items-end gap-2 hidden">
+                    <div id="connection-indicator" class="flex items-center gap-2">
+                        <span id="user-greeting" class="text-sm font-semibold text-gray-700 mr-2 hidden"></span>
+                        <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-gray-400"></span>
+                        <span id="connection-status" class="text-xs font-medium text-gray-500"></span>
+                    </div>
+                    
+                    <div class="hidden md:flex items-center gap-3">
+                        <div id="personal-attendance-toggle-pc" class="hidden items-center gap-2 mr-2">
+                            <span class="text-sm font-semibold text-gray-700" id="pc-attendance-label">내 근태:</span>
+                            <label class="attendance-toggle">
+                                <input type="checkbox" id="pc-attendance-checkbox" class="sr-only peer">
+                                <span class="attendance-toggle-text text-in">출근</span>
+                                <span class="attendance-toggle-text text-out">퇴근</span>
+                                <span class="attendance-toggle-knob"></span>
+                            </label>
+                            <button id="pc-clock-out-cancel-btn" class="hidden text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-medium px-2 py-1 rounded-md transition animate-pulse" title="방금 한 퇴근을 취소하고 다시 근무 상태로 되돌립니다.">
+                                퇴근 취소
+                            </button>
                         </div>
-                        <div id="word-flashcard-back" class="flashcard-back bg-cyan-50">
-                            <p id="word-pinyin" class="text-xl text-gray-600">pinyin</p>
-                            <p id="word-meaning" class="text-2xl font-semibold text-cyan-700 mt-2">뜻</p>
+
+                        <div class="relative hidden md:block">
+                            <button id="menu-toggle-btn" class="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold text-sm py-1.5 px-3 rounded-md shadow-sm transition active:scale-[0.98]">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                                <span>메뉴</span>
+                            </button>
+                            <div id="menu-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                                <button id="open-quantity-modal-today" class="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">
+                                    <span>📊</span> <span class="font-medium">오늘 처리량 입력</span>
+                                </button>
+                                <button id="open-cost-simulation-btn" class="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">
+                                    <span>💰</span> <span class="font-medium">운영 시뮬레이션</span>
+                                </button>
+                                
+                                <button id="open-history-btn" class="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100" style="display: none;">
+                                    <span>📜</span> <span class="font-medium">이력 보기</span>
+                                </button>
+                                <button id="end-shift-btn" class="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">
+                                    <span>🏁</span> <span class="font-medium">업무 마감</span>
+                                </button>
+
+                                <a href="admin.html" id="admin-link-btn" target="admin_window" class="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100" style="display: none;">
+                                    <span>⚙️</span> <span class="font-medium">관리자 페이지</span>
+                                </a>
+                                <button id="reset-app-btn" class="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100" style="display: none;">
+                                    <span>🔄</span> <span class="font-medium">오늘 데이터 초기화</span>
+                                </button>
+                                <button id="logout-btn" class="hidden w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-b-md">
+                                    <span>🚪</span> <span class="font-semibold">로그아웃</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <button id="word-tts-btn" class="tts-btn mt-4 p-2 rounded-full hover:bg-gray-200 transition-colors" data-text="">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
-                </button>
-            </div>
-            <div class="flex-shrink-0 mt-6 flex space-x-2">
-                <button id="show-word-answer-btn" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg">정답 보기</button>
-                <button id="next-word-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg">다음 단어 →</button>
-            </div>
-        </div>
-    </div>
 
-    <div id="char-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 relative flex flex-col" style="min-height: 400px;">
-            <div class="flex-shrink-0 flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-gray-800">간체자 학습 字</h2>
-                <button id="close-char-btn" class="p-1 rounded-full hover:bg-gray-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <div id="character-info" class="flex-grow flex flex-col justify-center items-center p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div class="text-center">
-                    <p class="text-6xl font-bold chinese-text text-red-700">字</p>
-                    <p class="text-2xl text-gray-600 mt-2">pinyin</p>
-                    <p class="text-2xl font-semibold text-red-600 mt-2">뜻</p>
-                </div>
-                <div class="mt-6 w-full">
-                    <h4 class="text-sm font-semibold text-gray-700 border-b pb-1">예시 단어:</h4>
-                    <div class="space-y-2 mt-2">
-                        <p class="text-gray-500">예시 단어 로딩 중...</p>
+                    <div class="flex flex-col items-start gap-2 md:hidden">
+                         <div id="personal-attendance-toggle-mobile" class="flex justify-between items-center w-full p-3 bg-white rounded-lg border shadow-sm hidden">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-gray-800 flex items-center gap-2">내 출퇴근</span>
+                                <button id="mobile-clock-out-cancel-btn" class="hidden text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-md">취소</button>
+                            </div>
+                            <label class="attendance-toggle">
+                                <input type="checkbox" id="mobile-attendance-checkbox" class="sr-only peer">
+                                <span class="attendance-toggle-text text-in">출근</span>
+                                <span class="attendance-toggle-text text-out">퇴근</span>
+                                <span class="attendance-toggle-knob"></span>
+                            </label>
+                        </div>
+                        <button id="open-quantity-modal-today-mobile" class="flex items-center gap-2 bg-purple-100 text-purple-800 font-semibold text-sm py-1.5 px-3 rounded-md shadow-sm">
+                            <span>📊 처리량 입력</span>
+                        </button>
+                        
+                        <button id="open-cost-simulation-btn-mobile" class="flex items-center gap-2 bg-indigo-100 text-indigo-800 font-semibold text-sm py-1.5 px-3 rounded-md shadow-sm">
+                            <span>💰 운영 시뮬레이션</span>
+                        </button>
+                        <button id="open-history-btn-mobile" class="flex items-center gap-2 bg-gray-100 text-gray-800 font-semibold text-sm py-1.5 px-3 rounded-md shadow-sm" style="display: none;">
+                            <span>📜 이력 보기</span>
+                        </button>
+                        <button id="end-shift-btn-mobile" class="flex items-center gap-2 bg-red-100 text-red-800 font-semibold text-sm py-1.5 px-3 rounded-md shadow-sm">
+                            <span>🏁 업무 마감</span>
+                        </button>
+
+                        <a href="admin.html" id="admin-link-btn-mobile" target="admin_window" class="flex items-center gap-2 bg-blue-100 text-blue-800 font-semibold text-sm py-1.5 px-3 rounded-md shadow-sm" style="display: none;">
+                            <span>⚙️ 관리</span>
+                        </a>
+                        <button id="reset-app-btn-mobile" class="flex items-center gap-2 bg-gray-200 text-gray-800 font-semibold text-sm py-1.5 px-3 rounded-md shadow-sm" style="display: none;">
+                            <span>🔄 초기화</span>
+                        </button>
+                        <button id="logout-btn-mobile" class="hidden flex items-center gap-1 bg-red-100 text-red-800 font-semibold text-sm py-1.5 px-3 rounded-md shadow-sm">
+                            <span>🚪 로그아웃</span>
+                        </button>
                     </div>
                 </div>
             </div>
-            <button id="char-tts-btn" class="tts-btn mt-4 p-2 rounded-full hover:bg-gray-200 transition-colors self-center" data-text="">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
-            </button>
-            <div class="flex-shrink-0 mt-6">
-                <button id="next-char-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg">다음 글자 →</button>
-            </div>
+
+            <header class="mb-8 text-center hidden md:block">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900">물류팀 업무현황</h1>
+            </header>
         </div>
-    </div>
 
-    <div id="roleplay-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 relative">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-gray-800">AI와 대화하기 💬</h2>
-                <button id="close-roleplay-btn" class="p-1 rounded-full hover:bg-gray-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+        <div class="mb-8 bg-gray-800 text-white rounded-lg border border-gray-700 shadow-lg hidden">
+            <div id="toggle-summary" class="flex justify-between items-center p-4 cursor-pointer md:cursor-auto">
+                <h2 class="text-xl font-bold">업무 현황 및 업무량</h2>
+                <svg id="summary-arrow" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 md:hidden transition-transform transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
             </div>
-            <p class="text-gray-600 mb-6">대화하고 싶은 주제를 선택하세요.</p>
-            <div id="roleplay-scenario-list" class="space-y-3 max-h-[60vh] overflow-y-auto">
-                <button data-scenario="daily_friend" class="w-full text-left p-4 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors border border-purple-200">
-                    <p class="text-lg font-semibold">🧑‍🤝‍🧑 일상대화</p>
-                    <p class="text-sm text-gray-500">친구, 가족, 동료 등과 편하게 대화합니다.</p>
-                </button>
-                <button data-scenario="restaurant" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-                    <p class="text-lg font-semibold">🍽️ 식당에서</p>
-                    <p class="text-sm text-gray-500">음식을 주문하고 계산을 요청합니다.</p>
-                </button>
-                <button data-scenario="shopping" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-                    <p class="text-lg font-semibold">🛍️ 가게에서</p>
-                    <p class="text-sm text-gray-500">물건을 찾고 가격을 흥정합니다.</p>
-                </button>
-                <button data-scenario="taxi" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-                    <p class="text-lg font-semibold">🚕 택시에서</p>
-                    <p class="text-sm text-gray-500">목적지를 말하고 경로를 묻습니다.</p>
-                </button>
-            </div>
+            <div id="summary-content" class="hidden md:grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 p-6 text-center">
+                </div>
         </div>
-    </div>
 
-    <div id="listening-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40 transition-all duration-300">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 relative flex flex-col max-h-[90vh] transition-all duration-300">
-            <div class="flex-shrink-0 flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-gray-800">듣기 학습 🎧</h2>
-                <button id="close-listening-btn" class="p-1 rounded-full hover:bg-gray-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 text-gray-600">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+        <div id="main-content-area" class="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200 flex-grow flex flex-col hidden">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">업무 진행</h2>
+            <div id="loading-spinner" class="text-center py-10">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+                <p class="mt-4 text-gray-600">데이터를 불러오는 중입니다...</p>
             </div>
+            <div id="team-status-board" class="space-y-8 flex-grow">
+                </div>
+        </div>
 
-            <div id="listening-controls" class="flex-shrink-0 mb-4">
-                <p class="text-gray-600 mb-4">학습할 대화 주제를 선택하세요.</p>
-                <div id="listening-scenario-list" class="space-y-3 max-h-[60vh] overflow-y-auto">
-                    <button data-scenario="today_conversation" class="w-full text-left p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200">
-                        <p class="text-lg font-semibold">🌟 오늘의 패턴 대화</p>
-                        <p class="text-sm text-gray-500">오늘 학습한 패턴 2개를 활용한 대화를 듣습니다.</p>
-                    </button>
-                    <button data-scenario="restaurant" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-                        <p class="text-lg font-semibold">🍽️ 식당</p>
-                    </button>
-                    <button data-scenario="shopping" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-                        <p class="text-lg font-semibold">🛍️ 쇼핑</p>
-                    </button>
-                    <button data-scenario="taxi" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-                        <p class="text-lg font-semibold">🚕 택시</p>
-                    </button>
-                    <button data-scenario="airport" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-                        <p class="text-lg font-semibold">✈️ 공항</p>
-                    </button>
+        <div class="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200 hidden">
+            <div id="toggle-completed-log" class="flex justify-between items-center cursor-pointer md:cursor-auto">
+                <h2 class="text-xl font-bold text-gray-900">오늘 완료된 업무</h2>
+                <svg id="completed-log-arrow" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 md:hidden transition-transform transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div id="completed-log-content" class="hidden md:block mt-4">
+                <div class="flex flex-wrap gap-2 justify-end items-center mb-4">
+                    <button id="save-progress-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 shadow-md">중간 저장</button>
+                </div>
+                <div class="overflow-auto relative bg-white rounded-md max-h-96">
+                    <table class="w-full text-sm text-left text-gray-600">
+                        <thead class="text-xs text-blue-500 uppercase bg-gray-100 sticky top-0 z-10">
+                            <tr>
+                                <th scope="col" class="px-6 py-3">이름</th>
+                                <th scope="col" class="px-6 py-3">업무</th>
+                                <th scope="col" class="px-6 py-3">시작 시간</th>
+                                <th scope="col" class="px-6 py-3">종료 시간</th>
+                                <th scope="col" class="px-6 py-3">소요 시간</th>
+                                <th scope="col" class="px-6 py-3 text-right">
+                                    <button id="open-manual-add-btn" class="text-xs font-bold text-blue-500 uppercase hover:text-blue-700 mr-3">수동 추가</button>
+                                    <button id="delete-all-completed-btn" class="text-xs font-bold text-red-500 uppercase hover:text-red-700">일괄삭제</button>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="work-log-body"></tbody>
+                    </table>
                 </div>
             </div>
+        </div>
 
-            <div id="listening-script-display" class="flex-grow bg-gray-100 p-4 rounded-lg overflow-y-auto min-h-[200px]">
-                <p class="text-gray-400 text-center">듣고 싶은 주제를 선택하세요.</p>
+        <div class="p-6 bg-gray-50 rounded-lg border border-gray-200 hidden">
+            <div id="toggle-analysis" class="flex justify-between items-center cursor-pointer md:cursor-auto">
+                <h2 class="text-xl font-bold text-gray-900">오늘의 업무 분석</h2>
+                 <svg id="analysis-arrow" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 md:hidden transition-transform transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+            <div id="analysis-content" class="hidden md:block mt-4">
+                <div class="mb-4 border-b border-gray-200">
+                    <nav id="analysis-tabs" class="flex space-x-4" aria-label="Tabs">
+                        <button type="button" data-tab-panel="analysis-task-summary-panel" class="analysis-tab-btn whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600">업무별 요약</button>
+                        <button type="button" data-tab-panel="analysis-personal-stats-panel" class="analysis-tab-btn whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300">개인별 통계</button>
+                    </nav>
                 </div>
-
-            <div id="listening-playback-controls" class="flex-shrink-0 mt-4 text-center hidden">
-                <button id="play-all-script-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg">
-                    ▶︎ 전체 대화 듣기
-                </button>
+                <div id="analysis-panels">
+                    <div id="analysis-task-summary-panel" class="analysis-tab-panel"></div>
+                    <div id="analysis-personal-stats-panel" class="analysis-tab-panel hidden">
+                        <div class="max-w-md mb-4">
+                            <label for="analysis-member-select" class="block text-sm font-medium text-gray-700 mb-1">직원 선택</label>
+                            <select id="analysis-member-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">--- 직원/알바 선택 ---</option>
+                            </select>
+                        </div>
+                        <div id="analysis-personal-stats-container" class="mt-4 p-4 bg-white rounded-lg border min-h-[150px]">
+                            <p class="text-center text-gray-500">통계를 보려면 위에서 직원을 선택하세요.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+    
     </div>
+    
+    <div id="modals-container-auth"></div>
+    <div id="modals-container-simulation"></div>
+    <div id="modals-container-confirm"></div>
+    <div id="modals-container-history"></div>
+    <div id="modals-container-form"></div>
+    <script>
+        // 1. 외부 HTML 컴포넌트 로더
+        async function loadComponent(url, containerId) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const html = await response.text();
+                document.getElementById(containerId).innerHTML = html;
+            } catch (error) {
+                console.error("컴포넌트 로딩 실패:", error);
+                // 에러 발생 시 사용자에게 알림
+                const toast = document.createElement('div');
+                toast.className = 'toast show bg-red-500 p-3 rounded-lg shadow-xl text-white';
+                toast.textContent = `필수 구성 요소(${url})를 불러오지 못했습니다. 새로고침 해주세요.`;
+                document.getElementById('toast-container').prepend(toast);
+            }
+        }
 
+        // 2. 앱 시작 (순차 실행 보장)
+        async function initApp() {
+            // (1) 모달 HTML 파일들을 먼저 불러와서 DOM에 삽입합니다.
+            // ✅ [수정] 모든 분리된 모달 파일을 병렬로 로드
+            await Promise.all([
+                loadComponent('components/modals-auth.html', 'modals-container-auth'),
+                loadComponent('components/modals-simulation.html', 'modals-container-simulation'),
+                loadComponent('components/modals-confirm.html', 'modals-container-confirm'),
+                loadComponent('components/modals-history.html', 'modals-container-history'),
+                loadComponent('components/modals-form.html', 'modals-container-form')
+            ]);
 
-    <script type="module" src="./js/main.js"></script> 
+            // (2) 모달이 준비된 후 메인 앱 로직(app.js)을 실행합니다.
+            try {
+                await import('./js/app.js');
+            } catch (e) {
+                console.error("메인 앱 스크립트 로딩 실패:", e);
+            }
+        }
+
+        initApp();
+    </script>
 </body>
 </html>
