@@ -292,16 +292,24 @@ export function setupSimulationModalListeners() {
         if (simTaskTableBody) {
             simTaskTableBody.innerHTML = ''; // 테이블 비우기
 
-            const keyTasks = State.appConfig.keyTasks || [];
+            // ✅ [수정] 3가지 목록을 모두 가져옴
+            const keyTaskSet = new Set(State.appConfig.keyTasks || []);
+            const quantityTaskSet = new Set(State.appConfig.quantityTaskTypes || []);
             const quantities = State.appState.taskQuantities || {};
             const tasksToPrepopulate = [];
 
-            keyTasks.forEach(taskName => {
+            // ✅ [수정] 오늘의 처리량(quantities)을 기준으로 순회
+            for (const taskName in quantities) {
                 const qty = Number(quantities[taskName]) || 0;
-                if (qty > 0) {
+                
+                // ✅ [수정] 3가지 조건 모두 만족하는지 확인
+                // 1. 처리량이 0보다 크고
+                // 2. '주요 업무' 목록(keyTaskSet)에 포함되어 있고
+                // 3. '처리량 집계 업무' 목록(quantityTaskSet)에 포함 (이래야 드롭다운에 항목이 있음)
+                if (qty > 0 && keyTaskSet.has(taskName) && quantityTaskSet.has(taskName)) {
                     tasksToPrepopulate.push({ task: taskName, qty: qty });
                 }
-            });
+            }
 
             if (tasksToPrepopulate.length > 0) {
                 // 처리량이 있는 주요 업무가 하나 이상 있으면, 그것들을 채워넣음
