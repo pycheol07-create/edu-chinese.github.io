@@ -1,31 +1,23 @@
 // js/state.js
 
 // --- 전역 상태 변수 ---
-
-// 원본 데이터
+// (기존 코드 ... 생략)
 export let allPatterns = [];
 export let allWords = [];
 export let allCharacters = [];
-
-// 학습 카운트
 export let learningCounts = {};
-
-// 채팅/교정 기록
 export let conversationHistory = [];
 export let correctionHistory = [];
-
-// 오디오/기타 상태 (수정: 재할당이 필요한 변수들을 객체로 감쌉니다)
 export const runTimeState = {
     currentAudio: null,
     currentPlayingButton: null,
     wakeLock: null,
-    isPlayAllRunning: false // [★ 새로 추가] '전체 듣기'가 실행 중인지 여부
+    isPlayAllRunning: false 
 };
-
-// (수정) audioCache는 재할당되지 않으므로 그대로 둡니다.
 export let audioCache = {};
 
 // --- 상태 초기화 및 관리 함수 ---
+// (... initializeCounts, saveCounts, initializeCorrectionHistory, saveCorrectionHistory, addCorrectionToHistory, initializeWordList, initializeCharacterList, getTodayString, getRandomPatterns 함수 ... 생략)
 
 /**
  * allPatterns 데이터를 state.js 모듈에 설정합니다.
@@ -148,6 +140,7 @@ export function getRandomPatterns() {
 
 /**
  * localStorage에서 오늘 날짜의 패턴을 로드하거나, 없으면 새로 생성하여 저장합니다.
+ * (이 함수는 앱이 처음 로드될 때만 사용됩니다.)
  * @returns {Array} 오늘의 패턴 2개
  */
 export function loadDailyPatterns() {
@@ -162,6 +155,20 @@ export function loadDailyPatterns() {
         return newPatterns;
     }
 }
+
+/**
+ * [★ 새로 추가]
+ * 날짜와 상관없이 새로운 일일 패턴 2개를 강제로 생성하고 저장합니다.
+ * ('새로운 패턴 보기' 버튼 클릭 시 사용됩니다.)
+ * @returns {Array} 새로 생성된 패턴 2개
+ */
+export function forceNewDailyPatterns() {
+    const todayStr = getTodayString();
+    const newPatterns = getRandomPatterns(); // 날짜 검사 없이 새 패턴 생성
+    localStorage.setItem('dailyChinesePatterns', JSON.stringify({ date: todayStr, patterns: newPatterns })); // 새 패턴으로 덮어쓰기
+    return newPatterns;
+}
+
 
 /**
  * 현재 재생 중인 오디오를 중지하고 상태를 초기화합니다.

@@ -399,11 +399,7 @@ function setupEventListeners() {
         // [★ 수정] 모달 닫을 때 UI 초기화 (풀스크린 및 컨트롤 숨김 해제)
         dom.listeningModal.classList.remove('is-fullscreen'); // 풀스크린 해제
         dom.listeningControls.classList.remove('hidden'); // 컨트롤 보이기
-        
-        // [★ 수정] 빈칸 숨기기
-        dom.listeningScriptDisplay.classList.add('hidden'); 
         dom.listeningScriptDisplay.innerHTML = '<p class="text-gray-400 text-center">듣고 싶은 주제를 선택하세요.</p>';
-        
         dom.listeningPlaybackControls.classList.add('hidden');
     });
 
