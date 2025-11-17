@@ -35,8 +35,6 @@ export function playTTS(text, buttonElement = null, lineElement = null, speaker 
     const playPromise = new Promise(async (resolve, reject) => {
         if (state.runTimeState.currentAudio) {
             // 다른 오디오가 재생 중이면 중지
-            // (주의: stopCurrentAudio는 currentAudio.onpause를 트리거하여
-            //  이전 Promise를 reject시킬 수 있음)
             state.stopCurrentAudio();
             
             // 만약 '중지' 버튼으로 동일한 버튼을 누른 거라면, 여기서 재생을 멈추고 resolve
@@ -133,8 +131,26 @@ export function playTTS(text, buttonElement = null, lineElement = null, speaker 
  * @returns {Promise<object>} - Gemini API 응답
  */
 export function translateText(text) {
-    const patternList = state.allPatterns.map(p => p.pattern).join(", ");
-    const systemPrompt = `... (생략) ...`; // 기존 프롬프트
+    // [★ 수정] AI가 영어 설명 대신 정확한 JSON을 반환하도록 강력한 프롬프트 작성
+    const systemPrompt = `You are a professional Chinese translator and tutor.
+Your goal is to translate the user's Korean text into natural, conversational Chinese.
+
+**CRITICAL INSTRUCTIONS:**
+1. Output MUST be a single, valid JSON object. 
+2. Do NOT include markdown backticks (like \`\`\`json). Just the raw JSON string.
+3. Do NOT explain in English. Use Korean for explanations.
+
+**JSON Structure:**
+{
+  "chinese": "Translated Chinese text (Simplified)",
+  "pinyin": "Pinyin with tone marks",
+  "alternatives": ["Alternative expression 1", "Alternative expression 2"],
+  "explanation": "A brief grammar or nuance explanation in Korean",
+  "usedPattern": "Name of the grammar pattern used (or null if none)"
+}
+
+**User Input (Korean):** "${text}"`;
+
     return callGeminiAPI('translate', { text, systemPrompt });
 }
 
