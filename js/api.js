@@ -22,7 +22,7 @@ async function callGeminiAPI(action, body) {
 }
 
 /**
- * [★ 수정] 텍스트를 음성(TTS)으로 재생합니다. (speaker 인자 추가)
+ * 텍스트를 음성(TTS)으로 재생합니다. (speaker 인자 추가)
  * (전체 듣기 기능을 위해 Promise를 반환하고, lineElement 하이라이트를 지원하도록 수정)
  * @param {string} text - 재생할 텍스트
  * @param {HTMLElement | null} buttonElement - (선택) 클릭된 TTS 버튼
@@ -51,12 +51,12 @@ export function playTTS(text, buttonElement = null, lineElement = null, speaker 
         if(lineElement) lineElement.classList.add('is-playing');
 
         try {
-            // [★ 수정] 캐시 키를 텍스트 + 화자로 구성 (목소리가 다를 수 있으므로)
+            // 캐시 키를 텍스트 + 화자로 구성 (목소리가 다를 수 있으므로)
             const cacheKey = `${speaker || 'default'}:${text}`;
             let audioData = state.audioCache[cacheKey];
             
             if (!audioData) {
-                // [★ 수정] speaker 정보(Man/Woman)를 API로 전송
+                // speaker 정보(Man/Woman)를 API로 전송
                 const result = await callGeminiAPI('tts', { text, speaker });
                 audioData = result.audioContent;
                 state.audioCache[cacheKey] = audioData;
@@ -86,7 +86,7 @@ export function playTTS(text, buttonElement = null, lineElement = null, speaker 
                 reject(new Error('Audio playback error')); // 오류로 reject
             };
 
-            // [★ 추가] stopCurrentAudio()에 의해 .pause()가 호출될 때
+            // stopCurrentAudio()에 의해 .pause()가 호출될 때
             audio.onpause = () => {
                  if(buttonElement) buttonElement.classList.remove('is-playing');
                  if(lineElement) lineElement.classList.remove('is-playing');
@@ -94,7 +94,6 @@ export function playTTS(text, buttonElement = null, lineElement = null, speaker 
                  if (state.runTimeState.currentAudio === null) {
                     reject(new Error('Playback stopped')); // 중지로 reject
                  }
-                 // (그 외의 이유로 pause되면 아무것도 하지 않음)
             };
 
         } catch (error) {
@@ -111,7 +110,6 @@ export function playTTS(text, buttonElement = null, lineElement = null, speaker 
     // Promise를 반환하지 않고, 오류만 콘솔에 기록 (기존 방식)
     if (!lineElement) {
         playPromise.catch(error => {
-            // "Playback stopped"는 사용자가 의도한 중지이므로 콘솔에 오류를 찍지 않음
             if (error && error.message !== 'Playback stopped') {
                 console.error("TTS playback error (unhandled):", error);
             }
@@ -131,7 +129,7 @@ export function playTTS(text, buttonElement = null, lineElement = null, speaker 
  * @returns {Promise<object>} - Gemini API 응답
  */
 export function translateText(text) {
-    // [★ 수정] AI가 영어 설명 대신 정확한 JSON을 반환하도록 강력한 프롬프트 작성
+    // [★ 수정] usedPattern에 대한 지시사항을 "MUST be in Korean"으로 변경
     const systemPrompt = `You are a professional Chinese translator and tutor.
 Your goal is to translate the user's Korean text into natural, conversational Chinese.
 
@@ -146,7 +144,7 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
   "pinyin": "Pinyin with tone marks",
   "alternatives": ["Alternative expression 1", "Alternative expression 2"],
   "explanation": "A brief grammar or nuance explanation in Korean",
-  "usedPattern": "Name of the grammar pattern used (or null if none)"
+  "usedPattern": "Name of the grammar pattern used (MUST be in Korean, e.g., '谁를 활용한 반어문', or null if none)"
 }
 
 **User Input (Korean):** "${text}"`;
@@ -155,7 +153,7 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 }
 
 /**
- * [★ 수정] AI 채팅 응답 요청 (API 호출)
+ * AI 채팅 응답 요청 (API 호출)
  * @param {string} text - 사용자 입력
  * @param {Array} history - 대화 기록
  * @param {string | null} roleContext - (선택) 롤플레잉 상황
@@ -175,7 +173,7 @@ export function startChatWithPattern(pattern) {
 }
 
 /**
- * [★ 새 기능] 롤플레잉 채팅 시작 (API 호출)
+ * 롤플레잉 채팅 시작 (API 호출)
  * @param {string} context - 롤플레잉 상황 (e.g., 'restaurant')
  * @returns {Promise<object>} - Gemini API 응답
  */
@@ -236,8 +234,6 @@ export function getCharacterInfo(char) {
 export function evaluatePronunciation(original, user) {
     return callGeminiAPI('evaluate_pronunciation', { originalText: original, userText: user });
 }
-
-// --- [★ 새로 추가] 듣기 학습 API 함수 ---
 
 /**
  * '오늘의 대화' 스크립트 요청 (API 호출)
