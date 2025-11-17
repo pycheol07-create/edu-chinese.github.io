@@ -55,7 +55,7 @@
             background-color: #ecfdf5; /* Tailwind green-50 */
             border-color: #22c55e; /* Tailwind green-500 */
         }
-        /* [★ 새로 추가] 듣기 모달이 'is-fullscreen'일 때 스타일 */
+        /* 듣기 모달이 'is-fullscreen'일 때 스타일 */
         #listening-modal.is-fullscreen > div {
              width: 100%;
              max-width: 100%;
@@ -77,14 +77,13 @@
             transform: translateY(0) scale(1);
             pointer-events: auto;
         }
-        /* [★ 수정] FAB 애니메이션 딜레이 (총 7개 버튼) */
         #fab-container.is-open #open-translator-btn { transition-delay: 0.0s; }
         #fab-container.is-open #open-correction-btn { transition-delay: 0.05s; }
         #fab-container.is-open #open-word-btn { transition-delay: 0.1s; }
         #fab-container.is-open #open-char-btn { transition-delay: 0.15s; }
-        #fab-container.is-open #all-patterns-btn { transition-delay: 0.2s; } /* ★ 추가 */
-        #fab-container.is-open #open-listening-btn { transition-delay: 0.25s; } /* ★ 추가 */
-        #fab-container.is-open #open-roleplay-btn { transition-delay: 0.3s; } /* ★ 수정 */
+        #fab-container.is-open #all-patterns-btn { transition-delay: 0.2s; }
+        #fab-container.is-open #open-listening-btn { transition-delay: 0.25s; }
+        #fab-container.is-open #open-roleplay-btn { transition-delay: 0.3s; }
         
         #fab-main-btn svg {
             transition: transform 0.3s ease-in-out;
@@ -93,7 +92,6 @@
             transform: rotate(45deg);
         }
 
-        /* 모바일 입력창 오버플로우 방지 */
         .min-w-0 {
             min-width: 0;
         }
@@ -461,6 +459,15 @@
                     </button>
                     <button data-scenario="airport" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                         <p class="text-lg font-semibold">✈️ 공항</p>
+                    </button>
+                    <button data-scenario="hotel" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <p class="text-lg font-semibold">🏨 호텔</p>
+                    </button>
+                    <button data-scenario="directions" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <p class="text-lg font-semibold">🗺️ 길 묻기</p>
+                    </button>
+                    <button data-scenario="hospital" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <p class="text-lg font-semibold">🏥 병원/약국</p>
                     </button>
                 </div>
             </div>

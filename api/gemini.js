@@ -9,7 +9,6 @@ export default async function handler(request, response) {
   }
 
   // 2. 프런트엔드에서 보낸 요청 데이터를 받습니다.
-  // [★ 수정] pattern1, pattern2, scenario, speaker 추가
   const { action, text, systemPrompt, history, pattern, originalText, userText, roleContext, pattern1, pattern2, scenario, speaker } = request.body;
 
   // [★ 새로 추가] AI 응답에서 JSON 블록만 추출하는 헬퍼 함수
@@ -72,9 +71,28 @@ export default async function handler(request, response) {
 
     // 3. 액션별 요청 본문 설정
     if (action === 'translate') {
-        const prompt = systemPrompt || `Translate this Korean text to Chinese: ${text}`;
+        // [★ 수정] AI가 영어 설명 대신 정확한 JSON을 반환하도록 강력한 프롬프트 작성
+        const prompt = systemPrompt || `You are a professional Chinese translator and tutor.
+Your goal is to translate the user's Korean text into natural, conversational Chinese.
+
+**CRITICAL INSTRUCTIONS:**
+1. Output MUST be a single, valid JSON object. 
+2. Do NOT include markdown backticks (like \`\`\`json). Just the raw JSON string.
+3. Do NOT explain in English. Use Korean for explanations.
+
+**JSON Structure:**
+{
+  "chinese": "Translated Chinese text (Simplified)",
+  "pinyin": "Pinyin with tone marks",
+  "alternatives": ["Alternative expression 1", "Alternative expression 2"],
+  "explanation": "A brief grammar or nuance explanation in Korean",
+  "usedPattern": "Name of the grammar pattern used (MUST be in Korean, e.g., '谁를 활용한 반어문', or null if none)"
+}
+
+**User Input (Korean):** "${text}"`;
+
         apiRequestBody = {
-            contents: [{ parts: [{ text: `${prompt}\n\nKorean: "${text}"` }] }]
+            contents: [{ parts: [{ text: prompt }] }]
         };
     
     } else if (action === 'chat') {
@@ -302,6 +320,10 @@ export default async function handler(request, response) {
         else if (scenario === 'taxi') scenarioKorean = '택시';
         else if (scenario === 'airport') scenarioKorean = '공항';
         else if (scenario === 'today_conversation') scenarioKorean = '오늘의 패턴 대화';
+        // [★ 추가] 새로운 시나리오 매핑 추가
+        else if (scenario === 'hotel') scenarioKorean = '호텔';
+        else if (scenario === 'directions') scenarioKorean = '길 묻기';
+        else if (scenario === 'hospital') scenarioKorean = '병원 또는 약국';
         
         // [★ 수정] 대화 턴 수 증가
         const listeningSystemPrompt = `You are a creative scriptwriter. Your task is to generate a short, natural dialogue for a specific situation.
