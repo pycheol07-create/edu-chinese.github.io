@@ -1,45 +1,81 @@
 // js/api.js
 import * as state from './state.js';
 import { showAlert } from './ui.js';
-import * as db from './db.js'; // [★ 추가] DB 모듈 임포트
+import * as db from './db.js'; // DB 모듈 (TTS 캐싱용)
+
+// [최적화 1] 딜레이 함수 (재시도 대기용)
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Gemini API를 호출하는 공통 함수
- * @param {string} action - API 엔드포인트에서 처리할 작업 (예: 'translate', 'chat')
- * @param {object} body - API에 전송할 데이터
- * @returns {Promise<object>} - API 응답 JSON
+ * [최적화 2] Gemini API 호출 (재시도 & 타임아웃 로직 적용)
+ * @param {string} action - API 엔드포인트 작업
+ * @param {object} body - 데이터
+ * @param {number} retries - 남은 재시도 횟수 (기본 2회)
+ * @returns {Promise<object>}
  */
-async function callGeminiAPI(action, body) {
-    const response = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...body })
-    });
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `API ${action} failed`);
+async function callGeminiAPI(action, body, retries = 2) {
+    const TIMEOUT_MS = 25000; // 25초 타임아웃 설정
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+        const response = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, ...body }),
+            signal: controller.signal // 타임아웃 신호 연결
+        });
+
+        clearTimeout(timeoutId); // 성공 시 타임아웃 해제
+
+        if (!response.ok) {
+            // 500번대 서버 에러나 429(Too Many Requests)는 재시도 가치 있음
+            if ((response.status >= 500 || response.status === 429) && retries > 0) {
+                console.warn(`API call failed (${response.status}). Retrying... (${retries} left)`);
+                await wait(1500); // 1.5초 대기 후 재시도
+                return callGeminiAPI(action, body, retries - 1);
+            }
+            
+            const errorData = await response.json();
+            throw new Error(errorData.error || `API ${action} failed`);
+        }
+        return await response.json();
+
+    } catch (error) {
+        clearTimeout(timeoutId);
+        
+        // 타임아웃 에러 처리
+        if (error.name === 'AbortError') {
+             if (retries > 0) {
+                console.warn(`API call timed out. Retrying... (${retries} left)`);
+                return callGeminiAPI(action, body, retries - 1);
+             }
+             throw new Error("AI 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        // 네트워크 에러 등 재시도
+        if (retries > 0) {
+             console.warn(`Network error: ${error.message}. Retrying... (${retries} left)`);
+             await wait(1500);
+             return callGeminiAPI(action, body, retries - 1);
+        }
+        throw error;
     }
-    return response.json();
 }
 
 /**
- * 텍스트를 음성(TTS)으로 재생합니다. (speaker 인자 추가)
- * (전체 듣기 기능을 위해 Promise를 반환하고, lineElement 하이라이트를 지원하도록 수정)
- * [★ 수정] IndexedDB 캐싱 적용으로 성능 및 비용 최적화
+ * 텍스트를 음성(TTS)으로 재생 (IndexedDB 캐싱 적용됨)
  * @param {string} text - 재생할 텍스트
  * @param {HTMLElement | null} buttonElement - (선택) 클릭된 TTS 버튼
  * @param {HTMLElement | null} lineElement - (선택) 하이라이트할 대화 라인 요소
  * @param {string | null} speaker - (선택) 'Man' or 'Woman', 목소리 구분을 위함
- * @returns {Promise<void>} - (lineElement가 있을 경우) 재생이 완료/중지되면 resolve/reject되는 Promise
  */
 export function playTTS(text, buttonElement = null, lineElement = null, speaker = null) {
-    // Promise로 감싸서 비동기 재생 완료를 핸들링
     const playPromise = new Promise(async (resolve, reject) => {
+        // 1. 기존 오디오 중지 로직
         if (state.runTimeState.currentAudio) {
-            // 다른 오디오가 재생 중이면 중지
             state.stopCurrentAudio();
-            
-            // 만약 '중지' 버튼으로 동일한 버튼을 누른 거라면, 여기서 재생을 멈추고 resolve
+            // 만약 '중지' 버튼으로 동일한 버튼을 누른 거라면, 여기서 멈춤
             if (state.runTimeState.currentPlayingButton === buttonElement) {
                 state.runTimeState.currentPlayingButton = null;
                 resolve();
@@ -47,227 +83,181 @@ export function playTTS(text, buttonElement = null, lineElement = null, speaker 
             }
         }
         
-        // 새 오디오 재생 시작
+        // 새 오디오 재생 시작 상태 설정
         state.runTimeState.currentPlayingButton = buttonElement;
         if(buttonElement) buttonElement.classList.add('is-playing');
         if(lineElement) lineElement.classList.add('is-playing');
 
+        // UI 정리 헬퍼 함수
+        function cleanupUI() {
+            if(buttonElement) buttonElement.classList.remove('is-playing');
+            if(lineElement) lineElement.classList.remove('is-playing');
+            state.runTimeState.currentAudio = null;
+            state.runTimeState.currentPlayingButton = null;
+        }
+
         try {
-            // 캐시 키를 텍스트 + 화자로 구성 (목소리가 다를 수 있으므로)
             const cacheKey = `${speaker || 'default'}:${text}`;
             
-            // [★ 수정됨] 3단계 캐싱 전략: 메모리 -> DB -> 네트워크(API)
-            
-            // 1단계: 메모리 캐시 확인 (가장 빠름)
+            // 1단계: 메모리 캐시 확인
             let audioData = state.audioCache[cacheKey];
             
-            // 2단계: IndexedDB 확인 (새로고침 해도 남아있음)
+            // 2단계: DB 캐시 확인
             if (!audioData) {
                 audioData = await db.getAudioFromDB(cacheKey);
                 if (audioData) {
-                    state.audioCache[cacheKey] = audioData; // 메모리에도 올려둠 (다음번엔 더 빠르게)
-                    console.log(`[TTS] Loaded from DB: "${text.substring(0, 10)}..."`);
+                    state.audioCache[cacheKey] = audioData;
                 }
             }
             
-            // 3단계: API 호출 (비용 발생)
+            // 3단계: API 호출 (TTS는 반응 속도가 중요하므로 재시도 1회만)
             if (!audioData) {
-                // speaker 정보(Man/Woman)를 API로 전송
-                const result = await callGeminiAPI('tts', { text, speaker });
+                const result = await callGeminiAPI('tts', { text, speaker }, 1);
                 audioData = result.audioContent;
-                
-                // 받아온 데이터를 캐시에 저장
-                state.audioCache[cacheKey] = audioData; // 메모리 저장
-                db.saveAudioToDB(cacheKey, audioData);  // [★ 추가] DB 영구 저장
+                // 캐시 저장
+                state.audioCache[cacheKey] = audioData;
+                db.saveAudioToDB(cacheKey, audioData);
             }
             
+            // 오디오 재생
             const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
             state.runTimeState.currentAudio = audio;
             audio.play();
             
-            // --- 오디오 이벤트 핸들러 ---
-            
+            // 이벤트 핸들러
             audio.onended = () => {
-                if(buttonElement) buttonElement.classList.remove('is-playing');
-                if(lineElement) lineElement.classList.remove('is-playing');
-                state.runTimeState.currentAudio = null;
-                state.runTimeState.currentPlayingButton = null;
-                resolve(); // 재생 완료
+                cleanupUI();
+                resolve();
             };
             
             audio.onerror = (e) => {
-                console.error('Audio playback error:', e);
-                showAlert('오디오 재생 중 오류가 발생했습니다.');
-                if(buttonElement) buttonElement.classList.remove('is-playing');
-                if(lineElement) lineElement.classList.remove('is-playing');
-                state.runTimeState.currentAudio = null;
-                state.runTimeState.currentPlayingButton = null;
-                reject(new Error('Audio playback error')); // 오류로 reject
+                cleanupUI();
+                reject(new Error('Audio playback error'));
             };
 
-            // stopCurrentAudio()에 의해 .pause()가 호출될 때
             audio.onpause = () => {
-                 if(buttonElement) buttonElement.classList.remove('is-playing');
-                 if(lineElement) lineElement.classList.remove('is-playing');
-                 // currentAudio가 null이 된 것은 stopCurrentAudio()가 원인임
+                 cleanupUI();
+                 // 사용자가 멈춘 게 아니라 시스템적으로(stopCurrentAudio) 멈췄을 때
                  if (state.runTimeState.currentAudio === null) {
-                    reject(new Error('Playback stopped')); // 중지로 reject
+                    reject(new Error('Playback stopped'));
                  }
             };
 
         } catch (error) {
             console.error('TTS error:', error);
-            showAlert(`음성(TTS)을 불러오는 데 실패했습니다: ${error.message}`);
-            if(buttonElement) buttonElement.classList.remove('is-playing');
-            if(lineElement) lineElement.classList.remove('is-playing');
-            state.runTimeState.currentPlayingButton = null;
-            reject(error); // TTS API 오류로 reject
+            showAlert(`음성 재생 실패: ${error.message}`);
+            cleanupUI();
+            reject(error);
         }
     });
 
-    // lineElement가 제공되지 않은 경우 (일반 버튼 클릭) 
-    // Promise를 반환하지 않고, 오류만 콘솔에 기록 (기존 방식)
+    // lineElement가 없으면(단순 버튼 클릭) 에러 로그만 남기고 종료
     if (!lineElement) {
         playPromise.catch(error => {
             if (error && error.message !== 'Playback stopped') {
                 console.error("TTS playback error (unhandled):", error);
             }
         });
-        return; // undefined 반환
+        return;
     }
 
-    // lineElement가 제공된 경우 (전체 듣기) Promise 반환
+    // 전체 듣기 기능 등을 위해 Promise 반환
     return playPromise;
 }
 
-// --- API를 호출하는 핸들러 함수들 ---
+// --- API 핸들러 함수들 (프롬프트 최적화 적용) ---
 
 /**
- * 한국어 텍스트를 중국어로 번역 (API 호출)
- * @param {string} text - 번역할 한국어
- * @returns {Promise<object>} - Gemini API 응답
+ * [최적화 3] 한국어 텍스트를 중국어로 번역
+ * - 프롬프트 길이를 줄이고 JSON 포맷 규칙을 강화하여 속도와 정확성 향상
  */
 export function translateText(text) {
-    // [★ 수정] usedPattern에 대한 지시사항을 "MUST be in Korean"으로 변경
-    const systemPrompt = `You are a professional Chinese translator and tutor.
-Your goal is to translate the user's Korean text into natural, conversational Chinese.
+    const systemPrompt = `You are a Chinese translator.
+Translate Korean to natural conversational Chinese.
 
-**CRITICAL INSTRUCTIONS:**
-1. Output MUST be a single, valid JSON object. 
-2. Do NOT include markdown backticks (like \`\`\`json). Just the raw JSON string.
-3. Do NOT explain in English. Use Korean for explanations.
+**RULES:**
+1. Response MUST be valid JSON. No markdown.
+2. Keys: "chinese", "pinyin", "alternatives"(array), "explanation"(Korean), "usedPattern"(Korean or null).
+3. Be concise and natural.
 
-**JSON Structure:**
-{
-  "chinese": "Translated Chinese text (Simplified)",
-  "pinyin": "Pinyin with tone marks",
-  "alternatives": ["Alternative expression 1", "Alternative expression 2"],
-  "explanation": "A brief grammar or nuance explanation in Korean",
-  "usedPattern": "Name of the grammar pattern used (MUST be in Korean, e.g., '谁를 활용한 반어문', or null if none)"
-}
-
-**User Input (Korean):** "${text}"`;
+**User:** "${text}"`;
 
     return callGeminiAPI('translate', { text, systemPrompt });
 }
 
 /**
- * AI 채팅 응답 요청 (API 호출)
- * @param {string} text - 사용자 입력
- * @param {Array} history - 대화 기록
- * @param {string | null} roleContext - (선택) 롤플레잉 상황
- * @returns {Promise<object>} - Gemini API 응답
+ * AI 채팅 응답 요청
  */
 export function getChatResponse(text, history, roleContext = null) {
     return callGeminiAPI('chat', { text, history, roleContext });
 }
 
 /**
- * 패턴으로 AI 채팅 시작 (API 호출)
- * @param {string} pattern - 시작할 패턴
- * @returns {Promise<object>} - Gemini API 응답
+ * 패턴으로 AI 채팅 시작
  */
 export function startChatWithPattern(pattern) {
     return callGeminiAPI('start_chat_with_pattern', { pattern });
 }
 
 /**
- * 롤플레잉 채팅 시작 (API 호출)
- * @param {string} context - 롤플레잉 상황 (e.g., 'restaurant')
- * @returns {Promise<object>} - Gemini API 응답
+ * 롤플레잉 채팅 시작
  */
 export function startRoleplayChat(context) {
     return callGeminiAPI('start_roleplay_chat', { roleContext: context });
 }
 
 /**
- * AI 답변 추천 요청 (API 호출)
- * @param {Array} history - 대화 기록
- * @returns {Promise<object>} - Gemini API 응답
+ * AI 답변 추천 요청
  */
 export function getSuggestedReplies(history) {
     return callGeminiAPI('suggest_reply', { history });
 }
 
 /**
- * 새 연습문제 생성 (API 호출)
- * @param {string} pattern - 연습문제를 만들 패턴
- * @returns {Promise<object>} - Gemini API 응답
+ * [최적화 3] 새 연습문제 생성
+ * - 불필요한 설명을 줄이고 문제 생성에 집중하도록 유도
  */
 export function getNewPractice(pattern) {
     return callGeminiAPI('generate_practice', { pattern });
 }
 
 /**
- * 중국어 작문 교정 (API 호출)
- * @param {string} text - 교정할 텍스트
- * @returns {Promise<object>} - Gemini API 응답
+ * 중국어 작문 교정
  */
 export function correctWriting(text) {
     return callGeminiAPI('correct_writing', { text });
 }
 
 /**
- * 작문 주제 추천 (API 호출)
- * @returns {Promise<object>} - Gemini API 응답
+ * 작문 주제 추천
  */
 export function getWritingTopic() {
     return callGeminiAPI('get_writing_topic', {});
 }
 
 /**
- * 간체자 정보 요청 (API 호출)
- * @param {string} char - 정보를 요청할 글자
- * @returns {Promise<object>} - Gemini API 응답
+ * 간체자 정보 요청
  */
 export function getCharacterInfo(char) {
     return callGeminiAPI('get_character_info', { text: char });
 }
 
 /**
- * 발음 평가 요청 (API 호출)
- * @param {string} original - 원본 텍스트
- * @param {string} user - 사용자가 말한 텍스트
- * @returns {Promise<object>} - Gemini API 응답
+ * 발음 평가 요청
  */
 export function evaluatePronunciation(original, user) {
     return callGeminiAPI('evaluate_pronunciation', { originalText: original, userText: user });
 }
 
 /**
- * '오늘의 대화' 스크립트 요청 (API 호출)
- * @param {string} pattern1 - 오늘 사용된 패턴 1
- * @param {string} pattern2 - 오늘 사용된 패턴 2
- * @returns {Promise<object>} - Gemini API 응답
+ * '오늘의 대화' 스크립트 요청
  */
 export function getTodayConversationScript(pattern1, pattern2) {
     return callGeminiAPI('generate_today_conversation', { pattern1, pattern2 });
 }
 
 /**
- * '상황별 듣기' 스크립트 요청 (API 호출)
- * @param {string} scenario - 듣기 시나리오 (e.g., 'restaurant')
- * @returns {Promise<object>} - Gemini API 응답
+ * '상황별 듣기' 스크립트 요청
  */
 export function getSituationalListeningScript(scenario) {
     return callGeminiAPI('generate_situational_listening', { scenario });
