@@ -55,7 +55,16 @@ function initializeApp() {
     setupToolEvents();
     setupUIEvents();
     
-    console.log("App initialized with modular events.");
+    // [★ 추가] 서비스 워커 등록 (PWA 기능 활성화)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then((reg) => console.log('Service Worker Registered!', reg))
+                .catch((err) => console.log('Service Worker registration failed', err));
+        });
+    }
+    
+    console.log("App initialized with modular events & PWA support.");
 }
 
 // --- 앱 실행 ---
