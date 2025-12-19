@@ -57,4 +57,20 @@ export function setupUIEvents() {
 
     // --- 커스텀 알림창 닫기 ---
     dom.customAlertCloseBtn.addEventListener('click', () => dom.customAlertModal.classList.add('hidden'));
+
+    // [★ 추가] 온라인/오프라인 상태 감지
+    const updateOnlineStatus = () => {
+        const banner = document.getElementById('offline-banner');
+        if (banner) {
+            if (!navigator.onLine) {
+                banner.classList.remove('hidden');
+            } else {
+                banner.classList.add('hidden');
+            }
+        }
+    };
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus(); // 초기 상태 체크
 }

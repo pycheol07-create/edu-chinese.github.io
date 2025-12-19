@@ -20,7 +20,7 @@ function initializeApp() {
     // 0. 원본 데이터 설정
     state.setAllPatterns(patternsData);
     
-    // 1. DOM 요소 초기화 (가장 먼저 실행)
+    // 1. DOM 요소 초기화
     dom.initializeDOM();
     
     // 2. UI 및 상태 초기화
@@ -41,21 +41,21 @@ function initializeApp() {
         }
     });
     
-    // 5. 전체 패턴 목록 렌더링 (모달용)
+    // 5. 전체 패턴 목록 렌더링
     ui.renderAllPatternsList();
     
     // 6. 기타 기능 초기화
     state.setupScreenWakeLock();
     speech.initializeSpeechRecognition();
     
-    // 7. 모든 이벤트 리스너 설정 (모듈화됨)
+    // 7. 이벤트 리스너 설정
     setupPracticeEvents();
     setupChatEvents();
     setupListeningEvents();
     setupToolEvents();
     setupUIEvents();
     
-    // [★ 추가] 서비스 워커 등록 (PWA 기능 활성화)
+    // 8. 서비스 워커 등록 (PWA)
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js')
@@ -63,9 +63,21 @@ function initializeApp() {
                 .catch((err) => console.log('Service Worker registration failed', err));
         });
     }
+
+    // [★ 추가] iOS 오디오 잠금 해제 (첫 터치 시 빈 오디오 재생)
+    document.body.addEventListener('click', function unlockAudio() {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const buffer = audioContext.createBuffer(1, 1, 22050);
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start(0);
+        
+        document.body.removeEventListener('click', unlockAudio);
+        console.log("Audio Context Unlocked for iOS");
+    }, { once: true });
     
-    console.log("App initialized with modular events & PWA support.");
+    console.log("App initialized with PWA & iOS Audio Fix.");
 }
 
-// --- 앱 실행 ---
 document.addEventListener('DOMContentLoaded', initializeApp);

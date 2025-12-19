@@ -1,10 +1,12 @@
-// sw.js - 서비스 워커
-const CACHE_NAME = 'chinese-app-v1';
+// sw.js
 
-// 캐싱할 파일 목록 (앱의 껍데기)
+// [★ 중요] 파일 수정 사항이 있을 때마다 이 버전을 올려주세요 (예: v1 -> v2)
+const CACHE_NAME = 'chinese-app-v2';
+
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
+  './manifest.json',
   './data/patterns.js',
   './js/main.js',
   './js/api.js',
@@ -22,7 +24,7 @@ const ASSETS_TO_CACHE = [
   './js/events/uiEvents.js'
 ];
 
-// 1. 설치 (Install): 파일 캐싱
+// 1. 설치 (Install) - 캐싱
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Install');
   event.waitUntil(
@@ -33,7 +35,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// 2. 활성화 (Activate): 구 버전 캐시 정리
+// 2. 활성화 (Activate) - 구 버전 캐시 정리
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keyList) => {
@@ -50,16 +52,15 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim();
 });
 
-// 3. 요청 가로채기 (Fetch): 캐시 우선, 없으면 네트워크
+// 3. 요청 (Fetch) - 캐시 우선, 네트워크 폴백 (API는 제외)
 self.addEventListener('fetch', (event) => {
-  // API 요청은 캐시하지 않고 항상 네트워크로 보냄
+  // API 요청은 캐시하지 않음
   if (event.request.url.includes('/api/')) {
     return;
   }
 
   event.respondWith(
     caches.match(event.request).then((response) => {
-      // 캐시에 있으면 반환, 없으면 네트워크 요청
       return response || fetch(event.request);
     })
   );
