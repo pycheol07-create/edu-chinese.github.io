@@ -1,6 +1,7 @@
 // js/api.js
 import * as state from './state.js';
 import { showAlert } from './ui.js';
+import * as db from './db.js'; // [★ 추가] DB 모듈 임포트
 
 /**
  * Gemini API를 호출하는 공통 함수
@@ -24,6 +25,7 @@ async function callGeminiAPI(action, body) {
 /**
  * 텍스트를 음성(TTS)으로 재생합니다. (speaker 인자 추가)
  * (전체 듣기 기능을 위해 Promise를 반환하고, lineElement 하이라이트를 지원하도록 수정)
+ * [★ 수정] IndexedDB 캐싱 적용으로 성능 및 비용 최적화
  * @param {string} text - 재생할 텍스트
  * @param {HTMLElement | null} buttonElement - (선택) 클릭된 TTS 버튼
  * @param {HTMLElement | null} lineElement - (선택) 하이라이트할 대화 라인 요소
@@ -53,13 +55,30 @@ export function playTTS(text, buttonElement = null, lineElement = null, speaker 
         try {
             // 캐시 키를 텍스트 + 화자로 구성 (목소리가 다를 수 있으므로)
             const cacheKey = `${speaker || 'default'}:${text}`;
+            
+            // [★ 수정됨] 3단계 캐싱 전략: 메모리 -> DB -> 네트워크(API)
+            
+            // 1단계: 메모리 캐시 확인 (가장 빠름)
             let audioData = state.audioCache[cacheKey];
             
+            // 2단계: IndexedDB 확인 (새로고침 해도 남아있음)
+            if (!audioData) {
+                audioData = await db.getAudioFromDB(cacheKey);
+                if (audioData) {
+                    state.audioCache[cacheKey] = audioData; // 메모리에도 올려둠 (다음번엔 더 빠르게)
+                    console.log(`[TTS] Loaded from DB: "${text.substring(0, 10)}..."`);
+                }
+            }
+            
+            // 3단계: API 호출 (비용 발생)
             if (!audioData) {
                 // speaker 정보(Man/Woman)를 API로 전송
                 const result = await callGeminiAPI('tts', { text, speaker });
                 audioData = result.audioContent;
-                state.audioCache[cacheKey] = audioData;
+                
+                // 받아온 데이터를 캐시에 저장
+                state.audioCache[cacheKey] = audioData; // 메모리 저장
+                db.saveAudioToDB(cacheKey, audioData);  // [★ 추가] DB 영구 저장
             }
             
             const audio = new Audio(`data:audio/mp3;base64,${audioData}`);
