@@ -17,7 +17,9 @@ export function setupListeningEvents() {
         // 모달 닫을 때 UI 초기화
         dom.listeningModal.classList.remove('is-fullscreen');
         dom.listeningControls.classList.remove('hidden');
-        dom.listeningScriptDisplay.innerHTML = '<p class="text-gray-400 text-center">듣고 싶은 주제를 선택하세요.</p>';
+        
+        // [수정] 닫을 때 텍스트를 초기화하지만, '듣고 싶은 주제를 선택하세요' 문구는 넣지 않음 (빈 상태 유지)
+        dom.listeningScriptDisplay.innerHTML = '';
         dom.listeningPlaybackControls.classList.add('hidden');
     });
 
@@ -50,4 +52,25 @@ export function setupListeningEvents() {
             }
         }
     });
+
+    // [새로 추가] 커스텀 듣기 생성 이벤트
+    const startCustomListeningBtn = document.getElementById('start-custom-listening-btn');
+    const customListeningInput = document.getElementById('custom-listening-input');
+    
+    if (startCustomListeningBtn && customListeningInput) {
+        customListeningInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') startCustomListeningBtn.click();
+        });
+
+        startCustomListeningBtn.addEventListener('click', () => {
+            const scenario = customListeningInput.value.trim();
+            if (!scenario) {
+                alert('원하는 상황을 입력해주세요!');
+                return;
+            }
+            // 기존 시나리오 요청 함수 재사용 (문자열 그대로 전달)
+            handlers.handleSituationalListeningRequest(scenario);
+            customListeningInput.value = '';
+        });
+    }
 }

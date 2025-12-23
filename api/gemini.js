@@ -173,18 +173,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\` if the user's last message was correct.
 `;
-        } else {
-            // [★ 수정] 그 외 커스텀 시나리오인 경우
-             chatSystemPrompt = `You are "Ling" (灵).
-- The user is roleplaying a specific situation: "${roleContext}".
-- Play the appropriate role based on this situation.
-- Be natural and concise (1-2 short sentences).
-- Ask questions to keep the conversation going.
-- **VERY IMPORTANT:** Analyze the user's *last* message for grammatical errors.
-- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
-- The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
-- Set "correction" to \`null\` if the user's last message was correct.
-`;
         }
         
         const contents = [
@@ -335,20 +323,19 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         apiRequestBody = { contents };
 
     } else if (action === 'generate_situational_listening') {
-        let scenarioKorean = scenario;
-        if (scenario === 'restaurant') scenarioKorean = '식당';
-        else if (scenario === 'shopping') scenarioKorean = '쇼핑';
-        else if (scenario === 'taxi') scenarioKorean = '택시';
-        else if (scenario === 'airport') scenarioKorean = '공항';
-        else if (scenario === 'today_conversation') scenarioKorean = '오늘의 패턴 대화';
-        // [★ 추가] 새로운 시나리오 매핑 추가
-        else if (scenario === 'hotel') scenarioKorean = '호텔';
-        else if (scenario === 'directions') scenarioKorean = '길 묻기';
-        else if (scenario === 'hospital') scenarioKorean = '병원 또는 약국';
+        let scenarioDescription = scenario;
+        if (scenario === 'restaurant') scenarioDescription = '식당 (Restaurant)';
+        else if (scenario === 'shopping') scenarioDescription = '쇼핑 (Shopping)';
+        else if (scenario === 'taxi') scenarioDescription = '택시 (Taxi)';
+        else if (scenario === 'airport') scenarioDescription = '공항 (Airport)';
+        else if (scenario === 'today_conversation') scenarioDescription = '오늘의 패턴 대화';
+        else if (scenario === 'hotel') scenarioDescription = '호텔 (Hotel)';
+        else if (scenario === 'directions') scenarioDescription = '길 묻기 (Asking for directions)';
+        else if (scenario === 'hospital') scenarioDescription = '병원 또는 약국 (Hospital/Pharmacy)';
         
         // [★ 수정] 대화 턴 수 증가
         const listeningSystemPrompt = `You are a creative scriptwriter. Your task is to generate a short, natural dialogue for a specific situation.
-- The situation is: "${scenarioKorean}" (in ${scenario}).
+- The situation is: "${scenarioDescription}".
 - The dialogue must be between two speakers: "Man" (👨‍💼) and "Woman" (👩‍💼).
 - The dialogue must be 5 to 7 turns long (5-7 lines for Man, 5-7 lines for Woman, total 10-14 lines).
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
