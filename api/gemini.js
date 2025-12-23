@@ -173,6 +173,18 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\` if the user's last message was correct.
 `;
+        } else {
+            // [★ 수정] 그 외 커스텀 시나리오인 경우
+             chatSystemPrompt = `You are "Ling" (灵).
+- The user is roleplaying a specific situation: "${roleContext}".
+- Play the appropriate role based on this situation.
+- Be natural and concise (1-2 short sentences).
+- Ask questions to keep the conversation going.
+- **VERY IMPORTANT:** Analyze the user's *last* message for grammatical errors.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\` if the user's last message was correct.
+`;
         }
         
         const contents = [
@@ -271,18 +283,27 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - Example: {"chinese": "早！今天感觉怎么样？", "pinyin": "Zǎo! Jīntiān gǎnjué zěnmeyàng?", "korean": "좋은 아침! 오늘 컨디션 어때요?", "correction": null}`;
         
         } else {
-             roleplayStartPrompt = `{"chinese": "您好！", "pinyin": "Nínhǎo!", "korean": "안녕하세요!", "correction": null}`;
-             apiRequestBody = { contents: [{ parts: [{ text: roleplayStartPrompt }] }] };
+             // [★ 수정] 미리 정의되지 않은 상황은 '커스텀 시나리오'로 처리
+             roleplayStartPrompt = `You are "Ling" (灵).
+- The user wants to roleplay a specific situation: "${roleContext}".
+- Play the appropriate role based on this situation. (e.g., if the user says "lost wallet", act as a police officer or a passerby).
+- Your goal is to start the conversation naturally based on this scenario.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\` for this first message.
+- Ask a natural opening question suitable for the situation.
+- Example for custom scenario "Buying a train ticket": {"chinese": "您好，请问您要去哪里？", "pinyin": "Nínhǎo, qǐngwèn nín yào qù nǎlǐ?", "korean": "안녕하세요, 어디로 가시나요?", "correction": null}`;
         }
 
-        if (action === 'start_roleplay_chat' && roleContext) {
-             const contents = [
-                { role: "user", parts: [{ text: roleplayStartPrompt }] },
-                { role: "model", parts: [{ text: `Okay, I understand. I will act as a ${roleContext} and provide the opening line in the required JSON format.` }] },
-                { role: "user", parts: [{ text: `Great. Please provide the first message now.` }] }
-            ];
-            apiRequestBody = { contents };
-        }
+        // [★ 수정] apiRequestBody 생성 로직 통합
+        const instructionRole = roleContext ? `act according to the scenario: "${roleContext}"` : `act as a conversational partner`;
+        
+        const contents = [
+            { role: "user", parts: [{ text: roleplayStartPrompt }] },
+            { role: "model", parts: [{ text: `Okay, I understand. I will ${instructionRole} and provide the opening line in the required JSON format.` }] },
+            { role: "user", parts: [{ text: `Great. Please provide the first message now.` }] }
+        ];
+        apiRequestBody = { contents };
 
     } else if (action === 'generate_today_conversation') {
         // [★ 수정] 대화 턴 수 증가
@@ -565,5 +586,3 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
     return response.status(500).json({ error: error.message });
   }
 }
-
-// v.2025.10.20_1101-20 (대화 턴 수 증가)

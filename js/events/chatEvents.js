@@ -71,4 +71,26 @@ export function setupChatEvents() {
             handlers.handleStartRoleplay(context);
         }
     });
+
+    // [새로 추가] 커스텀 상황극 시작 이벤트
+    const startCustomBtn = document.getElementById('start-custom-roleplay-btn');
+    const customInput = document.getElementById('custom-roleplay-input');
+    
+    if (startCustomBtn && customInput) {
+        // 엔터키 입력 지원
+        customInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') startCustomBtn.click();
+        });
+
+        startCustomBtn.addEventListener('click', () => {
+            const scenario = customInput.value.trim();
+            if (!scenario) {
+                alert('원하는 상황을 입력해주세요!'); // 간단한 알림
+                return;
+            }
+            dom.roleplayModal.classList.add('hidden');
+            handlers.handleStartRoleplay(scenario); // 입력된 텍스트로 롤플레잉 시작
+            customInput.value = ''; // 입력창 초기화
+        });
+    }
 }

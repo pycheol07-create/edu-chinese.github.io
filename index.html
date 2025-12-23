@@ -208,8 +208,17 @@
     <div id="roleplay-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-40">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 relative">
             <div class="flex justify-between items-center mb-4"><h2 class="text-2xl font-bold text-gray-800">AI와 대화하기 💬</h2><button id="close-roleplay-btn" class="p-1 rounded-full hover:bg-gray-200"><svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button></div>
-            <p class="text-gray-600 mb-6">대화하고 싶은 주제를 선택하세요.</p>
-            <div id="roleplay-scenario-list" class="space-y-3 max-h-[60vh] overflow-y-auto">
+            
+            <div class="mb-5 pb-5 border-b border-gray-200">
+                <label class="block text-gray-700 text-sm font-bold mb-2">🎭 나만의 상황 만들기</label>
+                <div class="flex gap-2">
+                    <input type="text" id="custom-roleplay-input" class="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" placeholder="예: 잃어버린 지갑 찾기, 아이돌 소개하기">
+                    <button id="start-custom-roleplay-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded shadow-md transition-colors whitespace-nowrap">시작</button>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">원하는 상황을 자유롭게 적어보세요. AI가 그 상황의 파트너가 되어줍니다.</p>
+            </div>
+            <p class="text-gray-600 mb-3 font-semibold">또는 주제를 선택하세요:</p>
+            <div id="roleplay-scenario-list" class="space-y-3 max-h-[40vh] overflow-y-auto">
                 <button data-scenario="daily_friend" class="w-full text-left p-4 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors border border-purple-200"><p class="text-lg font-semibold">🧑‍🤝‍🧑 일상대화</p><p class="text-sm text-gray-500">친구, 가족, 동료 등과 편하게 대화합니다.</p></button>
                 <button data-scenario="restaurant" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"><p class="text-lg font-semibold">🍽️ 식당에서</p><p class="text-sm text-gray-500">음식을 주문하고 계산을 요청합니다.</p></button>
                 <button data-scenario="shopping" class="w-full text-left p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"><p class="text-lg font-semibold">🛍️ 가게에서</p><p class="text-sm text-gray-500">물건을 찾고 가격을 흥정합니다.</p></button>
