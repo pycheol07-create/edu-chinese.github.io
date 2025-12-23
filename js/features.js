@@ -4,31 +4,16 @@ import * as state from './state.js';
 import * as api from './api.js';
 import { showAlert } from './ui.js';
 
-// [★ 새로 추가] AI 응답에서 JSON 블록만 추출하는 헬퍼 함수
-/**
- * 텍스트에서 ```json ... ``` 블록을 추출합니다.
- * @param {string} text - AI가 응답한 전체 텍스트
- * @returns {string | null} - 추출된 JSON 문자열 또는 null
- */
+// [AI 응답 JSON 추출 헬퍼 함수]
 function extractJson(text) {
     if (!text) return null;
-    
-    // 1. ```json ... ``` 블록 찾기
     const match = text.match(/```json\s*([\s\S]*?)\s*```/);
-    if (match && match[1]) {
-        return match[1].trim();
-    }
-    
-    // 2. 만약 백틱이 없다면, 텍스트가 { 로 시작하고 } 로 끝나는지 확인
+    if (match && match[1]) return match[1].trim();
     const trimmedText = text.trim();
-    if (trimmedText.startsWith('{') && trimmedText.endsWith('}')) {
-        return trimmedText;
-    }
-
+    if (trimmedText.startsWith('{') && trimmedText.endsWith('}')) return trimmedText;
     console.warn("Could not find or extract JSON block from text:", text);
-    return null; // JSON을 찾지 못함
+    return null; 
 }
-
 
 /**
  * 단어 학습 모달에 다음 랜덤 단어를 표시합니다.
@@ -39,28 +24,23 @@ export function showNextWord() {
         return;
     }
 
-    // 카드 뒷면으로 뒤집기 (초기화)
     if (dom.wordFlashcard) dom.wordFlashcard.classList.remove('is-flipped');
     
-    // 랜덤 단어 선택
     const randomIndex = Math.floor(Math.random() * state.allWords.length);
     const word = state.allWords[randomIndex];
 
-    // 카드 앞면에 단어 표시
     if (dom.wordFlashcardFront) {
         dom.wordFlashcardFront.innerHTML = `<p class="text-4xl font-bold chinese-text text-cyan-800">${word.word}</p>`;
     }
     
-    // 카드 뒷면에 병음/뜻 표시
     if (dom.wordPinyin) dom.wordPinyin.textContent = word.pinyin;
     if (dom.wordMeaning) dom.wordMeaning.textContent = word.meaning;
 
-    // TTS 버튼에 텍스트 설정
     if (dom.wordTtsBtn) dom.wordTtsBtn.dataset.text = word.word;
 }
 
 /**
- * 간체자 학습 모달에 다음 랜덤 글자 정보를 (API 호출 후) 표시합니다.
+ * [수정] 간체자 학습 모달에 심화 정보(어원, 주의사항, 파생단어)를 표시합니다.
  */
 export async function showNextCharacter() {
     if (state.allCharacters.length === 0) {
@@ -69,29 +49,25 @@ export async function showNextCharacter() {
     }
     if (!dom.characterInfo) return;
 
-    // 로딩 상태 표시
-    dom.characterInfo.innerHTML = '<div class="loader mx-auto"></div>';
+    // 로딩 UI
+    dom.characterInfo.innerHTML = `
+        <div class="h-full flex flex-col items-center justify-center space-y-4">
+            <div class="loader mx-auto"></div>
+            <p class="text-gray-500 animate-pulse">AI 선생님이 글자를 분석 중입니다...</p>
+        </div>`;
     if (dom.charTtsBtn) dom.charTtsBtn.dataset.text = '';
 
-    // 랜덤 글자 선택
     const randomIndex = Math.floor(Math.random() * state.allCharacters.length);
     const char = state.allCharacters[randomIndex];
 
     try {
-        // api.js의 래퍼 함수 사용
         const result = await api.getCharacterInfo(char); 
         
         let charData;
         if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
-            
-            // [★ 수정] AI 응답 텍스트 원본
             const aiResponseText = result.candidates[0].content.parts[0].text;
-            // [★ 수정] 새로운 extractJson 함수 사용
             const charText = extractJson(aiResponseText);
-
-            if (!charText) { // [★ 수정]
-                throw new Error("AI가 유효한 JSON 형식으로 응답하지 않았습니다.");
-            }
+            if (!charText) throw new Error("AI가 유효한 JSON 형식으로 응답하지 않았습니다.");
             try {
                 charData = JSON.parse(charText);
             } catch (e) {
@@ -103,45 +79,86 @@ export async function showNextCharacter() {
             throw new Error("AI로부터 유효한 응답을 받지 못했습니다.");
         }
 
-        // [★ 수정] TTS 버튼 설정 (데이터 파싱 직후)
         if (dom.charTtsBtn) dom.charTtsBtn.dataset.text = charData.char;
 
-        // [★ 수정] examples가 유효한 배열인지 확인 (이전 턴에서 이미 수정한 내용)
-        let examplesHtml = '<p class="text-sm text-gray-500">예시 단어가 없습니다.</p>'; // 기본값
-        
-        if (Array.isArray(charData.examples) && charData.examples.length > 0) {
-            examplesHtml = charData.examples.map(ex => `
-                <div class="p-2 bg-white rounded-md shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-lg chinese-text font-semibold text-gray-800">${ex.word}</p>
-                            <p class="text-sm text-gray-500">${ex.pinyin}</p>
-                        </div>
-                        <button class="tts-btn p-1 rounded-full hover:bg-gray-200 transition-colors" data-text="${ex.word}">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-gray-500 pointer-events-none"><path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" /></svg>
-                        </button>
-                    </div>
-                    <p class="text-sm text-gray-600 mt-1 pt-1 border-t">${ex.meaning}</p>
-                </div>
-            `).join('');
+        // 1. 어원/해부학 섹션 HTML 생성
+        let etymologyHtml = '';
+        if (charData.etymology) {
+            etymologyHtml = `
+                <div class="bg-amber-50 p-3 rounded-lg border border-amber-100">
+                    <h4 class="text-sm font-bold text-amber-800 mb-1">🔍 한자 해부학 (어원)</h4>
+                    <p class="text-sm text-gray-700 leading-relaxed">${charData.etymology}</p>
+                </div>`;
         }
 
-        // 결과 표시
-        dom.characterInfo.innerHTML = `
-            <div class="text-center">
-                <p class="text-6xl font-bold chinese-text text-red-700">${charData.char}</p>
-                <p class="text-2xl text-gray-600 mt-2">${charData.pinyin}</p>
-                <p class="text-2xl font-semibold text-red-600 mt-2">${charData.meaning}</p>
-            </div>
-            <div class="mt-6 w-full">
-                <h4 class="text-sm font-semibold text-gray-700 border-b pb-1">예시 단어:</h4>
-                <div class="space-y-2 mt-2">
-                    ${examplesHtml}
+        // 2. 닮은꼴 주의보 섹션 HTML 생성
+        let cautionHtml = '';
+        if (charData.caution && charData.caution.similar_char) {
+            cautionHtml = `
+                <div class="bg-red-50 p-3 rounded-lg border border-red-100 flex items-start space-x-3">
+                    <div class="flex-shrink-0 text-2xl">⚠️</div>
+                    <div>
+                        <h4 class="text-sm font-bold text-red-800 mb-1">닮은꼴 주의보!</h4>
+                        <p class="text-sm text-gray-700">
+                            <span class="font-bold text-red-600 text-lg mx-1">${charData.caution.similar_char}</span>와 헷갈리지 마세요.
+                            <br><span class="text-xs text-gray-500">${charData.caution.tip}</span>
+                        </p>
+                    </div>
+                </div>`;
+        }
+
+        // 3. 단어 확장 섹션 HTML 생성
+        let wordsHtml = '';
+        if (Array.isArray(charData.related_words) && charData.related_words.length > 0) {
+            const listItems = charData.related_words.map(w => `
+                <div class="flex justify-between items-center py-2 border-b last:border-0 border-gray-100">
+                    <div>
+                        <span class="text-lg font-bold text-gray-800 chinese-text">${w.word}</span>
+                        <span class="text-xs text-gray-400 ml-1">${w.pinyin}</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-sm text-gray-600 mr-2">${w.meaning}</span>
+                         <button class="tts-btn p-1 rounded-full hover:bg-gray-100 text-gray-400" data-text="${w.word}">
+                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                        </button>
+                    </div>
                 </div>
-            </div>`;
+            `).join('');
+            
+            wordsHtml = `
+                <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <h4 class="text-sm font-bold text-blue-800 mb-2">🧩 꼬리에 꼬리를 무는 단어</h4>
+                    <div class="bg-white rounded-md px-3 shadow-sm">
+                        ${listItems}
+                    </div>
+                </div>`;
+        }
+
+        // 전체 렌더링
+        dom.characterInfo.innerHTML = `
+            <div class="text-center p-4 bg-white border-b-2 border-gray-100 mb-4 sticky top-0 z-10">
+                <p class="text-6xl font-bold chinese-text text-red-600 shadow-sm inline-block">${charData.char}</p>
+                <div class="mt-2">
+                    <span class="text-xl font-medium text-gray-800 mr-2">${charData.pinyin}</span>
+                    <span class="text-lg text-gray-500">${charData.meaning}</span>
+                </div>
+            </div>
+            
+            <div class="space-y-4 px-1 pb-4">
+                ${etymologyHtml}
+                ${cautionHtml}
+                ${wordsHtml}
+            </div>
+        `;
         
     } catch (error) {
         console.error('Get character info error:', error);
-        dom.characterInfo.innerHTML = `<p class="text-red-500 text-center">글자 정보를 불러오는 중 오류가 발생했습니다: ${error.message}</p>`;
+        dom.characterInfo.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-full text-center">
+                <p class="text-4xl mb-2">😵</p>
+                <p class="text-red-500 font-bold">오류 발생</p>
+                <p class="text-sm text-gray-500 mt-1">${error.message}</p>
+                <button onclick="document.getElementById('next-char-btn').click()" class="mt-4 text-blue-500 underline text-sm">다시 시도하기</button>
+            </div>`;
     }
 }

@@ -11,12 +11,7 @@ export default async function handler(request, response) {
   // 2. 프런트엔드에서 보낸 요청 데이터를 받습니다.
   const { action, text, systemPrompt, history, pattern, originalText, userText, roleContext, pattern1, pattern2, scenario, speaker } = request.body;
 
-  // [★ 새로 추가] AI 응답에서 JSON 블록만 추출하는 헬퍼 함수
-  /**
-   * 텍스트에서 ```json ... ``` 블록을 추출합니다.
-   * @param {string} text - AI가 응답한 전체 텍스트
-   * @returns {string | null} - 추출된 JSON 문자열 또는 null
-   */
+  // [JSON 추출 헬퍼 함수]
   function extractJson(text) {
     if (!text) return null;
     
@@ -36,13 +31,12 @@ export default async function handler(request, response) {
     return null; // JSON을 찾지 못함
   }
 
-
   try {
     let apiUrl;
     let apiRequestBody;
     let modelShortName = 'gemini-1.0-pro'; // 기본 모델 설정
 
-    // TTS가 아닌 경우 (번역, 채팅, 답변 추천, 패턴 채팅 시작, 문제 생성 등) 모델 동적 선택 필요
+    // TTS가 아닌 경우 모델 동적 선택
     if (action !== 'tts') {
         const listModelsRes = await fetch(
             `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`
@@ -71,7 +65,6 @@ export default async function handler(request, response) {
 
     // 3. 액션별 요청 본문 설정
     if (action === 'translate') {
-        // [★ 수정] AI가 영어 설명 대신 정확한 JSON을 반환하도록 강력한 프롬프트 작성
         const prompt = systemPrompt || `You are a professional Chinese translator and tutor.
 Your goal is to translate the user's Korean text into natural, conversational Chinese.
 
@@ -96,19 +89,18 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         };
     
     } else if (action === 'chat') {
-        // --- 기본 "Ling" 프롬프트 (친구, 또는 패턴 대화) ---
         let chatSystemPrompt = `You are "Ling" (灵), a friendly native Chinese speaker and language tutor. Your goal is to help a user learning Chinese.
 - Have a natural, concise conversation (1-2 short sentences).
 - Ask questions to keep the conversation going.
 - **VERY IMPORTANT:** Analyze the user's *last* message for grammatical errors or unnatural expressions.
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
-- ... (이하 기본 Ling 프롬프트 예시와 동일) ...
+- Set "correction" to \`null\` if the user's last message was correct.
+- If there is an error, "correction" object should contain: "original", "corrected", "explanation" (in Korean).
 - Example if user said "你好":
   {"chinese": "你好！你吃饭了吗？", "pinyin": "Nǐ hǎo! Nǐ chīfàn le ma?", "korean": "안녕하세요! 밥 먹었어요?", "correction": null}
 `;
 
-        // --- 롤플레잉 상황별 프롬프트 ---
         if (roleContext === 'restaurant') {
             chatSystemPrompt = `You are "Ling" (灵), acting as a helpful RESTAURANT WAITER (餐厅服务员).
 - Your goal is to take the user's (customer's) order.
@@ -118,10 +110,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\` if the user's last message was correct.
-- Example if user said "我要一个这个":
-  {"chinese": "好的，一份宫保鸡丁。您想喝点什么吗？", "pinyin": "Hǎo de, yī fèn gōng bǎo jī dīng. Nín xiǎng hē diǎn shénme ma?", "korean": "네, 쿵파오 치킨 하나요. 마실 것도 필요하신가요?", "correction": null}
-- Example if user said "我点菜了":
-  {"chinese": "好的，您请说。", "pinyin": "Hǎo de, nín qǐng shuō.", "korean": "네, 말씀하세요.", "correction": {"original": "我点菜了", "corrected": "我要点菜", "explanation": "'点菜了'는 '주문했어요(과거)'라는 뜻이에요. '주문할게요'는 '我要点菜(wǒ yào diǎncài)'가 더 자연스러워요."}}
 `;
         } else if (roleContext === 'shopping') {
             chatSystemPrompt = `You are "Ling" (灵), acting as a friendly SHOPKEEPER (售货员).
@@ -173,6 +161,18 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\` if the user's last message was correct.
 `;
+        } else if (roleContext) {
+             // 커스텀 시나리오
+             chatSystemPrompt = `You are "Ling" (灵).
+- The user wants to roleplay a specific situation: "${roleContext}".
+- Play the appropriate role based on this situation.
+- Be natural and concise (1-2 short sentences).
+- Ask questions to keep the conversation going.
+- **VERY IMPORTANT:** Analyze the user's *last* message for grammatical errors.
+- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
+- The JSON object MUST have the keys: "chinese", "pinyin", "korean", "correction".
+- Set "correction" to \`null\` if the user's last message was correct.
+`;
         }
         
         const contents = [
@@ -201,7 +201,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
     
     } else if (action === 'start_roleplay_chat') {
         let roleplayStartPrompt = '';
-        
         if (roleContext === 'restaurant') {
             roleplayStartPrompt = `You are "Ling" (灵), acting as a helpful RESTAURANT WAITER (餐厅服务员).
 - Your goal is to start a conversation with a customer who just sat down.
@@ -209,9 +208,7 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\` (this is the first message).
 - Ask a simple, natural opening question.
-- Example: {"chinese": "您好！您想现在点菜吗？", "pinyin": "Nínhǎo! Nín xiǎng xiànzài diǎncài ma?", "korean": "안녕하세요! 지금 주문하시겠어요?", "correction": null}
-- Example: {"chinese": "您好，这是菜单。请问您几位？", "pinyin": "Nínhǎo, zhè shì càidān. Qǐngwèn nín jǐ wèi?", "korean": "안녕하세요, 메뉴입니다. 몇 분이세요?", "correction": null}`;
-        
+- Example: {"chinese": "您好！您想现在点菜吗？", "pinyin": "Nínhǎo! Nín xiǎng xiànzài diǎncài ma?", "korean": "안녕하세요! 지금 주문하시겠어요?", "correction": null}`;
         } else if (roleContext === 'shopping') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a friendly SHOPKEEPER (售货员).
 - Your goal is to start a conversation with a customer who just entered your store.
@@ -220,7 +217,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - Set "correction" to \`null\`.
 - Ask a simple, natural opening question.
 - Example: {"chinese": "您好，欢迎光临！您想找点什么？", "pinyin": "Nínhǎo, huānyíng guānglín! Nín xiǎng zhǎo diǎn shénme?", "korean": "안녕하세요, 어서오세요! 찾으시는 거 있으신가요?", "correction": null}`;
-       
         } else if (roleContext === 'taxi') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a TAXI DRIVER (出租车司机).
 - Your goal is to start a conversation with a passenger who just got in your taxi.
@@ -229,7 +225,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - Set "correction" to \`null\`.
 - Ask a simple, natural opening question.
 - Example: {"chinese": "您好！请问您要去哪儿？", "pinyin": "Nínhǎo! Qǐngwèn nín yào qù nǎr?", "korean": "안녕하세요! 어디로 가시나요?", "correction": null}`;
-        
         } else if (roleContext === 'daily_friend') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a close FRIEND (朋友).
 - Your goal is to start a casual, friendly chat.
@@ -237,9 +232,7 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\`.
 - Ask a simple, natural opening question.
-- Example: {"chinese": "嘿！最近怎么样？", "pinyin": "Hēi! Zuìjìn zěnmeyàng?", "korean": "안녕! 요즘 어떻게 지내?", "correction": null}
-- Example: {"chinese": "你今天忙不忙啊？", "pinyin": "Nǐ jīntiān máng bù máng a?", "korean": "너 오늘 바빠?", "correction": null}`;
-
+- Example: {"chinese": "嘿！最近怎么样？", "pinyin": "Hēi! Zuìjìn zěnmeyàng?", "korean": "안녕! 요즘 어떻게 지내?", "correction": null}`;
         } else if (roleContext === 'daily_lover') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a caring BOYFRIEND/GIRLFRIEND (男朋友/女朋友).
 - Your goal is to start an affectionate chat.
@@ -247,9 +240,7 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\`.
 - Ask a simple, warm opening question.
-- Example: {"chinese": "宝贝，在做什么呢？", "pinyin": "Bǎobèi, zài zuò shénme ne?", "korean": "자기야, 뭐하고 있어?", "correction": null}
-- Example: {"chinese": "我想你了，你呢？", "pinyin": "Wǒ xiǎng nǐ le, nǐ ne?", "korean": "보고 싶다, 너는?", "correction": null}`;
-
+- Example: {"chinese": "宝贝，在做什么呢？", "pinyin": "Bǎobèi, zài zuò shénme ne?", "korean": "자기야, 뭐하고 있어?", "correction": null}`;
         } else if (roleContext === 'daily_family') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a close FAMILY MEMBER (家人).
 - Your goal is to start a comfortable chat.
@@ -257,9 +248,7 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\`.
 - Ask a simple, caring opening question.
-- Example: {"chinese": "今天过得怎么样？吃饭了吗？", "pinyin": "Jīntiān guòde zěnmeyàng? Chīfàn le ma?", "korean": "오늘 어떻게 보냈어? 밥은 먹었고?", "correction": null}
-- Example: {"chinese": "下班了吗？", "pinyin": "Xiàbān le ma?", "korean": "퇴근했어?", "correction": null}`;
-
+- Example: {"chinese": "今天过得怎么样？吃饭了吗？", "pinyin": "Jīntiān guòde zěnmeyàng? Chīfàn le ma?", "korean": "오늘 어떻게 보냈어? 밥은 먹었고?", "correction": null}`;
         } else if (roleContext === 'daily_colleague') {
              roleplayStartPrompt = `You are "Ling" (灵), acting as a friendly COLLEAGUE (同事).
 - Your goal is to start a polite, work-related chat.
@@ -267,14 +256,12 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
 - Set "correction" to \`null\`.
 - Ask a simple, polite opening question.
-- Example: {"chinese": "中午一起吃饭吗？", "pinyin": "Zhōngwǔ yìqǐ chīfàn ma?", "korean": "점심 같이 먹을래요?", "correction": null}
-- Example: {"chinese": "早！今天感觉怎么样？", "pinyin": "Zǎo! Jīntiān gǎnjué zěnmeyàng?", "korean": "좋은 아침! 오늘 컨디션 어때요?", "correction": null}`;
-        
+- Example: {"chinese": "中午一起吃饭吗？", "pinyin": "Zhōngwǔ yìqǐ chīfàn ma?", "korean": "점심 같이 먹을래요?", "correction": null}`;
         } else {
-             // [★ 수정] 미리 정의되지 않은 상황은 '커스텀 시나리오'로 처리
+             // 커스텀 시나리오
              roleplayStartPrompt = `You are "Ling" (灵).
 - The user wants to roleplay a specific situation: "${roleContext}".
-- Play the appropriate role based on this situation. (e.g., if the user says "lost wallet", act as a police officer or a passerby).
+- Play the appropriate role based on this situation.
 - Your goal is to start the conversation naturally based on this scenario.
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
 - The JSON object must have these exact keys: "chinese", "pinyin", "korean", "correction".
@@ -283,7 +270,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - Example for custom scenario "Buying a train ticket": {"chinese": "您好，请问您要去哪里？", "pinyin": "Nínhǎo, qǐngwèn nín yào qù nǎlǐ?", "korean": "안녕하세요, 어디로 가시나요?", "correction": null}`;
         }
 
-        // [★ 수정] apiRequestBody 생성 로직 통합
         const instructionRole = roleContext ? `act according to the scenario: "${roleContext}"` : `act as a conversational partner`;
         
         const contents = [
@@ -294,7 +280,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         apiRequestBody = { contents };
 
     } else if (action === 'generate_today_conversation') {
-        // [★ 수정] 대화 턴 수 증가
         const conversationSystemPrompt = `You are a creative scriptwriter. Your task is to generate a short, natural dialogue based on two specific Chinese patterns provided by the user.
 - The dialogue must be between two speakers: "Man" (👨‍💼) and "Woman" (👩‍💼).
 - The dialogue must be 5 to 7 turns long (5-7 lines for Man, 5-7 lines for Woman, total 10-14 lines).
@@ -323,19 +308,18 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         apiRequestBody = { contents };
 
     } else if (action === 'generate_situational_listening') {
-        let scenarioDescription = scenario;
-        if (scenario === 'restaurant') scenarioDescription = '식당 (Restaurant)';
-        else if (scenario === 'shopping') scenarioDescription = '쇼핑 (Shopping)';
-        else if (scenario === 'taxi') scenarioDescription = '택시 (Taxi)';
-        else if (scenario === 'airport') scenarioDescription = '공항 (Airport)';
-        else if (scenario === 'today_conversation') scenarioDescription = '오늘의 패턴 대화';
-        else if (scenario === 'hotel') scenarioDescription = '호텔 (Hotel)';
-        else if (scenario === 'directions') scenarioDescription = '길 묻기 (Asking for directions)';
-        else if (scenario === 'hospital') scenarioDescription = '병원 또는 약국 (Hospital/Pharmacy)';
+        let scenarioKorean = scenario;
+        if (scenario === 'restaurant') scenarioKorean = '식당';
+        else if (scenario === 'shopping') scenarioKorean = '쇼핑';
+        else if (scenario === 'taxi') scenarioKorean = '택시';
+        else if (scenario === 'airport') scenarioKorean = '공항';
+        else if (scenario === 'today_conversation') scenarioKorean = '오늘의 패턴 대화';
+        else if (scenario === 'hotel') scenarioKorean = '호텔';
+        else if (scenario === 'directions') scenarioKorean = '길 묻기';
+        else if (scenario === 'hospital') scenarioKorean = '병원 또는 약국';
         
-        // [★ 수정] 대화 턴 수 증가
         const listeningSystemPrompt = `You are a creative scriptwriter. Your task is to generate a short, natural dialogue for a specific situation.
-- The situation is: "${scenarioDescription}".
+- The situation is: "${scenarioKorean}" (in ${scenario}).
 - The dialogue must be between two speakers: "Man" (👨‍💼) and "Woman" (👩‍💼).
 - The dialogue must be 5 to 7 turns long (5-7 lines for Man, 5-7 lines for Woman, total 10-14 lines).
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
@@ -390,7 +374,23 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         apiRequestBody = { contents };
         
     } else if (action === 'correct_writing') {
-        const correctionSystemPrompt = `... (생략) ...`;
+        // [★ 생략된 프롬프트 복원]
+        const correctionSystemPrompt = `You are a helpful Chinese language tutor.
+Your goal is to correct the user's Chinese sentence for grammar, vocabulary, and naturalness.
+
+**Instructions:**
+1. Analyze the user's text.
+2. Provide a corrected version (Simplified Chinese).
+3. Provide a helpful explanation in Korean about *why* it was corrected or how to improve it.
+4. Output MUST be a single, valid JSON object.
+
+**JSON Structure:**
+{
+  "corrected_sentence": "Corrected Chinese text",
+  "explanation": "Explanation in Korean"
+}
+
+**User Input:** "${text}"`;
         const contents = [
             { role: "user", parts: [{ text: correctionSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I understand. I will correct the user's text and respond in the required JSON format (corrected_sentence, explanation)." }] },
@@ -399,7 +399,18 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         apiRequestBody = { contents };
         
     } else if (action === 'get_writing_topic') {
-        const topicSystemPrompt = `... (생략) ...`;
+        // [★ 생략된 프롬프트 복원]
+        const topicSystemPrompt = `You are a Chinese language tutor.
+Your goal is to provide a simple, interesting topic for a beginner/intermediate learner to write a short journal entry about.
+
+**Instructions:**
+1. The topic should be in Korean.
+2. Output MUST be a single, valid JSON object.
+
+**JSON Structure:**
+{
+  "topic": "Suggested topic in Korean (e.g., '가장 좋아하는 계절과 그 이유')"
+}`;
         const contents = [
             { role: "user", parts: [{ text: topicSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I understand. I will provide a simple writing topic in Korean, formatted as the requested JSON." }] },
@@ -408,36 +419,54 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         apiRequestBody = { contents };
 
     } else if (action === 'get_character_info') {
-        // [★ 수정] '간체자 학습' 오류 해결을 위해 프롬프트 수정
-        const characterSystemPrompt = `You are an AI Chinese lexicographer. Your goal is to provide detailed information about a single Chinese character in a specific JSON format.
-- Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
-- The JSON object must have these exact keys: "char" (string), "pinyin" (string), "meaning" (string), and "examples" (array).
-- "char": The character itself.
-- "pinyin": The main pinyin.
-- "meaning": The primary Korean meaning.
-- "examples": An array of 2-3 common words that use this character.
-- Each object in the "examples" array must have these exact keys: "word" (string), "pinyin" (string), "meaning" (string, in Korean).
+        // [★ 수정] 간체자 심화 학습을 위한 프롬프트 (최신 버전 유지)
+        const characterSystemPrompt = `You are an expert Chinese etymologist and teacher.
+Provide a comprehensive analysis of the Chinese character "${text}" in a strict JSON format.
 
-- Example for character "好":
+**JSON Structure:**
 {
-  "char": "好",
-  "pinyin": "hǎo",
-  "meaning": "좋다",
-  "examples": [
-    { "word": "你好", "pinyin": "nǐ hǎo", "meaning": "안녕하세요" },
-    { "word": "好看", "pinyin": "hǎo kàn", "meaning": "보기 좋다, 예쁘다" },
-    { "word": "好久", "pinyin": "hǎo jiǔ", "meaning": "오래" }
+  "char": "${text}",
+  "pinyin": "Pinyin with tone marks",
+  "meaning": "Korean Meaning",
+  "etymology": "Brief explanation of origin/components in Korean (e.g., '사람 인(人)과 나무 목(木)이 합쳐져 사람이 나무에 기대 쉬는 모습')",
+  "caution": {
+    "similar_char": "A character that looks similar (e.g., '土' vs '士')",
+    "tip": "How to distinguish them in Korean"
+  },
+  "related_words": [
+    { "word": "Compound Word 1", "pinyin": "pinyin", "meaning": "Korean meaning" },
+    { "word": "Compound Word 2", "pinyin": "pinyin", "meaning": "Korean meaning" },
+    { "word": "Compound Word 3", "pinyin": "pinyin", "meaning": "Korean meaning" }
   ]
-}`;
+}
+
+**Important Instructions:**
+- All explanations MUST be in Korean.
+- If there is no confusing similar character, set "caution" to null.
+- "related_words" should show how this character expands into common words (HSK 1-5 level prefered).`;
+
         const contents = [
             { role: "user", parts: [{ text: characterSystemPrompt }] },
-            { role: "model", parts: [{ text: "Okay, I understand. I will provide information for the requested character in the specified JSON format." }] },
-            { role: "user", parts: [{ text: `Please provide information for the character: "${text}"` }] }
+            { role: "model", parts: [{ text: "Okay, I will analyze the character and provide the etymology, caution, and related words in the required JSON format." }] },
+            { role: "user", parts: [{ text: `Please analyze the character "${text}" now.` }] }
         ];
         apiRequestBody = { contents };
 
     } else if (action === 'evaluate_pronunciation') {
-        const pronunciationSystemPrompt = `... (생략: 발음 평가 프롬프트) ...`;
+        // [★ 생략된 프롬프트 복원]
+        const pronunciationSystemPrompt = `You are a strict Chinese pronunciation coach.
+Compare the "Original" text with what the "User said" (transcribed text).
+
+**Instructions:**
+1. Analyze if the user's spoken text matches the original text closely enough to be understood.
+2. Be lenient with minor homophones but strict with completely different words.
+3. Output MUST be a single, valid JSON object.
+
+**JSON Structure:**
+{
+  "is_correct": true or false,
+  "feedback": "Feedback in Korean (e.g., '성조가 조금 다르지만 훌륭해요!' or 'XX 발음을 더 주의해보세요.')"
+}`;
         const contents = [
             { role: "user", parts: [{ text: pronunciationSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I understand. I will act as a pronunciation coach and respond in the required JSON format (is_correct, feedback)." }] },
@@ -446,6 +475,7 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         apiRequestBody = { contents };
 
     } else if (action === 'suggest_reply') {
+        // [★ 생략된 프롬프트 복원]
         const suggestSystemPrompt = `You are "Ling" (灵), a friendly native Chinese speaker. A user is in a conversation and wants suggestions for what to say next.
 - The user provides the conversation history.
 - Your goal is to provide 3 distinct reply suggestions.
@@ -470,7 +500,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
             { role: "user", parts: [{ text: suggestSystemPrompt }] },
             { role: "model", parts: [{ text: "Okay, I will provide reply suggestions including pinyin and Korean meaning in the specified JSON format." }] }, 
             ...history,
-            // [★ 수정] 500 오류 해결: AI에게 작업을 명확히 지시하는 마지막 프롬프트를 추가합니다.
             { role: "user", parts: [{ text: "Please provide 3 suggestions for a reply to the last message, based on our conversation." }] }
         ];
         apiRequestBody = { contents };
@@ -478,7 +507,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
     else if (action === 'tts') {
         apiUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
         
-        // [★ 수정] 3번 문제(목소리) 해결: speaker 값에 따라 목소리 선택
         let voiceName = 'cmn-CN-Wavenet-B'; // 기본값 (남성)
         if (speaker === 'Woman') {
             voiceName = 'cmn-CN-Wavenet-A'; // 여성
@@ -486,7 +514,7 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         
         apiRequestBody = {
             input: { text: text },
-            voice: { languageCode: 'cmn-CN', name: voiceName }, // [★ 수정]
+            voice: { languageCode: 'cmn-CN', name: voiceName }, 
             audioConfig: { audioEncoding: 'MP3' }
         };
     } else {
@@ -513,45 +541,28 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         return response.status(200).json(data);
     }
 
-    // [★ 수정] 'suggest_reply' 액션의 파싱 로직을 (tts처럼) 앞으로 이동시킵니다.
-    // (이 로직은 서버에서 파싱을 완료하고 클라이언트에 깔끔한 JSON을 보내야 합니다.)
     if (action === 'suggest_reply') {
         try {
-            // 1. AI 응답 텍스트 가져오기 (존재하지 않을 수 있음)
             const aiResponseText = data.candidates[0]?.content?.parts?.[0]?.text;
             if (!aiResponseText) {
                  throw new Error("AI response part is missing or empty.");
             }
-            
-            // 2. 헬퍼 함수로 JSON 추출
             const cleanedText = extractJson(aiResponseText); 
-
-            if (!cleanedText) { // JSON 추출 실패
+            if (!cleanedText) {
                 throw new Error("AI response did not contain a valid JSON block.");
             }
-
-            // 3. 추출된 JSON 파싱
             const suggestionData = JSON.parse(cleanedText);
-
-            // 4. 데이터 확인 후 반환
             if (suggestionData && suggestionData.suggestions && Array.isArray(suggestionData.suggestions)) {
                 return response.status(200).json(suggestionData);
             } else {
                 throw new Error("Parsed JSON does not contain 'suggestions' array.");
             }
-            
         } catch (e) {
-            // 5. 파싱 또는 추출 실패 시
             console.error(`[api/gemini.js] suggest_reply parsing error: ${e.message}`, data.candidates?.[0]?.content?.parts?.[0]?.text);
-            // handlers.js의 catch 블록으로 이 오류 메시지를 전송
-            // [★ 수정] 오류 로그 2번(candidates 확인 실패)을 방지하기 위해 구체적인 오류 메시지 전송
             throw new Error("AI가 유효한 답변 추천 JSON을 반환하지 않았습니다. (파싱 실패)"); 
         }
     }
 
-
-    // [★ 수정] suggest_reply가 위에서 처리되었으므로, 이 체크는 나머지 액션에만 해당됩니다.
-    // (번역, 채팅, 패턴 채팅, 롤플레잉, 듣기 대본, 작문 교정 등)
     if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
         console.error("Invalid response structure from Google API (non-suggest_reply):", data);
          if (data.promptFeedback && data.promptFeedback.blockReason) {
@@ -564,8 +575,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         throw new Error("AI로부터 유효한 응답 구조를 받지 못했습니다. (candidates 확인 실패)");
     }
 
-    // (chat, generate_..., correct_writing 등)은 data 전체를 반환
-    // (클라이언트 측의 handlers.js에 있는 extractJson 함수가 이 응답을 처리합니다)
     return response.status(200).json(data);
 
   } catch (error) {
