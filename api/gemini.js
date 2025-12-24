@@ -9,7 +9,8 @@ export default async function handler(request, response) {
   }
 
   // 2. 프런트엔드에서 보낸 요청 데이터를 받습니다.
-  const { action, text, systemPrompt, history, pattern, originalText, userText, roleContext, pattern1, pattern2, scenario, speaker } = request.body;
+  // [수정] previousQuestions 추가
+  const { action, text, systemPrompt, history, pattern, originalText, userText, roleContext, pattern1, pattern2, scenario, speaker, previousQuestions } = request.body;
 
   // [JSON 추출 헬퍼 함수]
   function extractJson(text) {
@@ -346,6 +347,12 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         apiRequestBody = { contents };
 
     } else if (action === 'generate_practice') {
+        // [수정] 프롬프트에 제외해야 할 이전 문장들을 포함시킵니다.
+        let avoidInstruction = "";
+        if (previousQuestions && previousQuestions.length > 0) {
+            avoidInstruction = `\n\n**IMPORTANT:** Do NOT use the following sentences (or very similar ones), as the user has already practiced them:\n${previousQuestions.map(q => `- ${q}`).join('\n')}\nGenerate a COMPLETELY NEW sentence.`;
+        }
+
         const practiceSystemPrompt = `You are an AI language tutor. Your goal is to create a single practice problem for a user learning Chinese based on a specific pattern.
 - The user needs to translate a Korean sentence into Chinese.
 - Your entire response MUST be a single, valid JSON object and nothing else. Do not use markdown backticks.
@@ -353,7 +360,7 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
 - "korean": A simple Korean sentence that *requires* the pattern "${pattern}" to be translated naturally.
 - "chinese": The correct Chinese translation of the "korean" sentence, using the pattern "${pattern}".
 - "pinyin": The pinyin for the "chinese" sentence.
-- "practiceVocab": An array of 1-3 key vocabulary objects found in the "chinese" sentence. Each object must have keys: "word", "pinyin", "meaning".
+- "practiceVocab": An array of 1-3 key vocabulary objects found in the "chinese" sentence. Each object must have keys: "word", "pinyin", "meaning".${avoidInstruction}
 
 - Example for pattern "A是A, 但是B":
 {
