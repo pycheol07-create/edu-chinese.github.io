@@ -87,22 +87,30 @@ export async function showNextCharacter() {
             etymologyHtml = `
                 <div class="bg-amber-50 p-3 rounded-lg border border-amber-100">
                     <h4 class="text-sm font-bold text-amber-800 mb-1">🔍 한자 해부학 (어원)</h4>
-                    <p class="text-sm text-gray-700 leading-relaxed">${charData.etymology}</p>
+                    <p class="text-sm text-gray-700 leading-relaxed text-justify">${charData.etymology}</p>
                 </div>`;
         }
 
-        // 2. 닮은꼴 주의보 섹션 HTML 생성
+        // 2. 닮은꼴 주의보 섹션 HTML 생성 (수정: 유사 한자 정보 표시 강화)
         let cautionHtml = '';
         if (charData.caution && charData.caution.similar_char) {
+            const similarInfo = charData.caution.similar_char_meaning 
+                ? `<span class="text-xs text-gray-500 block mt-1 ml-1">(${charData.caution.similar_char_pinyin || ''} ${charData.caution.similar_char_meaning})</span>` 
+                : '';
+
             cautionHtml = `
                 <div class="bg-red-50 p-3 rounded-lg border border-red-100 flex items-start space-x-3">
                     <div class="flex-shrink-0 text-2xl">⚠️</div>
                     <div>
                         <h4 class="text-sm font-bold text-red-800 mb-1">닮은꼴 주의보!</h4>
-                        <p class="text-sm text-gray-700">
-                            <span class="font-bold text-red-600 text-lg mx-1">${charData.caution.similar_char}</span>와 헷갈리지 마세요.
-                            <br><span class="text-xs text-gray-500">${charData.caution.tip}</span>
-                        </p>
+                        <div class="text-sm text-gray-700">
+                            <div class="flex items-center flex-wrap">
+                                <span class="font-bold text-red-600 text-lg mx-1">${charData.caution.similar_char}</span>
+                                <span>와 헷갈리지 마세요.</span>
+                                ${similarInfo}
+                            </div>
+                            <p class="mt-2 text-xs text-gray-600 border-t border-red-200 pt-1 leading-snug">${charData.caution.tip}</p>
+                        </div>
                     </div>
                 </div>`;
         }
@@ -134,7 +142,7 @@ export async function showNextCharacter() {
                 </div>`;
         }
 
-        // 전체 렌더링
+        // 전체 렌더링 (수정: 한국어 발음(음/훈) 표시 추가)
         dom.characterInfo.innerHTML = `
             <div class="text-center p-4 bg-white border-b-2 border-gray-100 mb-4 sticky top-0 z-10">
                 <p class="text-6xl font-bold chinese-text text-red-600 shadow-sm inline-block">${charData.char}</p>
@@ -142,6 +150,7 @@ export async function showNextCharacter() {
                     <span class="text-xl font-medium text-gray-800 mr-2">${charData.pinyin}</span>
                     <span class="text-lg text-gray-500">${charData.meaning}</span>
                 </div>
+                ${charData.korean_pronunciation ? `<p class="text-sm text-gray-400 mt-1 font-medium">(${charData.korean_pronunciation})</p>` : ''}
             </div>
             
             <div class="space-y-4 px-1 pb-4">

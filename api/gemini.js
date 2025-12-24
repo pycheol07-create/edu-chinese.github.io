@@ -9,7 +9,6 @@ export default async function handler(request, response) {
   }
 
   // 2. 프런트엔드에서 보낸 요청 데이터를 받습니다.
-  // [수정] previousQuestions 추가
   const { action, text, systemPrompt, history, pattern, originalText, userText, roleContext, pattern1, pattern2, scenario, speaker, previousQuestions } = request.body;
 
   // [JSON 추출 헬퍼 함수]
@@ -347,7 +346,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         apiRequestBody = { contents };
 
     } else if (action === 'generate_practice') {
-        // [수정] 프롬프트에 제외해야 할 이전 문장들을 포함시킵니다.
         let avoidInstruction = "";
         if (previousQuestions && previousQuestions.length > 0) {
             avoidInstruction = `\n\n**IMPORTANT:** Do NOT use the following sentences (or very similar ones), as the user has already practiced them:\n${previousQuestions.map(q => `- ${q}`).join('\n')}\nGenerate a COMPLETELY NEW sentence.`;
@@ -381,7 +379,6 @@ Your goal is to translate the user's Korean text into natural, conversational Ch
         apiRequestBody = { contents };
         
     } else if (action === 'correct_writing') {
-        // [★ 생략된 프롬프트 복원]
         const correctionSystemPrompt = `You are a helpful Chinese language tutor.
 Your goal is to correct the user's Chinese sentence for grammar, vocabulary, and naturalness.
 
@@ -406,7 +403,6 @@ Your goal is to correct the user's Chinese sentence for grammar, vocabulary, and
         apiRequestBody = { contents };
         
     } else if (action === 'get_writing_topic') {
-        // [★ 생략된 프롬프트 복원]
         const topicSystemPrompt = `You are a Chinese language tutor.
 Your goal is to provide a simple, interesting topic for a beginner/intermediate learner to write a short journal entry about.
 
@@ -426,7 +422,7 @@ Your goal is to provide a simple, interesting topic for a beginner/intermediate 
         apiRequestBody = { contents };
 
     } else if (action === 'get_character_info') {
-        // [★ 수정] 간체자 심화 학습을 위한 프롬프트 (최신 버전 유지)
+        // [수정] 간체자 학습 프롬프트: 한국어 발음, 유사 한자 뜻 추가, 어원 간략화 요청
         const characterSystemPrompt = `You are an expert Chinese etymologist and teacher.
 Provide a comprehensive analysis of the Chinese character "${text}" in a strict JSON format.
 
@@ -435,9 +431,12 @@ Provide a comprehensive analysis of the Chinese character "${text}" in a strict 
   "char": "${text}",
   "pinyin": "Pinyin with tone marks",
   "meaning": "Korean Meaning",
-  "etymology": "Brief explanation of origin/components in Korean (e.g., '사람 인(人)과 나무 목(木)이 합쳐져 사람이 나무에 기대 쉬는 모습')",
+  "korean_pronunciation": "Korean sound/meaning (e.g., '사람 인' for '人', '클 대' for '大')", 
+  "etymology": "Very brief and summarized explanation of origin in Korean (1-2 sentences max)",
   "caution": {
     "similar_char": "A character that looks similar (e.g., '土' vs '士')",
+    "similar_char_pinyin": "Pinyin of similar char",
+    "similar_char_meaning": "Meaning of similar char in Korean",
     "tip": "How to distinguish them in Korean"
   },
   "related_words": [
@@ -460,7 +459,6 @@ Provide a comprehensive analysis of the Chinese character "${text}" in a strict 
         apiRequestBody = { contents };
 
     } else if (action === 'evaluate_pronunciation') {
-        // [★ 생략된 프롬프트 복원]
         const pronunciationSystemPrompt = `You are a strict Chinese pronunciation coach.
 Compare the "Original" text with what the "User said" (transcribed text).
 
@@ -482,7 +480,6 @@ Compare the "Original" text with what the "User said" (transcribed text).
         apiRequestBody = { contents };
 
     } else if (action === 'suggest_reply') {
-        // [★ 생략된 프롬프트 복원]
         const suggestSystemPrompt = `You are "Ling" (灵), a friendly native Chinese speaker. A user is in a conversation and wants suggestions for what to say next.
 - The user provides the conversation history.
 - Your goal is to provide 3 distinct reply suggestions.
