@@ -422,15 +422,19 @@ Your goal is to provide a simple, interesting topic for a beginner/intermediate 
         apiRequestBody = { contents };
 
     } else if (action === 'get_character_info') {
-        // [수정] 간체자 학습 프롬프트: 한국어 발음, 유사 한자 뜻 추가, 어원 간략화 요청
+        // [수정] 간체자 학습 프롬프트: 다음자 정보(all_readings) 추가 요청
         const characterSystemPrompt = `You are an expert Chinese etymologist and teacher.
 Provide a comprehensive analysis of the Chinese character "${text}" in a strict JSON format.
 
 **JSON Structure:**
 {
   "char": "${text}",
-  "pinyin": "Pinyin with tone marks",
-  "meaning": "Korean Meaning",
+  "pinyin": "Main Pinyin (e.g., 'le')",
+  "meaning": "Main Meaning (e.g., '완료')",
+  "all_readings": [
+     { "pinyin": "pinyin 1", "meaning": "meaning for pinyin 1" },
+     { "pinyin": "pinyin 2", "meaning": "meaning for pinyin 2" }
+  ],
   "korean_pronunciation": "Korean sound/meaning (e.g., '사람 인' for '人', '클 대' for '大')", 
   "etymology": "Very brief and summarized explanation of origin in Korean (1-2 sentences max)",
   "caution": {
@@ -448,12 +452,14 @@ Provide a comprehensive analysis of the Chinese character "${text}" in a strict 
 
 **Important Instructions:**
 - All explanations MUST be in Korean.
+- If the character has multiple pronunciations (polyphone/多音字) or multiple meanings, list ALL of them in "all_readings".
+- If it has only one pronunciation/meaning, put that one in "all_readings" as well.
 - If there is no confusing similar character, set "caution" to null.
 - "related_words" should show how this character expands into common words (HSK 1-5 level prefered).`;
 
         const contents = [
             { role: "user", parts: [{ text: characterSystemPrompt }] },
-            { role: "model", parts: [{ text: "Okay, I will analyze the character and provide the etymology, caution, and related words in the required JSON format." }] },
+            { role: "model", parts: [{ text: "Okay, I will analyze the character and provide all readings, etymology, caution, and related words in the required JSON format." }] },
             { role: "user", parts: [{ text: `Please analyze the character "${text}" now.` }] }
         ];
         apiRequestBody = { contents };

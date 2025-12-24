@@ -40,7 +40,7 @@ export function showNextWord() {
 }
 
 /**
- * [수정] 간체자 학습 모달에 심화 정보(어원, 주의사항, 파생단어)를 표시합니다.
+ * [수정] 간체자 학습 모달에 심화 정보(어원, 주의사항, 파생단어, 다중 발음)를 표시합니다.
  */
 export async function showNextCharacter() {
     if (state.allCharacters.length === 0) {
@@ -81,6 +81,24 @@ export async function showNextCharacter() {
 
         if (dom.charTtsBtn) dom.charTtsBtn.dataset.text = charData.char;
 
+        // [수정] 헤더: 발음/뜻 목록 생성 (다중 발음 지원)
+        let readingsHtml = '';
+        if (charData.all_readings && Array.isArray(charData.all_readings) && charData.all_readings.length > 0) {
+            readingsHtml = charData.all_readings.map(r => `
+                <div class="flex items-center justify-center space-x-2 mt-1">
+                    <span class="text-xl font-medium text-gray-800">${r.pinyin}</span>
+                    <span class="text-gray-500">: ${r.meaning}</span>
+                </div>
+            `).join('');
+        } else {
+            // fallback (all_readings가 없을 때)
+            readingsHtml = `
+                <div class="mt-2">
+                    <span class="text-xl font-medium text-gray-800 mr-2">${charData.pinyin}</span>
+                    <span class="text-lg text-gray-500">${charData.meaning}</span>
+                </div>`;
+        }
+
         // 1. 어원/해부학 섹션 HTML 생성
         let etymologyHtml = '';
         if (charData.etymology) {
@@ -91,7 +109,7 @@ export async function showNextCharacter() {
                 </div>`;
         }
 
-        // 2. 닮은꼴 주의보 섹션 HTML 생성 (수정: 유사 한자 정보 표시 강화)
+        // 2. 닮은꼴 주의보 섹션 HTML 생성 (유사 한자 정보 표시 강화)
         let cautionHtml = '';
         if (charData.caution && charData.caution.similar_char) {
             const similarInfo = charData.caution.similar_char_meaning 
@@ -142,15 +160,14 @@ export async function showNextCharacter() {
                 </div>`;
         }
 
-        // 전체 렌더링 (수정: 한국어 발음(음/훈) 표시 추가)
+        // 전체 렌더링 (헤더 부분 수정됨)
         dom.characterInfo.innerHTML = `
             <div class="text-center p-4 bg-white border-b-2 border-gray-100 mb-4 sticky top-0 z-10">
                 <p class="text-6xl font-bold chinese-text text-red-600 shadow-sm inline-block">${charData.char}</p>
                 <div class="mt-2">
-                    <span class="text-xl font-medium text-gray-800 mr-2">${charData.pinyin}</span>
-                    <span class="text-lg text-gray-500">${charData.meaning}</span>
+                    ${readingsHtml}
                 </div>
-                ${charData.korean_pronunciation ? `<p class="text-sm text-gray-400 mt-1 font-medium">(${charData.korean_pronunciation})</p>` : ''}
+                ${charData.korean_pronunciation ? `<p class="text-sm text-gray-400 mt-2 font-medium">(${charData.korean_pronunciation})</p>` : ''}
             </div>
             
             <div class="space-y-4 px-1 pb-4">
